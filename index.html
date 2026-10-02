@@ -1,0 +1,4374 @@
+<!DOCTYPE html>
+<html lang="pt-BR" translate="no">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+
+<title>Copiloto Entregas V7.1</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+
+<style>
+
+body{
+margin:0;
+font-family:'Inter','Segoe UI',Arial,sans-serif;
+background:#f6f5f3;
+padding-bottom:30px;
+-webkit-font-smoothing:antialiased;
+}
+
+h1,h2,h3{
+font-family:'Poppins','Inter',sans-serif;
+}
+
+header{
+background:linear-gradient(135deg,#ff7a1a 0%,#ff6a00 55%,#e85800 100%);
+color:white;
+padding:22px 20px 26px 20px;
+text-align:left;
+box-shadow:0 4px 16px rgba(255,106,0,.25);
+position:relative;
+overflow:hidden;
+}
+
+header .marca{
+display:flex;
+align-items:center;
+gap:10px;
+font-family:'Poppins',sans-serif;
+font-size:22px;
+font-weight:700;
+letter-spacing:-.3px;
+position:relative;
+z-index:1;
+}
+
+header .selo{
+width:38px;
+height:38px;
+background:rgba(255,255,255,.22);
+border-radius:11px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:20px;
+flex-shrink:0;
+}
+
+header .subtitulo{
+margin-top:4px;
+font-size:12.5px;
+font-weight:500;
+color:rgba(255,255,255,.85);
+position:relative;
+z-index:1;
+}
+
+header::after{
+content:"";
+position:absolute;
+right:-30px;
+top:-40px;
+width:150px;
+height:150px;
+border-radius:50%;
+background:rgba(255,255,255,.08);
+}
+
+.botao-som{
+position:absolute;
+top:16px;
+right:16px;
+width:auto;
+margin:0;
+padding:8px 10px;
+border-radius:10px;
+background:rgba(255,255,255,.2);
+font-size:16px;
+z-index:2;
+}
+
+.container{
+padding:15px;
+}
+
+.card{
+background:white;
+padding:18px;
+border-radius:18px;
+margin-bottom:15px;
+box-shadow:0 4px 18px rgba(20,20,20,.06);
+}
+
+.card h2{
+font-size:16px;
+margin:0 0 4px 0;
+color:#222;
+}
+
+.stats{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:15px;
+}
+
+.stat{
+background:#fff3eb;
+padding:14px 12px;
+border-radius:14px;
+text-align:center;
+}
+
+.stat div:first-child{
+font-size:11.5px;
+color:#8a6a4f;
+font-weight:600;
+letter-spacing:.2px;
+}
+
+.stat h2{
+margin:4px 0 0 0;
+font-size:22px;
+color:#222;
+}
+
+.stat.entregue-cor{ background:#eef0f2; }
+.stat.entregue-cor div:first-child{ color:#5b6472; }
+.stat.pendente-cor{ background:#fff3eb; }
+.stat.ocorrencia-cor{ background:#fdeaea; }
+.stat.ocorrencia-cor div:first-child{ color:#a34747; }
+
+.barra-progresso{
+margin-top:16px;
+background:#ececec;
+border-radius:20px;
+overflow:hidden;
+height:20px;
+box-shadow:inset 0 1px 3px rgba(0,0,0,.08);
+}
+
+.barra-progresso-fill{
+height:100%;
+background:linear-gradient(90deg,#34d399,#22c55e);
+width:0%;
+transition:width .4s ease;
+text-align:center;
+font-size:11px;
+font-weight:600;
+color:white;
+line-height:20px;
+white-space:nowrap;
+}
+
+input[type=file]{
+width:100%;
+margin-top:10px;
+font-size:14px;
+color:#555;
+}
+
+button{
+width:100%;
+padding:14px;
+border:none;
+border-radius:12px;
+font-size:15.5px;
+font-weight:600;
+margin-top:10px;
+cursor:pointer;
+transition:transform .1s ease, filter .15s ease;
+font-family:inherit;
+}
+
+button:active{
+transform:scale(.97);
+filter:brightness(.95);
+}
+
+.importar{
+background:linear-gradient(135deg,#ff8a3d,#ff6a00);
+color:white;
+box-shadow:0 4px 12px rgba(255,106,0,.3);
+}
+
+.waze{
+background:#00b7ff;
+color:white;
+box-shadow:0 4px 12px rgba(0,183,255,.25);
+}
+
+.toggle{
+background:#f0f0f0;
+color:#444;
+box-shadow:none;
+}
+
+.abas{
+display:flex;
+background:white;
+position:sticky;
+top:0;
+z-index:500;
+box-shadow:0 2px 6px rgba(0,0,0,.08);
+}
+
+.aba-btn{
+flex:1;
+margin:0;
+padding:14px 6px;
+border:none;
+border-right:1px solid rgba(255,106,0,.25);
+border-radius:0;
+background:white;
+color:#8a8a8a;
+font-size:13px;
+font-weight:600;
+font-family:inherit;
+border-bottom:3px solid transparent;
+cursor:pointer;
+transition:background .15s ease,color .15s ease;
+}
+
+.aba-btn:last-child{
+border-right:none;
+}
+
+.aba-btn.ativa{
+color:#ff6a00;
+background:#fff6ef;
+border-bottom:3px solid #ff6a00;
+}
+
+.aba-btn.ocorrencias-aba.ativa{
+color:#e74c3c;
+background:#fdeeee;
+border-bottom-color:#e74c3c;
+}
+
+.painel-aba{
+display:none;
+}
+
+.painel-aba.ativo{
+display:block;
+}
+
+#painelMapa{
+position:relative;
+overflow:hidden;
+}
+
+#mapa{
+height:calc(100vh - 130px);
+border-radius:0;
+margin-top:0;
+}
+
+.aviso-vazio{
+text-align:center;
+color:#999;
+padding:30px 10px;
+}
+
+.divisoria-entregues{
+display:flex;
+align-items:center;
+text-align:center;
+color:#2ecc71;
+font-weight:bold;
+font-size:13px;
+margin:20px 0 10px 0;
+}
+
+.divisoria-entregues::before,
+.divisoria-entregues::after{
+content:"";
+flex:1;
+height:1px;
+background:#cdeedc;
+}
+
+.divisoria-entregues span{
+padding:0 10px;
+}
+
+.pin-usuario{
+width:18px;
+height:18px;
+background:#2563eb;
+border:3px solid white;
+border-radius:50%;
+box-shadow:0 0 0 4px rgba(37,99,235,.35);
+animation:pulsoUsuario 2s infinite;
+}
+
+@keyframes pulsoUsuario{
+0%{ box-shadow:0 0 0 4px rgba(37,99,235,.35); }
+70%{ box-shadow:0 0 0 12px rgba(37,99,235,0); }
+100%{ box-shadow:0 0 0 4px rgba(37,99,235,0); }
+}
+
+/* Pin estilo "etiqueta" (Mercado Livre) */
+.pin-mapa{
+position:relative;
+width:25px;
+height:34px;
+}
+
+.pin-corpo{
+width:24px;
+height:24px;
+border-radius:50%;
+background:currentColor;
+border:2px solid white;
+box-shadow:0 2px 5px rgba(0,0,0,.45);
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.pin-corpo span{
+color:white;
+font-size:10px;
+font-weight:700;
+}
+
+.pin-mapa::after{
+content:"";
+position:absolute;
+left:50%;
+top:20px;
+transform:translateX(-50%);
+width:0;
+height:0;
+border-left:4.5px solid transparent;
+border-right:4.5px solid transparent;
+border-top:10px solid currentColor;
+filter:drop-shadow(0 2px 2px rgba(0,0,0,.25));
+}
+
+/* Parada selecionada no mapa: fica maior e com um anel de destaque,
+sempre acima dos demais pins */
+.pin-mapa.marcador-selecionado{
+transform:scale(1.3);
+transform-origin:bottom center;
+z-index:1000;
+animation:aparecerSelecionado .2s ease;
+}
+
+.pin-mapa.marcador-selecionado .pin-corpo{
+box-shadow:0 0 0 5px rgba(255,106,0,.35), 0 4px 10px rgba(0,0,0,.5);
+border-color:#fff6ef;
+}
+
+@keyframes aparecerSelecionado{
+0%{ transform:scale(1) translateY(0); }
+50%{ transform:scale(1.4) translateY(-4px); }
+100%{ transform:scale(1.3) translateY(0); }
+}
+
+/* Barra de resumo flutuante sobre o mapa */
+#resumoMapa{
+position:absolute;
+top:12px;
+left:12px;
+right:12px;
+background:white;
+border-radius:14px;
+padding:12px 14px;
+box-shadow:0 2px 10px rgba(0,0,0,.15);
+color:#333;
+font-size:13px;
+z-index:400;
+display:flex;
+flex-direction:column;
+gap:8px;
+}
+
+#resumoMapaTextos{
+display:flex;
+justify-content:space-between;
+font-weight:700;
+font-size:14px;
+}
+
+#resumoMapaOcorrencias{
+color:#c0392b;
+}
+
+.legenda-mapa{
+display:flex;
+gap:12px;
+flex-wrap:wrap;
+font-size:11.5px;
+color:#666;
+font-weight:500;
+}
+
+.legenda-mapa span{
+display:flex;
+align-items:center;
+gap:5px;
+}
+
+.ponto-legenda{
+width:9px;
+height:9px;
+border-radius:50%;
+display:inline-block;
+}
+
+#painelBuscaMapa{
+display:none;
+position:absolute;
+top:90px;
+right:64px;
+left:12px;
+background:white;
+border-radius:12px;
+padding:8px;
+box-shadow:0 4px 14px rgba(0,0,0,.25);
+z-index:399;
+gap:6px;
+}
+
+#painelBuscaMapa.aberto{
+display:flex;
+}
+
+#painelBuscaMapa input{
+flex:1;
+border:1px solid #e5e5e5;
+border-radius:8px;
+padding:7px 10px;
+font-size:13px;
+font-family:inherit;
+}
+
+#painelBuscaMapa button{
+width:auto;
+margin:0;
+padding:7px 12px;
+border-radius:8px;
+background:#ff6a00;
+color:white;
+font-size:14px;
+}
+
+.botao-flutuante-mapa{
+position:absolute;
+right:12px;
+width:44px;
+height:44px;
+padding:0;
+margin:0;
+border-radius:50%;
+background:white;
+box-shadow:0 2px 8px rgba(0,0,0,.2);
+font-size:19px;
+z-index:400;
+}
+
+.botao-flutuante-mapa.ativo{
+background:#ffe4cc;
+}
+
+#botaoCentralizar{
+position:absolute;
+top:202px;
+right:12px;
+width:44px;
+height:44px;
+padding:0;
+margin:0;
+border-radius:50%;
+background:white;
+box-shadow:0 2px 8px rgba(0,0,0,.2);
+font-size:20px;
+z-index:400;
+}
+
+#botaoAjustarPosicao{
+position:absolute;
+top:258px;
+right:12px;
+width:44px;
+height:44px;
+padding:0;
+margin:0;
+border-radius:50%;
+background:white;
+box-shadow:0 2px 8px rgba(0,0,0,.2);
+font-size:19px;
+z-index:400;
+}
+
+#botaoAjustarPosicao.ativo{
+background:#ffe4cc;
+box-shadow:0 0 0 3px rgba(255,106,0,.25), 0 2px 8px rgba(0,0,0,.2);
+}
+
+#statusLocalizacaoMapa{
+font-size:11.5px;
+font-weight:600;
+color:#5b6472;
+line-height:1.35;
+}
+
+#statusLocalizacaoMapa.ok{ color:#1f7a3d; }
+#statusLocalizacaoMapa.alerta{ color:#b45309; }
+#statusLocalizacaoMapa.erro{ color:#c0392b; }
+
+/* Fundo escurecido atrás do painel inferior */
+#fundoInfoMapa{
+display:none;
+position:absolute;
+top:0;left:0;right:0;bottom:0;
+background:rgba(0,0,0,.35);
+z-index:600;
+}
+
+#fundoInfoMapa.aberto{
+display:block;
+}
+
+/* Painel inferior (bottom sheet) com os dados da parada, estilo Mercado Livre */
+#painelInfoMapa{
+position:absolute;
+left:0;
+right:0;
+bottom:0;
+background:white;
+border-radius:18px 18px 0 0;
+box-shadow:0 -4px 16px rgba(0,0,0,.25);
+padding:10px 18px 18px 18px;
+transform:translateY(100%);
+transition:transform .25s ease;
+z-index:601;
+max-height:65%;
+overflow-y:auto;
+}
+
+#painelInfoMapa.aberto{
+transform:translateY(0);
+}
+
+.alca-painel{
+width:40px;
+height:5px;
+background:#ddd;
+border-radius:10px;
+margin:0 auto 12px auto;
+}
+
+.btn-linha{
+display:flex;
+gap:8px;
+margin-top:10px;
+}
+
+.btn-linha button{
+margin-top:0;
+padding:12px 6px;
+font-size:13px;
+}
+
+.entregue-btn{ background:#2ecc71; color:white; }
+.ocorrencia-btn{ background:#e74c3c; color:white; }
+.desfazer-btn{ background:#ccc; color:#333; }
+
+.grupo{
+background:white;
+padding:16px;
+border-radius:16px;
+margin-bottom:12px;
+box-shadow:0 3px 12px rgba(20,20,20,.06);
+border-left:5px solid #ff6a00;
+transition:opacity .2s ease, box-shadow .2s ease;
+}
+
+.grupo h3{
+margin:0;
+font-size:15.5px;
+color:#222;
+}
+
+.grupo.status-entregue{
+border-left-color:#9ca3af;
+opacity:.65;
+box-shadow:none;
+}
+
+.grupo.status-ocorrencia{
+border-left-color:#e74c3c;
+}
+
+/* Parada composta: um só cabeçalho, várias localizações dentro
+(ex: Parada 5 com casa 43, casa 45, casa 1 - mesma família/parada) */
+.parada-composta{
+background:white;
+padding:16px;
+border-radius:16px;
+margin-bottom:12px;
+box-shadow:0 3px 12px rgba(20,20,20,.06);
+}
+
+.parada-composta > h3{
+margin:0;
+font-size:15.5px;
+color:#222;
+}
+
+.badge-total-parada{
+display:inline-block;
+margin-top:8px;
+padding:6px 12px;
+border-radius:8px;
+background:#ffe4cc;
+color:#a34c00;
+font-weight:700;
+font-size:13.5px;
+}
+
+.sub-local{
+border-left:4px solid #ff6a00;
+padding:10px 0 8px 12px;
+margin-top:12px;
+}
+
+.sub-local.status-entregue{
+border-left-color:#9ca3af;
+opacity:.65;
+}
+
+.sub-local.status-ocorrencia{
+border-left-color:#e74c3c;
+}
+
+.endereco{
+margin-top:6px;
+font-size:14.5px;
+line-height:1.4;
+color:#444;
+}
+
+.nome-destinatario{
+margin-top:6px;
+font-size:14px;
+font-weight:600;
+color:#333;
+}
+
+.destaque-temporario{
+box-shadow:0 0 0 3px #ff6a00, 0 6px 16px rgba(0,0,0,.18) !important;
+}
+
+.toast-copiloto{
+position:fixed;
+left:50%;
+bottom:26px;
+transform:translateX(-50%) translateY(20px);
+background:#222;
+color:white;
+padding:12px 20px;
+border-radius:30px;
+font-size:14px;
+font-weight:600;
+box-shadow:0 6px 20px rgba(0,0,0,.3);
+z-index:2000;
+opacity:0;
+pointer-events:none;
+transition:opacity .25s ease, transform .25s ease;
+}
+
+.toast-copiloto.aparecer{
+opacity:1;
+transform:translateX(-50%) translateY(0);
+}
+
+.toast-copiloto.toast-sucesso{ background:#1f7a3d; }
+.toast-copiloto.toast-alerta{ background:#c0392b; }
+.toast-copiloto.toast-neutro{ background:#333; }
+
+.badge{
+display:inline-block;
+margin-top:10px;
+padding:6px 11px;
+border-radius:8px;
+background:#fff3cd;
+font-weight:600;
+font-size:13px;
+color:#7a5b00;
+}
+
+.badge-status{
+display:inline-block;
+margin-top:10px;
+margin-left:6px;
+padding:6px 10px;
+border-radius:8px;
+font-weight:bold;
+font-size:13px;
+}
+
+.badge-status.pendente{ background:#fff3cd; color:#7a5b00; }
+.badge-status.entregue{ background:#e5e7eb; color:#374151; }
+.badge-status.ocorrencia{ background:#fbdada; color:#8c1c1c; }
+.badge-status.misto{ background:#ffe8d1; color:#a34c00; font-size:12px; }
+
+.pacote-status-entregue{ opacity:.6; }
+.pacote-status-ocorrencia{ background:#fff5f5; border-radius:8px; padding:8px !important; margin:4px 0; }
+
+.entregue-pacote-texto{
+margin-top:6px;
+font-size:12.5px;
+font-weight:700;
+color:#1f7a3d;
+}
+
+.ocorrencia-pacote-texto{
+margin-top:6px;
+font-size:12.5px;
+font-weight:700;
+color:#8c1c1c;
+}
+
+.ocorrencia-pacote-btn{
+width:auto;
+margin-top:8px;
+padding:6px 10px;
+font-size:12px;
+font-weight:600;
+background:#fdeaea;
+color:#c0392b;
+border-radius:8px;
+}
+
+.btn-linha-pacote{
+display:flex;
+gap:6px;
+margin-top:6px;
+}
+
+.entregue-pacote-btn{
+width:auto;
+padding:6px 10px;
+font-size:12px;
+font-weight:600;
+background:#e5f7ea;
+color:#1f7a3d;
+border-radius:8px;
+}
+
+.desfazer-pacote-btn{
+width:auto;
+padding:6px 10px;
+font-size:12px;
+font-weight:600;
+background:#eee;
+color:#555;
+border-radius:8px;
+}
+
+.motivo-texto{
+font-size:13px;
+color:#8c1c1c;
+margin-top:6px;
+font-style:italic;
+}
+
+.pacotes{
+display:none;
+margin-top:10px;
+}
+
+.pacote{
+padding:10px;
+border-top:1px solid #eee;
+}
+
+.codigo{
+font-weight:bold;
+word-break:break-word;
+}
+
+.detalhe{
+font-size:14px;
+color:#555;
+margin-top:4px;
+}
+
+.nome-cliente-pacote{
+font-size:13.5px;
+font-weight:600;
+color:#333;
+margin-top:3px;
+}
+
+.leaflet-popup-content{
+font-family:Arial,sans-serif;
+}
+
+.popup-titulo{
+font-weight:bold;
+margin-bottom:4px;
+}
+
+.popup-btn{
+display:inline-block;
+padding:5px 8px;
+border-radius:6px;
+font-size:12px;
+font-weight:bold;
+color:white;
+border:none;
+margin-top:4px;
+margin-right:4px;
+cursor:pointer;
+}
+
+/* Modal de motivo da ocorrência */
+.modal-fundo{
+display:none;
+position:fixed;
+top:0;left:0;right:0;bottom:0;
+background:rgba(0,0,0,.5);
+z-index:1000;
+align-items:flex-end;
+justify-content:center;
+}
+
+.modal-fundo.aberto{
+display:flex;
+}
+
+.modal-caixa{
+background:white;
+width:100%;
+max-width:480px;
+border-radius:16px 16px 0 0;
+padding:18px;
+}
+
+.modal-caixa h3{
+margin-top:0;
+}
+
+.motivo-opcao{
+width:100%;
+text-align:left;
+background:#f4f4f4;
+color:#333;
+margin-top:8px;
+padding:12px;
+border-radius:10px;
+}
+
+.motivo-opcao:active{
+background:#ffe0cc;
+}
+
+.cancelar-modal{
+background:#eee;
+color:#555;
+margin-top:14px;
+}
+
+
+
+/* ====================================================================== */
+/* V7.1 - OTIMIZAÇÃO DE ROTA                                              */
+/* ====================================================================== */
+
+.config-otimizacao-btn{
+background:#fff6ef;
+color:#b45309;
+border:1px solid #ffd5b5;
+box-shadow:none;
+font-size:13.5px;
+padding:11px 12px;
+}
+
+.status-otimizacao-rota{
+margin-top:12px;
+padding:12px 13px;
+border-radius:12px;
+background:#f8fafc;
+border:1px solid #e5e7eb;
+font-size:12.5px;
+line-height:1.45;
+color:#475569;
+}
+
+.status-otimizacao-rota strong{ color:#222; }
+
+.status-otimizacao-rota .linha-status-rota{
+display:flex;
+align-items:center;
+gap:7px;
+font-weight:700;
+color:#222;
+margin-bottom:6px;
+}
+
+.comparacao-rota{
+margin-top:9px;
+padding:10px;
+border-radius:12px;
+background:white;
+border:1px solid #e6eaf0;
+}
+
+.comparacao-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+}
+
+.comparacao-item{
+padding:9px 10px;
+border-radius:10px;
+background:#f8fafc;
+font-size:11.5px;
+color:#64748b;
+}
+
+.comparacao-item strong{
+display:block;
+font-size:14px;
+color:#1f2937;
+margin-top:2px;
+}
+
+.comparacao-item.otimizada{ background:#fff4ea; }
+.comparacao-item.otimizada strong{ color:#b45309; }
+
+.economia-rota{
+margin-top:8px;
+padding:8px 10px;
+border-radius:9px;
+background:#ecfdf3;
+color:#18733b;
+font-weight:700;
+font-size:12px;
+}
+
+.economia-rota.pior{
+background:#fff7ed;
+color:#b45309;
+}
+
+.comparacao-nota{
+margin-top:7px;
+font-size:10.5px;
+line-height:1.35;
+color:#7c8798;
+}
+
+.rota-referencia{
+margin-top:8px;
+display:flex;
+flex-wrap:wrap;
+gap:6px;
+align-items:center;
+font-size:11.5px;
+font-weight:600;
+color:#6b7280;
+}
+
+.rota-referencia .rota-otimizada-pill,
+.rota-referencia .rota-shopee-pill{
+display:inline-flex;
+align-items:center;
+gap:4px;
+padding:5px 8px;
+border-radius:999px;
+}
+
+.rota-referencia .rota-otimizada-pill{
+background:#fff0e4;
+color:#b45309;
+}
+
+.rota-referencia .rota-shopee-pill{
+background:#f1f5f9;
+color:#475569;
+}
+
+.otimizacao-fundo{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(15,23,42,.55);
+z-index:3000;
+align-items:flex-end;
+justify-content:center;
+backdrop-filter:blur(2px);
+}
+
+.otimizacao-fundo.aberto{ display:flex; }
+
+.otimizacao-caixa{
+background:#fff;
+width:100%;
+max-width:560px;
+max-height:92vh;
+overflow-y:auto;
+border-radius:22px 22px 0 0;
+padding:18px 18px 22px;
+box-shadow:0 -10px 35px rgba(0,0,0,.22);
+}
+
+.otimizacao-caixa h2{
+font-family:'Poppins','Inter',sans-serif;
+font-size:20px;
+margin:3px 0 4px;
+color:#1f2937;
+}
+
+.otimizacao-subtitulo{
+font-size:13px;
+line-height:1.45;
+color:#64748b;
+margin-bottom:14px;
+}
+
+.otimizacao-opcao{
+width:100%;
+text-align:left;
+background:white;
+color:#222;
+border:1px solid #e7e7e7;
+box-shadow:0 3px 12px rgba(20,20,20,.05);
+padding:14px;
+margin-top:10px;
+border-radius:15px;
+display:flex;
+gap:12px;
+align-items:flex-start;
+}
+
+.otimizacao-opcao:active{ background:#fff7f0; }
+
+.otimizacao-opcao .icone-opcao{
+width:40px;
+height:40px;
+flex:0 0 40px;
+border-radius:12px;
+background:#fff1e7;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:21px;
+}
+
+.otimizacao-opcao .titulo-opcao{
+font-size:14.5px;
+font-weight:800;
+color:#222;
+}
+
+.otimizacao-opcao .desc-opcao{
+font-size:12.5px;
+font-weight:500;
+color:#64748b;
+line-height:1.4;
+margin-top:3px;
+}
+
+.otimizacao-lembrar{
+display:flex;
+align-items:flex-start;
+gap:9px;
+margin-top:14px;
+padding:11px 12px;
+background:#f8fafc;
+border-radius:12px;
+font-size:12.5px;
+color:#475569;
+line-height:1.4;
+}
+
+.otimizacao-lembrar input{
+margin-top:2px;
+width:17px;
+height:17px;
+accent-color:#ff6a00;
+}
+
+.fechar-otimizacao-btn{
+display:none;
+background:#f1f5f9;
+color:#475569;
+box-shadow:none;
+}
+
+.fechar-otimizacao-btn.visivel{ display:block; }
+
+/* Seletor de destino final por mapa */
+#modalDestinoFinal{ z-index:3200; }
+
+.destino-picker-caixa{
+max-width:680px;
+}
+
+.destinos-salvos-titulo{
+font-size:12px;
+font-weight:800;
+color:#475569;
+margin:4px 0 7px;
+}
+
+#listaDestinosSalvos{
+display:flex;
+gap:7px;
+overflow-x:auto;
+padding-bottom:4px;
+scrollbar-width:thin;
+}
+
+.destino-salvo-card{
+flex:0 0 auto;
+max-width:210px;
+border:1px solid #e4e8ee;
+background:#f8fafc;
+border-radius:11px;
+padding:8px 9px;
+}
+
+.destino-salvo-card .nome{
+font-weight:800;
+font-size:12px;
+color:#1f2937;
+}
+
+.destino-salvo-card .endereco{
+font-size:10.5px;
+line-height:1.3;
+color:#64748b;
+margin-top:2px;
+max-width:185px;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+}
+
+.destino-salvo-acoes{
+display:flex;
+gap:5px;
+margin-top:6px;
+}
+
+.destino-salvo-acoes button{
+width:auto;
+margin:0;
+padding:6px 8px;
+font-size:10.5px;
+border-radius:8px;
+}
+
+.destino-salvo-usar{
+background:#ff6a00;
+color:white;
+}
+
+.destino-salvo-excluir{
+background:#eef2f7;
+color:#64748b;
+}
+
+#mapaDestinoFinal{
+height:min(48vh,420px);
+min-height:300px;
+margin-top:10px;
+border-radius:14px;
+overflow:hidden;
+border:1px solid #dfe4ea;
+background:#eef2f7;
+}
+
+.destino-instrucao{
+margin-top:9px;
+padding:9px 10px;
+border-radius:10px;
+background:#fff7ed;
+color:#9a4d00;
+font-size:12px;
+line-height:1.4;
+}
+
+#destinoSelecionadoInfo{
+margin-top:9px;
+padding:9px 10px;
+border-radius:10px;
+background:#f8fafc;
+border:1px solid #e5e7eb;
+font-size:12px;
+line-height:1.4;
+color:#475569;
+}
+
+.destino-nome-input{
+width:100%;
+box-sizing:border-box;
+margin-top:9px;
+border:1px solid #d7dce2;
+border-radius:10px;
+padding:11px;
+font-family:inherit;
+font-size:13px;
+outline:none;
+}
+
+.destino-nome-input:focus{
+border-color:#ff8a3d;
+box-shadow:0 0 0 3px rgba(255,106,0,.12);
+}
+
+.destino-acoes{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+margin-top:9px;
+}
+
+.destino-acoes button{
+margin:0;
+font-size:12.5px;
+padding:11px 8px;
+}
+
+.destino-usar-btn{ background:#ff6a00; color:white; }
+.destino-salvar-btn{ background:#eef2f7; color:#334155; }
+
+.overlay-otimizando{
+display:none;
+position:fixed;
+inset:0;
+z-index:3500;
+background:rgba(255,255,255,.96);
+align-items:center;
+justify-content:center;
+padding:24px;
+}
+
+.overlay-otimizando.aberto{
+display:flex;
+}
+
+.otimizando-conteudo{
+width:100%;
+max-width:360px;
+text-align:center;
+}
+
+.otimizando-spinner{
+width:48px;
+height:48px;
+border-radius:50%;
+border:5px solid #ffe2cc;
+border-top-color:#ff6a00;
+margin:0 auto 16px;
+animation:girarOtimizacao .85s linear infinite;
+}
+
+@keyframes girarOtimizacao{
+to{ transform:rotate(360deg); }
+}
+
+.otimizando-conteudo h3{
+font-family:'Poppins','Inter',sans-serif;
+margin:0 0 6px;
+font-size:18px;
+color:#1f2937;
+}
+
+#textoProgressoOtimizacao{
+font-size:13px;
+color:#64748b;
+line-height:1.45;
+}
+
+.pin-destino-final{
+width:30px;
+height:30px;
+border-radius:50%;
+background:#7c3aed;
+border:2px solid white;
+box-shadow:0 2px 8px rgba(0,0,0,.35);
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:15px;
+}
+
+@media (min-width:700px){
+.otimizacao-fundo{ align-items:center; padding:20px; }
+.otimizacao-caixa{ border-radius:22px; }
+}
+
+</style>
+
+</head>
+
+<body translate="no">
+
+<header>
+<button id="botaoSom" class="botao-som" onclick="alternarSom()" title="Ligar/desligar som">🔊</button>
+<div class="marca">
+<span class="selo">🚚</span>
+<span>Copiloto Entregas</span>
+</div>
+<div class="subtitulo" id="saudacaoHeader">Sua rota, organizada do seu jeito</div>
+</header>
+
+<div class="abas">
+<button class="aba-btn ativa" id="btnAbaLista" onclick="irParaAba(0)">📋 Lista (<span id="contadorLista">0</span>)</button>
+<button class="aba-btn" id="btnAbaMapa" onclick="irParaAba(1)">🗺️ Mapa</button>
+<button class="aba-btn ocorrencias-aba" id="btnAbaOcorrencias" onclick="irParaAba(2)">⚠️ Ocorrências (<span id="contadorOcorrencias">0</span>)</button>
+</div>
+
+<div id="areaAbas">
+
+<div class="painel-aba ativo" id="painelLista">
+
+<div class="container">
+
+<div class="card">
+
+<h2>Importar Rota Shopee</h2>
+
+<input
+type="file"
+id="arquivo"
+accept=".xlsx,.xls">
+
+<button
+class="importar"
+onclick="importarExcel()">
+Importar Rota
+</button>
+
+<button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
+<div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
+
+<div class="stats">
+
+<div class="stat">
+<div>Pacotes</div>
+<h2 id="pacotes">0</h2>
+</div>
+
+<div class="stat">
+<div>Paradas</div>
+<h2 id="locais">0</h2>
+</div>
+
+<div class="stat pendente-cor">
+<div>Pendentes</div>
+<h2 id="qtdPendentes">0</h2>
+</div>
+
+<div class="stat entregue-cor">
+<div>Entregues</div>
+<h2 id="qtdEntregues">0</h2>
+</div>
+
+<div class="stat ocorrencia-cor" style="grid-column:1 / span 2;">
+<div>Ocorrências</div>
+<h2 id="qtdOcorrencias">0</h2>
+</div>
+
+</div>
+
+<div class="barra-progresso">
+<div class="barra-progresso-fill" id="barraProgresso">0%</div>
+</div>
+
+</div>
+
+<div id="lista"></div>
+
+</div>
+
+</div>
+
+<div class="painel-aba" id="painelMapa">
+<div id="mapa"></div>
+
+<div id="resumoMapa">
+
+<div id="resumoMapaTextos">
+<span id="resumoMapaTexto">0 pendentes</span>
+<span id="resumoMapaOcorrencias">0 ocorrências</span>
+</div>
+
+<div class="legenda-mapa">
+<span><i class="ponto-legenda" style="background:#ff6a00"></i> Pendente</span>
+<span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span>
+<span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span>
+</div>
+
+<div id="statusLocalizacaoMapa">📍 Localização: aguardando GPS...</div>
+
+</div>
+
+<div id="painelBuscaMapa">
+<input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()">
+<button onclick="buscarParadaNoMapa()">🔍</button>
+</div>
+
+<button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada">🔍</button>
+
+<button id="botaoOcultarEntregues" class="botao-flutuante-mapa" style="top:146px;" onclick="alternarOcultarEntreguesMapa()" title="Ocultar/mostrar entregues">👁️</button>
+
+<button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar">🎯</button>
+<button id="botaoAjustarPosicao" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa">📌</button>
+
+<div id="fundoInfoMapa" onclick="fecharInfoMapa()"></div>
+<div id="painelInfoMapa">
+<div class="alca-painel"></div>
+<div id="conteudoInfoMapa"></div>
+</div>
+
+</div>
+
+<div class="painel-aba" id="painelOcorrencias">
+<div class="container">
+<div id="listaOcorrencias"></div>
+</div>
+</div>
+
+</div>
+
+<!-- Modal para selecionar o motivo da ocorrência -->
+<div class="modal-fundo" id="modalMotivo">
+<div class="modal-caixa">
+<h3>Motivo da ocorrência</h3>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Cliente ausente')">Cliente ausente</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Comércio fechado')">Comércio fechado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Endereço não localizado')">Endereço não localizado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Recusado')">Recusado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Problema de acesso')">Problema de acesso</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Outro')">Outro</button>
+<button class="cancelar-modal" onclick="fecharModalMotivo()">Cancelar</button>
+
+</div>
+</div>
+
+<!-- V7.1: escolha/configuração do modo de otimização -->
+<div class="otimizacao-fundo" id="modalOtimizacao">
+<div class="otimizacao-caixa">
+<div class="alca-painel"></div>
+<h2>⚡ Como deseja organizar sua rota?</h2>
+<div class="otimizacao-subtitulo">A rota é sempre otimizada antes de você começar. A numeração original da Shopee continua preservada nos detalhes para comparação.</div>
+
+<button class="otimizacao-opcao" onclick="selecionarModoOtimizacao('rapida')">
+<span class="icone-opcao">⏱️</span>
+<span>
+<div class="titulo-opcao">Mais rápida</div>
+<div class="desc-opcao">Começa da sua localização atual e busca uma sequência eficiente pelas vias.</div>
+</span>
+</button>
+
+<button class="otimizacao-opcao" onclick="abrirSeletorDestinoFinal()">
+<span class="icone-opcao">🏁</span>
+<span>
+<div class="titulo-opcao">Terminar perto de...</div>
+<div class="desc-opcao">Você pinga o ponto final no mapa e o Copiloto organiza a reta final para terminar perto dele.</div>
+</span>
+</button>
+
+<label class="otimizacao-lembrar">
+<input type="checkbox" id="lembrarEscolhaOtimizacao">
+<span><strong>Lembrar minha escolha</strong><br>Nas próximas rotas o Copiloto aplica esta configuração automaticamente. Você pode mudar depois em “⚙️ Otimização da rota”.</span>
+</label>
+
+<button id="fecharModalOtimizacaoBtn" class="fechar-otimizacao-btn" onclick="fecharModalOtimizacao()">Fechar configurações</button>
+</div>
+</div>
+
+<!-- V7.1: escolha do ponto final diretamente no mapa -->
+<div class="otimizacao-fundo" id="modalDestinoFinal">
+<div class="otimizacao-caixa destino-picker-caixa">
+<div class="alca-painel"></div>
+<h2>🏁 Onde você quer terminar?</h2>
+<div class="otimizacao-subtitulo">Toque no mapa para pingar o ponto final. Você também pode reutilizar um local que já salvou.</div>
+
+<div id="areaDestinosSalvos" style="display:none;">
+<div class="destinos-salvos-titulo">Locais salvos</div>
+<div id="listaDestinosSalvos"></div>
+</div>
+
+<div id="mapaDestinoFinal"></div>
+<div class="destino-instrucao">📌 Toque no mapa exatamente no ponto onde você quer terminar depois da última entrega.</div>
+<div id="destinoSelecionadoInfo">Nenhum ponto selecionado ainda.</div>
+
+<input class="destino-nome-input" id="nomeDestinoSalvo" type="text" maxlength="40" placeholder="Nome opcional para salvar, ex.: Casa, Base...">
+
+<div class="destino-acoes">
+<button class="destino-usar-btn" onclick="confirmarDestinoSelecionado()">Usar este ponto</button>
+<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()">💾 Salvar ponto</button>
+</div>
+
+<button class="cancelar-modal" onclick="fecharSeletorDestinoFinal()">Voltar</button>
+</div>
+</div>
+
+<!-- V7.1: tela de cálculo -->
+<div class="overlay-otimizando" id="overlayOtimizando">
+<div class="otimizando-conteudo">
+<div class="otimizando-spinner"></div>
+<h3>Otimizando sua rota</h3>
+<div id="textoProgressoOtimizacao">Preparando as paradas...</div>
+</div>
+</div>
+
+<script>
+
+// ======================================================================
+// ESTADO GLOBAL
+// grupos: array de paradas. Cada parada:
+// { id, stop, endereco, lat, lng, pacotes:[{codigo,endereco,stop}],
+//   status: 'pendente' | 'entregue' | 'ocorrencia', motivo: string|null }
+// ======================================================================
+
+let grupos = [];
+let mapa = null;
+let marcadores = {};
+let meuMarcador = null;
+let circuloPrecisaoUsuario = null;
+let idRastreamento = null;
+let precisaoLocalizacaoMetros = null;
+let ultimaPosicaoUsuario = null;
+let localizacaoManualAtiva = false;
+let modoAjustePosicaoManual = false;
+let primeiraCentralizacaoGPSFeita = false;
+// (alvoAguardandoMotivo é declarado mais abaixo, junto da lógica de status)
+let abaAtual = 0; // 0 = Lista, 1 = Mapa, 2 = Ocorrências
+let mapaFoiEnquadrado = false; // controla se já demos fitBounds (evita resetar o zoom)
+let celebracaoMostrada = false; // evita repetir a comemoração de rota 100% toda hora
+let marcosMostrados = new Set(); // marcos de progresso (25/50/75%) já avisados nesta rota
+let recordeAvisado = false; // evita repetir o aviso de recorde do dia várias vezes
+const HISTORICO_STORAGE_KEY = "copiloto_entregas_historico";
+const SOM_STORAGE_KEY = "copiloto_entregas_som_ativado";
+const CHAVE_STORAGE = "copiloto_entregas_rota_atual";
+const META_ROTA_STORAGE_KEY = "copiloto_entregas_meta_rota_v7";
+const OTIMIZACAO_PREF_KEY = "copiloto_entregas_otimizacao_pref_v7_1";
+const DESTINOS_SALVOS_KEY = "copiloto_entregas_destinos_salvos_v7_1";
+
+let metaRota = {
+modo:null,
+provedor:'OSRM',
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+atualizadoEm:null
+};
+let modalOtimizacaoEmModoConfiguracao = false;
+let marcadorDestinoRota = null;
+let mapaDestinoFinal = null;
+let marcadorDestinoSelecionado = null;
+let destinoSelecionadoAtual = null;
+
+// ----------------------------------------------------------------------
+// IMPORTAÇÃO DA PLANILHA
+// ----------------------------------------------------------------------
+
+function importarExcel(){
+
+const arquivo =
+document.getElementById("arquivo").files[0];
+
+
+if(!arquivo){
+
+alert("Selecione a planilha");
+return;
+
+}
+
+const reader = new FileReader();
+
+reader.onload = function(e){
+
+const data =
+new Uint8Array(e.target.result);
+
+const workbook =
+XLSX.read(data,{type:'array'});
+
+const sheet =
+workbook.Sheets[
+workbook.SheetNames[0]
+];
+
+const json =
+XLSX.utils.sheet_to_json(sheet);
+
+processarEntregas(json);
+
+};
+reader.readAsArrayBuffer(arquivo);
+
+}
+
+async function processarEntregas(dados){
+
+// Nova planilha = nova rota (zera tudo, inclusive o que estava salvo)
+const baldes = {}; // agrupados primeiro por número de Parada (ou "EXTRA")
+
+document.getElementById("pacotes").innerText =
+dados.length;
+
+dados.forEach(item=>{
+
+const endereco =
+item["Destination Address"] ||
+item["Address"] ||
+"-";
+
+const bairro =
+item["Bairro"] ||
+item["Neighborhood"] ||
+"";
+
+const cidade =
+item["City"] ||
+item["Cidade"] ||
+"";
+
+const cep =
+item["Zipcode/Postal code"] ||
+item["Zipcode"] ||
+item["CEP"] ||
+"";
+
+const codigo =
+item["SPX TN"] ||
+item["SPX_TN"] ||
+"-";
+
+const destinatario =
+item["Recipient"] ||
+item["Recipient Name"] ||
+item["Consignee"] ||
+item["Consignee Name"] ||
+item["Nome"] ||
+item["Nome do Destinatário"] ||
+item["Customer Name"] ||
+item["Buyer Name"] ||
+"";
+
+const lat =
+item["Latitude"] ||
+"";
+
+const lng =
+item["Longitude"] ||
+"";
+
+const stopOriginal =
+item["Stop"] ||
+item["stop"] ||
+"";
+
+const stopTexto = String(stopOriginal).trim();
+
+const paradaBase = stopTexto
+.replace(/[A-Za-z]$/,"")
+.trim();
+
+// Balde inicial: mesmo número de Parada já é um forte indício de ser o
+// mesmo local. Dentro do balde, decide-se se é "o mesmo lugar de fato"
+// pela função paradasMesmoLocal (unidade/apto -> depois distância real).
+const chaveBalde = stopTexto ? ("STOP|" + paradaBase) : "EXTRA";
+
+if(!baldes[chaveBalde]) baldes[chaveBalde] = [];
+
+const candidato = { endereco:endereco, lat:lat, lng:lng };
+
+let cluster = baldes[chaveBalde].find(c => paradasMesmoLocal(c.representante, candidato));
+
+if(!cluster){
+
+cluster = {
+representante: candidato,
+grupo: {
+id: chaveBalde + "#" + (baldes[chaveBalde].length + 1),
+endereco:endereco,
+lat:lat,
+lng:lng,
+stop:paradaBase,
+stopOriginal:paradaBase,
+ordemOtimizada:null,
+destinatario:destinatario,
+bairro:bairro,
+cidade:cidade,
+cep:cep,
+pacotes:[]
+// status não fica mais aqui - é calculado por pacote (ver statusEfetivoGrupo)
+}
+};
+
+baldes[chaveBalde].push(cluster);
+
+}
+
+if(!cluster.grupo.destinatario && destinatario){
+cluster.grupo.destinatario = destinatario;
+}
+
+cluster.grupo.pacotes.push({
+
+codigo:codigo,
+endereco:endereco,
+stop:stopTexto,
+destinatario:destinatario,
+status:'pendente',
+motivo:null
+
+});
+
+});
+
+grupos = [];
+Object.values(baldes).forEach(lista => lista.forEach(c => grupos.push(c.grupo)));
+grupos.forEach((g, indice) => {
+if(!Number.isFinite(g.indiceImportacao)) g.indiceImportacao = indice;
+});
+
+mapaFoiEnquadrado = false; // nova rota -> próximo enquadramento do mapa deve se ajustar às novas paradas
+celebracaoMostrada = false; // nova rota -> pode comemorar de novo quando terminar essa
+marcosMostrados = new Set(); // nova rota -> pode avisar os marcos de progresso de novo
+recordeAvisado = false; // nova rota -> pode avisar recorde de novo
+painelPacotesAbertos = new Set(); // nova rota -> nenhum painel deve começar aberto
+
+metaRota = {
+modo:null,
+provedor:'OSRM',
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+atualizadoEm:null
+};
+
+salvarStorage();
+
+// Antes da V7 apresentar a rota, garante que as coordenadas problemáticas
+// tenham a melhor chance possível de serem corrigidas. Isso evita otimizar
+// uma parada para um ponto inválido e só depois movê-la no mapa.
+abrirOverlayOtimizacao('Preparando os endereços da rota...');
+await corrigirCoordenadasAusentes({renderizar:false, silencioso:true});
+fecharOverlayOtimizacao();
+
+// A rota crua pode aparecer por baixo do modal, mas a numeração final só
+// é definida depois da escolha/aplicação da otimização.
+renderizarTudo();
+prepararOtimizacaoAposImportacao();
+
+}
+
+// ----------------------------------------------------------------------
+// CORREÇÃO DE COORDENADAS AUSENTES/ERRADAS A PARTIR DO ENDEREÇO
+// Só entra em ação quando a Latitude/Longitude da planilha está vazia
+// ou claramente fora do Brasil - não mexe em coordenadas que já parecem
+// corretas, pra não gastar tempo/cota à toa.
+// ----------------------------------------------------------------------
+
+function coordenadaValida(lat, lng){
+const latN = parseFloat(lat);
+const lngN = parseFloat(lng);
+if(isNaN(latN) || isNaN(lngN)) return false;
+if(latN === 0 && lngN === 0) return false;
+// faixa aproximada do território brasileiro
+if(latN > 6 || latN < -34 || lngN > -30 || lngN < -75) return false;
+return true;
+}
+
+function esperar(ms){
+return new Promise(resolver => setTimeout(resolver, ms));
+}
+
+// Monta uma consulta de endereço completa (rua, bairro, cidade, CEP)
+// para a geocodificação ser muito mais precisa do que só a rua sozinha
+// - evita confundir com uma rua de mesmo nome em outra cidade.
+function montarConsultaEndereco(grupo){
+const partes = [grupo.endereco, grupo.bairro, grupo.cidade, grupo.cep]
+.filter(p => p && String(p).trim() && String(p).trim() !== "-");
+return partes.join(", ");
+}
+
+async function geocodificarEndereco(consulta){
+try{
+const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=" + encodeURIComponent(consulta);
+const resposta = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
+if(!resposta.ok) return null;
+const dados = await resposta.json();
+if(dados && dados.length > 0){
+return { lat: dados[0].lat, lng: dados[0].lon };
+}
+}catch(erro){
+console.warn("Falha ao buscar coordenada para:", consulta, erro);
+}
+return null;
+}
+
+async function corrigirCoordenadasAusentes(opcoes = {}){
+
+const candidatos = grupos.filter(g => !coordenadaValida(g.lat, g.lng));
+
+if(candidatos.length === 0) return;
+
+if(!opcoes.silencioso) mostrarToast(`🔍 Corrigindo ${candidatos.length} coordenada(s)...`, 'neutro');
+
+let corrigidas = 0;
+
+for(const grupo of candidatos){
+
+const resultado = await geocodificarEndereco(montarConsultaEndereco(grupo));
+
+if(resultado){
+grupo.lat = resultado.lat;
+grupo.lng = resultado.lng;
+corrigidas++;
+}
+
+// Respeita o limite de uso do serviço gratuito (1 consulta por segundo)
+await esperar(1100);
+
+}
+
+if(corrigidas > 0){
+salvarStorage();
+if(opcoes.renderizar !== false) renderizarTudo();
+if(!opcoes.silencioso) mostrarToast(`✅ ${corrigidas} coordenada(s) corrigida(s)`, 'sucesso');
+}
+
+}
+
+// Verificação sob demanda de UMA parada específica, acionada pelo botão
+// "🔍 Verificar localização" no painel do mapa. Sempre busca de novo,
+// mesmo que a coordenada atual pareça válida - útil quando o pin está
+// no lugar errado mas dentro do Brasil (então a checagem automática
+// da importação não pegaria isso sozinha).
+async function verificarLocalizacaoPin(id){
+
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+
+fecharInfoMapa();
+mostrarToast('🔍 Verificando localização...', 'neutro');
+
+const resultado = await geocodificarEndereco(montarConsultaEndereco(grupo));
+
+if(!resultado){
+mostrarToast('⚠️ Não foi possível verificar - endereço não encontrado', 'alerta');
+return;
+}
+
+const latAntiga = parseFloat(grupo.lat);
+const lngAntiga = parseFloat(grupo.lng);
+const latNova = parseFloat(resultado.lat);
+const lngNova = parseFloat(resultado.lng);
+
+const distanciaMudanca = (!isNaN(latAntiga) && !isNaN(lngAntiga))
+? distanciaMetros(latAntiga, lngAntiga, latNova, lngNova)
+: null;
+
+grupo.lat = resultado.lat;
+grupo.lng = resultado.lng;
+salvarStorage();
+renderizarTudo();
+
+// Leva o mapa até onde o pin ficou, pra você ver na hora pra onde ele foi
+mapa.setView([latNova, lngNova], Math.max(mapa.getZoom(), 17));
+setTimeout(()=> destacarMarcador(grupo.id), 150);
+
+if(distanciaMudanca !== null && distanciaMudanca < 15){
+mostrarToast('✅ Já estava correto - nada mudou', 'sucesso');
+}else{
+mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso');
+}
+
+}
+
+
+// ======================================================================
+// V7.1 - OTIMIZAÇÃO DE ROTA
+// ======================================================================
+// Estratégia:
+// 1) cria uma rota-base geográfica rápida (sem força bruta);
+// 2) divide a rota em janelas pequenas;
+// 3) consulta tempos de deslocamento pelas vias para refinar cada janela;
+// 4) compara o tempo estimado da ordem original da Shopee com a otimizada.
+// Isso escala muito melhor do que tentar calcular uma matriz N x N inteira
+// para 80/100+ paradas no celular.
+
+function carregarPreferenciaOtimizacao(){
+try{
+const bruto = localStorage.getItem(OTIMIZACAO_PREF_KEY);
+const pref = bruto ? JSON.parse(bruto) : null;
+if(!pref || !['rapida','endereco'].includes(pref.modo)){
+return {lembrar:false, modo:'rapida', destinoFinal:null};
+}
+return {
+lembrar:!!pref.lembrar,
+modo:pref.modo,
+destinoFinal:pontoValido(pref.destinoFinal) ? pref.destinoFinal : null
+};
+}catch(erro){
+return {lembrar:false, modo:'rapida', destinoFinal:null};
+}
+}
+
+function salvarPreferenciaOtimizacao(modo, destinoFinal, lembrar){
+try{
+localStorage.setItem(OTIMIZACAO_PREF_KEY, JSON.stringify({
+lembrar:!!lembrar,
+modo:['rapida','endereco'].includes(modo) ? modo : 'rapida',
+destinoFinal:pontoValido(destinoFinal) ? destinoFinal : null
+}));
+}catch(erro){
+console.warn('Não foi possível salvar a preferência de otimização:', erro);
+}
+}
+
+function carregarDestinosSalvos(){
+try{
+const bruto = localStorage.getItem(DESTINOS_SALVOS_KEY);
+const itens = bruto ? JSON.parse(bruto) : [];
+return Array.isArray(itens) ? itens.filter(pontoValido) : [];
+}catch(erro){
+return [];
+}
+}
+
+function persistirDestinosSalvos(lista){
+try{
+localStorage.setItem(DESTINOS_SALVOS_KEY, JSON.stringify(lista));
+}catch(erro){
+mostrarToast('⚠️ Não foi possível salvar este local no aparelho', 'alerta');
+}
+}
+
+function escaparHtmlTexto(valor){
+return String(valor ?? '')
+.replace(/&/g,'&amp;')
+.replace(/</g,'&lt;')
+.replace(/>/g,'&gt;')
+.replace(/"/g,'&quot;')
+.replace(/'/g,'&#039;');
+}
+
+function abrirModalOtimizacao(modoConfiguracao){
+modalOtimizacaoEmModoConfiguracao = !!modoConfiguracao;
+const modal = document.getElementById('modalOtimizacao');
+const fechar = document.getElementById('fecharModalOtimizacaoBtn');
+const pref = carregarPreferenciaOtimizacao();
+const lembrar = document.getElementById('lembrarEscolhaOtimizacao');
+
+if(lembrar) lembrar.checked = !!pref.lembrar;
+if(fechar) fechar.classList.toggle('visivel', !!modoConfiguracao);
+modal.classList.add('aberto');
+}
+
+function fecharModalOtimizacao(){
+document.getElementById('modalOtimizacao').classList.remove('aberto');
+modalOtimizacaoEmModoConfiguracao = false;
+}
+
+function abrirConfiguracaoOtimizacao(){
+abrirModalOtimizacao(true);
+}
+
+function prepararOtimizacaoAposImportacao(){
+const pref = carregarPreferenciaOtimizacao();
+
+if(pref.lembrar && pref.modo === 'rapida'){
+executarEscolhaOtimizacao('rapida', null, true);
+return;
+}
+
+if(pref.lembrar && pref.modo === 'endereco' && pontoValido(pref.destinoFinal)){
+executarEscolhaOtimizacao('endereco', pref.destinoFinal, true);
+return;
+}
+
+// Sem preferência lembrada, a otimização é obrigatória: o usuário escolhe
+// como organizar, mas não existe mais a opção de seguir sem otimizar.
+abrirModalOtimizacao(false);
+}
+
+function selecionarModoOtimizacao(modo){
+if(modo === 'endereco'){
+abrirSeletorDestinoFinal();
+return;
+}
+const lembrar = !!document.getElementById('lembrarEscolhaOtimizacao').checked;
+executarEscolhaOtimizacao('rapida', null, lembrar);
+}
+
+function executarEscolhaOtimizacao(modo, destinoFinal, lembrar){
+if(modo === 'endereco' && !pontoValido(destinoFinal)){
+abrirSeletorDestinoFinal();
+return;
+}
+
+// Sem uma rota carregada, o botão funciona somente como configuração para
+// a próxima importação. No modo destino, a coordenada pingada também é salva
+// na preferência quando "Lembrar minha escolha" estiver marcado.
+if(!grupos.length){
+salvarPreferenciaOtimizacao(modo, destinoFinal, lembrar);
+fecharSeletorDestinoFinal();
+fecharModalOtimizacao();
+mostrarToast('⚙️ Preferência de otimização salva', 'sucesso');
+return;
+}
+
+salvarPreferenciaOtimizacao(modo, destinoFinal, lembrar);
+fecharSeletorDestinoFinal();
+fecharModalOtimizacao();
+executarOtimizacaoRota(modo, destinoFinal);
+}
+
+function renderizarDestinosSalvos(){
+const area = document.getElementById('areaDestinosSalvos');
+const listaEl = document.getElementById('listaDestinosSalvos');
+if(!area || !listaEl) return;
+
+const salvos = carregarDestinosSalvos();
+area.style.display = salvos.length ? 'block' : 'none';
+listaEl.innerHTML = salvos.map(item=>{
+const nome = escaparHtmlTexto(item.nome || 'Local salvo');
+const endereco = escaparHtmlTexto(item.endereco || `${Number(item.lat).toFixed(5)}, ${Number(item.lng).toFixed(5)}`);
+return `
+<div class="destino-salvo-card">
+<div class="nome">📍 ${nome}</div>
+<div class="endereco">${endereco}</div>
+<div class="destino-salvo-acoes">
+<button class="destino-salvo-usar" onclick="usarDestinoSalvo('${item.id}')">Usar</button>
+<button class="destino-salvo-excluir" onclick="removerDestinoSalvo('${item.id}')">Excluir</button>
+</div>
+</div>`;
+}).join('');
+}
+
+function inicializarMapaDestinoFinal(){
+if(mapaDestinoFinal) return;
+
+mapaDestinoFinal = L.map('mapaDestinoFinal', {
+zoomControl:true,
+attributionControl:true
+}).setView([-14.235,-51.925], 4);
+
+L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+{
+maxZoom:19,
+attribution:'Tiles &copy; Esri'
+}
+).addTo(mapaDestinoFinal);
+
+mapaDestinoFinal.on('click', function(e){
+definirDestinoSelecionado({lat:e.latlng.lat, lng:e.latlng.lng}, true);
+});
+}
+
+function enquadrarMapaDestinoFinal(){
+if(!mapaDestinoFinal) return;
+
+if(ultimaPosicaoUsuario && pontoValido(ultimaPosicaoUsuario)){
+mapaDestinoFinal.setView([Number(ultimaPosicaoUsuario.lat), Number(ultimaPosicaoUsuario.lng)], 14);
+return;
+}
+
+const pontos = gruposComCoordenadaValida().map(g=>[Number(g.lat), Number(g.lng)]);
+if(pontos.length){
+mapaDestinoFinal.fitBounds(pontos, {padding:[28,28], maxZoom:14});
+}
+}
+
+function abrirSeletorDestinoFinal(){
+const modal = document.getElementById('modalDestinoFinal');
+if(!modal) return;
+renderizarDestinosSalvos();
+modal.classList.add('aberto');
+setTimeout(()=>{
+inicializarMapaDestinoFinal();
+mapaDestinoFinal.invalidateSize();
+enquadrarMapaDestinoFinal();
+}, 120);
+}
+
+function fecharSeletorDestinoFinal(){
+const modal = document.getElementById('modalDestinoFinal');
+if(modal) modal.classList.remove('aberto');
+}
+
+async function reverseGeocodificarPonto(lat, lng){
+try{
+const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+const resposta = await fetch(url, {headers:{'Accept-Language':'pt-BR'}});
+if(!resposta.ok) return null;
+const dados = await resposta.json();
+return dados && dados.display_name ? dados.display_name : null;
+}catch(erro){
+console.warn('Não foi possível identificar o endereço do ponto:', erro);
+return null;
+}
+}
+
+async function definirDestinoSelecionado(ponto, buscarEndereco){
+if(!pontoValido(ponto)) return;
+const lat = Number(ponto.lat);
+const lng = Number(ponto.lng);
+
+destinoSelecionadoAtual = {
+lat,
+lng,
+nome:ponto.nome || '',
+endereco:ponto.endereco || '',
+texto:ponto.texto || ponto.nome || ponto.endereco || 'Ponto escolhido no mapa'
+};
+
+if(marcadorDestinoSelecionado){
+marcadorDestinoSelecionado.setLatLng([lat,lng]);
+}else if(mapaDestinoFinal){
+const icone = L.divIcon({
+html:'<div class="pin-destino-final">🏁</div>',
+className:'',
+iconSize:[30,30],
+iconAnchor:[15,15]
+});
+marcadorDestinoSelecionado = L.marker([lat,lng], {icon:icone, zIndexOffset:1000}).addTo(mapaDestinoFinal);
+}
+
+const info = document.getElementById('destinoSelecionadoInfo');
+if(info) info.textContent = '🏁 Ponto selecionado. Identificando o endereço...';
+
+if(buscarEndereco){
+const endereco = await reverseGeocodificarPonto(lat,lng);
+if(destinoSelecionadoAtual && Number(destinoSelecionadoAtual.lat) === lat && Number(destinoSelecionadoAtual.lng) === lng){
+destinoSelecionadoAtual.endereco = endereco || '';
+destinoSelecionadoAtual.texto = destinoSelecionadoAtual.nome || endereco || 'Ponto escolhido no mapa';
+}
+}
+
+if(info && destinoSelecionadoAtual){
+info.textContent = destinoSelecionadoAtual.endereco
+? `🏁 ${destinoSelecionadoAtual.endereco}`
+: `🏁 Ponto escolhido: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+}
+
+function confirmarDestinoSelecionado(){
+if(!pontoValido(destinoSelecionadoAtual)){
+mostrarToast('⚠️ Toque no mapa para escolher onde deseja terminar', 'alerta');
+return;
+}
+const lembrar = !!document.getElementById('lembrarEscolhaOtimizacao').checked;
+const nome = (document.getElementById('nomeDestinoSalvo').value || '').trim();
+const destino = {...destinoSelecionadoAtual};
+if(nome){
+destino.nome = nome;
+destino.texto = nome;
+}else if(!destino.texto){
+destino.texto = destino.endereco || 'Ponto escolhido no mapa';
+}
+executarEscolhaOtimizacao('endereco', destino, lembrar);
+}
+
+function salvarDestinoSelecionado(){
+if(!pontoValido(destinoSelecionadoAtual)){
+mostrarToast('⚠️ Primeiro toque no mapa para escolher um ponto', 'alerta');
+return;
+}
+
+const input = document.getElementById('nomeDestinoSalvo');
+const nome = (input.value || '').trim();
+if(!nome){
+mostrarToast('⚠️ Dê um nome para este local, como Casa ou Base', 'alerta');
+input.focus();
+return;
+}
+
+const lista = carregarDestinosSalvos();
+const item = {
+id:'dest_' + Date.now(),
+nome,
+lat:Number(destinoSelecionadoAtual.lat),
+lng:Number(destinoSelecionadoAtual.lng),
+endereco:destinoSelecionadoAtual.endereco || '',
+texto:nome
+};
+lista.push(item);
+persistirDestinosSalvos(lista.slice(-20));
+destinoSelecionadoAtual = {...item};
+renderizarDestinosSalvos();
+mostrarToast(`💾 ${nome} salvo`, 'sucesso');
+}
+
+function usarDestinoSalvo(id){
+const item = carregarDestinosSalvos().find(x=>String(x.id) === String(id));
+if(!item) return;
+destinoSelecionadoAtual = {...item, texto:item.nome || item.endereco || 'Local salvo'};
+const lembrar = !!document.getElementById('lembrarEscolhaOtimizacao').checked;
+executarEscolhaOtimizacao('endereco', destinoSelecionadoAtual, lembrar);
+}
+
+function removerDestinoSalvo(id){
+const lista = carregarDestinosSalvos().filter(x=>String(x.id) !== String(id));
+persistirDestinosSalvos(lista);
+renderizarDestinosSalvos();
+mostrarToast('🗑️ Local salvo removido', 'neutro');
+}
+
+function abrirOverlayOtimizacao(texto){
+const overlay = document.getElementById('overlayOtimizando');
+const el = document.getElementById('textoProgressoOtimizacao');
+if(el && texto) el.textContent = texto;
+if(overlay) overlay.classList.add('aberto');
+}
+
+function atualizarProgressoOtimizacao(texto){
+const el = document.getElementById('textoProgressoOtimizacao');
+if(el) el.textContent = texto;
+}
+
+function fecharOverlayOtimizacao(){
+const overlay = document.getElementById('overlayOtimizando');
+if(overlay) overlay.classList.remove('aberto');
+}
+
+function pontoGrupo(grupo){
+return {lat:parseFloat(grupo.lat), lng:parseFloat(grupo.lng), grupo};
+}
+
+function pontoValido(p){
+return p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
+}
+
+function distanciaPontos(a,b){
+return distanciaMetros(Number(a.lat), Number(a.lng), Number(b.lat), Number(b.lng));
+}
+
+function gruposComCoordenadaValida(){
+return grupos.filter(g => {
+const p = pontoGrupo(g);
+return pontoValido(p);
+});
+}
+
+async function obterPontoInicialOtimizacao(){
+// No PC, se o usuário já ajustou a posição manualmente, essa é a fonte mais
+// confiável. No celular, tentamos sempre uma leitura GPS nova.
+if(localizacaoManualAtiva && meuMarcador){
+const ll = meuMarcador.getLatLng();
+return {lat:ll.lat, lng:ll.lng, precisao:0, manual:true};
+}
+
+if(navigator.geolocation && geolocalizacaoPodeFuncionarAqui()){
+try{
+const posicao = await new Promise((resolve,reject)=>{
+navigator.geolocation.getCurrentPosition(resolve, reject, {
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:20000
+});
+});
+aplicarPosicaoGeolocalizada(posicao, false);
+return {
+lat:posicao.coords.latitude,
+lng:posicao.coords.longitude,
+precisao:posicao.coords.accuracy,
+manual:false
+};
+}catch(erro){
+console.warn('GPS novo não disponível para otimização:', erro);
+}
+}
+
+if(ultimaPosicaoUsuario && pontoValido(ultimaPosicaoUsuario)){
+return {
+lat:ultimaPosicaoUsuario.lat,
+lng:ultimaPosicaoUsuario.lng,
+precisao:ultimaPosicaoUsuario.precisao,
+manual:false
+};
+}
+
+throw new Error('LOCALIZACAO_INDISPONIVEL');
+}
+
+function rotaVizinhoMaisProximo(gruposEntrada, inicio){
+const restantes = [...gruposEntrada];
+const ordem = [];
+let atual = inicio;
+
+while(restantes.length){
+let melhorIndice = 0;
+let melhorDistancia = Infinity;
+for(let i=0;i<restantes.length;i++){
+const d = distanciaPontos(atual, pontoGrupo(restantes[i]));
+if(d < melhorDistancia){
+melhorDistancia = d;
+melhorIndice = i;
+}
+}
+const proximo = restantes.splice(melhorIndice,1)[0];
+ordem.push(proximo);
+atual = pontoGrupo(proximo);
+}
+
+return ordem;
+}
+
+function rotaInsercaoComDestino(gruposEntrada, inicio, destino){
+// Cheapest insertion com início/fim fixos. Isso tende naturalmente a deixar
+// as últimas entregas perto do endereço final escolhido.
+const restantes = [...gruposEntrada];
+const caminho = [inicio, destino];
+
+while(restantes.length){
+let melhor = null;
+
+for(let r=0;r<restantes.length;r++){
+const ponto = pontoGrupo(restantes[r]);
+for(let pos=0;pos<caminho.length-1;pos++){
+const a = caminho[pos];
+const b = caminho[pos+1];
+const aumento = distanciaPontos(a,ponto) + distanciaPontos(ponto,b) - distanciaPontos(a,b);
+if(!melhor || aumento < melhor.aumento){
+melhor = {r,pos,aumento};
+}
+}
+}
+
+const escolhido = restantes.splice(melhor.r,1)[0];
+caminho.splice(melhor.pos+1,0,pontoGrupo(escolhido));
+}
+
+return caminho.slice(1,-1).map(p=>p.grupo);
+}
+
+function melhorarRota2Opt(rota, inicio, destino){
+if(rota.length < 4) return [...rota];
+
+const inicioVirtual = {lat:Number(inicio.lat), lng:Number(inicio.lng), virtual:true};
+const fimVirtual = destino ? {lat:Number(destino.lat), lng:Number(destino.lng), virtual:true} : null;
+let nos = [inicioVirtual, ...rota.map(pontoGrupo)];
+if(fimVirtual) nos.push(fimVirtual);
+
+const fimEditavel = fimVirtual ? nos.length - 2 : nos.length - 1;
+let melhorou = true;
+let passadas = 0;
+
+while(melhorou && passadas < 3){
+melhorou = false;
+passadas++;
+
+for(let i=1;i<fimEditavel;i++){
+for(let j=i+1;j<=fimEditavel;j++){
+const anterior = nos[i-1];
+const primeiro = nos[i];
+const ultimo = nos[j];
+const seguinte = nos[j+1] || null;
+
+let atual = distanciaPontos(anterior,primeiro);
+let novo = distanciaPontos(anterior,ultimo);
+if(seguinte){
+atual += distanciaPontos(ultimo,seguinte);
+novo += distanciaPontos(primeiro,seguinte);
+}
+
+if(novo + 1 < atual){
+const invertido = nos.slice(i,j+1).reverse();
+nos.splice(i,j-i+1,...invertido);
+melhorou = true;
+}
+}
+}
+}
+
+return nos.filter(n=>!n.virtual).map(n=>n.grupo);
+}
+
+function stringCoordenadas(pontos){
+return pontos.map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`).join(';');
+}
+
+async function consultarMatrizOSRM(pontos){
+const coords = stringCoordenadas(pontos);
+const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`;
+const resposta = await fetch(url);
+if(!resposta.ok) throw new Error('OSRM_MATRIX_' + resposta.status);
+const dados = await resposta.json();
+if(!dados || !Array.isArray(dados.durations)) throw new Error('OSRM_MATRIX_INVALIDA');
+return {matriz:dados.durations, provedor:'OSRM'};
+}
+
+async function consultarMatrizRoteamento(pontos){
+return await consultarMatrizOSRM(pontos);
+}
+
+function custoMatriz(matriz, origem, destino){
+const valor = matriz && matriz[origem] ? matriz[origem][destino] : null;
+return Number.isFinite(valor) ? valor : Infinity;
+}
+
+function otimizarJanelaComMatriz(matriz, quantidadeParadas, temAncoraFinal){
+const n = quantidadeParadas;
+if(n <= 1) return [...Array(n).keys()];
+
+const totalMascaras = 1 << n;
+const dp = Array.from({length:totalMascaras},()=>Array(n).fill(Infinity));
+const pai = Array.from({length:totalMascaras},()=>Array(n).fill(-1));
+
+for(let j=0;j<n;j++){
+dp[1<<j][j] = custoMatriz(matriz, 0, j+1);
+}
+
+for(let mask=1;mask<totalMascaras;mask++){
+for(let j=0;j<n;j++){
+if(!(mask & (1<<j)) || !Number.isFinite(dp[mask][j])) continue;
+for(let k=0;k<n;k++){
+if(mask & (1<<k)) continue;
+const proximoMask = mask | (1<<k);
+const custo = dp[mask][j] + custoMatriz(matriz, j+1, k+1);
+if(custo < dp[proximoMask][k]){
+dp[proximoMask][k] = custo;
+pai[proximoMask][k] = j;
+}
+}
+}
+}
+
+const cheia = totalMascaras - 1;
+let melhorFim = -1;
+let melhorCusto = Infinity;
+const indiceAncoraFinal = n + 1;
+
+for(let j=0;j<n;j++){
+let custo = dp[cheia][j];
+if(temAncoraFinal) custo += custoMatriz(matriz, j+1, indiceAncoraFinal);
+if(custo < melhorCusto){
+melhorCusto = custo;
+melhorFim = j;
+}
+}
+
+if(melhorFim < 0 || !Number.isFinite(melhorCusto)) return [...Array(n).keys()];
+
+const ordemReversa = [];
+let mask = cheia;
+let atual = melhorFim;
+while(atual >= 0){
+ordemReversa.push(atual);
+const anterior = pai[mask][atual];
+mask = mask & ~(1<<atual);
+atual = anterior;
+}
+
+return ordemReversa.reverse();
+}
+
+async function refinarRotaPorTrechos(ordemInicial, inicio, destino){
+let ordem = [...ordemInicial];
+const tamanhoJanela = 8; // origem + até 8 paradas + âncora final
+let falhas = 0;
+const totalJanelas = Math.ceil(ordem.length / tamanhoJanela);
+
+for(let base=0,numeroJanela=1;base<ordem.length;base+=tamanhoJanela,numeroJanela++){
+const janela = ordem.slice(base, base+tamanhoJanela);
+if(janela.length <= 1) continue;
+
+const ancoraInicio = base === 0 ? inicio : pontoGrupo(ordem[base-1]);
+const proximoFora = ordem[base+tamanhoJanela];
+const ancoraFim = proximoFora ? pontoGrupo(proximoFora) : (destino || null);
+const pontos = [ancoraInicio, ...janela.map(pontoGrupo)];
+if(ancoraFim) pontos.push(ancoraFim);
+
+atualizarProgressoOtimizacao(`Analisando as vias · trecho ${numeroJanela}/${totalJanelas}...`);
+
+try{
+const resultado = await consultarMatrizRoteamento(pontos);
+const permutacao = otimizarJanelaComMatriz(resultado.matriz, janela.length, !!ancoraFim);
+const reordenada = permutacao.map(i=>janela[i]);
+ordem.splice(base, janela.length, ...reordenada);
+}catch(erro){
+console.warn('Falha ao refinar trecho da rota:', erro);
+falhas++;
+}
+}
+
+return {ordem, falhas};
+}
+
+async function consultarTrechoDirectionsOSRM(pontos){
+const coords = stringCoordenadas(pontos);
+const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
+const resposta = await fetch(url);
+if(!resposta.ok) throw new Error('OSRM_ROUTE_' + resposta.status);
+const dados = await resposta.json();
+if(!dados.routes || !dados.routes[0]) throw new Error('OSRM_ROUTE_INVALIDA');
+return {duracao:dados.routes[0].duration, distancia:dados.routes[0].distance};
+}
+
+async function calcularMetricasRota(ordem, inicio, destino){
+const caminho = [inicio, ...ordem.map(pontoGrupo)];
+if(destino) caminho.push(destino);
+if(caminho.length < 2) return {duracao:null, distancia:null, provedor:null};
+
+try{
+let duracao = 0;
+let distancia = 0;
+for(let i=0;i<caminho.length-1;){
+const trecho = caminho.slice(i, Math.min(i+40, caminho.length));
+if(trecho.length < 2) break;
+const r = await consultarTrechoDirectionsOSRM(trecho);
+duracao += r.duracao;
+distancia += r.distancia;
+i += trecho.length - 1;
+if(i < caminho.length-1) await esperar(120);
+}
+return {duracao, distancia, provedor:'OSRM'};
+}catch(erro){
+console.warn('Falha ao calcular métricas da rota:', erro);
+return {duracao:null, distancia:null, provedor:null};
+}
+}
+
+async function executarOtimizacaoRota(modo, destinoFinal){
+abrirOverlayOtimizacao('Buscando sua localização atual...');
+
+try{
+const inicio = await obterPontoInicialOtimizacao();
+const validos = gruposComCoordenadaValida();
+const invalidos = grupos.filter(g=>!validos.includes(g));
+
+if(validos.length === 0) throw new Error('SEM_COORDENADAS');
+
+let destino = null;
+if(modo === 'endereco'){
+if(!pontoValido(destinoFinal)) throw new Error('DESTINO_NAO_SELECIONADO');
+destino = {
+lat:Number(destinoFinal.lat),
+lng:Number(destinoFinal.lng),
+nome:destinoFinal.nome || '',
+endereco:destinoFinal.endereco || '',
+texto:destinoFinal.texto || destinoFinal.nome || destinoFinal.endereco || 'Ponto escolhido no mapa'
+};
+}
+
+// Mantém uma cópia da ordem original da Shopee para a comparação de tempo.
+const ordemShopee = [...validos].sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
+
+atualizarProgressoOtimizacao('Montando a melhor sequência inicial...');
+let ordem = modo === 'endereco'
+? rotaInsercaoComDestino(validos, inicio, destino)
+: rotaVizinhoMaisProximo(validos, inicio);
+
+ordem = melhorarRota2Opt(ordem, inicio, destino);
+
+const refinamento = await refinarRotaPorTrechos(ordem, inicio, destino);
+ordem = refinamento.ordem;
+
+// Preserva pontos sem coordenada no final e mantém a referência original.
+invalidos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
+grupos = [...ordem, ...invalidos];
+grupos.forEach((g,indice)=>{ g.ordemOtimizada = indice + 1; });
+
+atualizarProgressoOtimizacao('Calculando o tempo da ordem da Shopee...');
+const metricasShopee = await calcularMetricasRota(ordemShopee, inicio, destino);
+
+atualizarProgressoOtimizacao('Calculando o tempo da rota otimizada...');
+const metricasOtimizadas = await calcularMetricasRota(ordem, inicio, destino);
+
+metaRota = {
+modo,
+provedor:'OSRM',
+distanciaMetros:Number.isFinite(metricasOtimizadas.distancia) ? metricasOtimizadas.distancia : null,
+duracaoSegundos:Number.isFinite(metricasOtimizadas.duracao) ? metricasOtimizadas.duracao : null,
+distanciaShopeeMetros:Number.isFinite(metricasShopee.distancia) ? metricasShopee.distancia : null,
+duracaoShopeeSegundos:Number.isFinite(metricasShopee.duracao) ? metricasShopee.duracao : null,
+destinoFinal:destino ? {...destino} : null,
+inicio:{lat:inicio.lat,lng:inicio.lng,precisao:inicio.precisao ?? null},
+atualizadoEm:Date.now()
+};
+
+mapaFoiEnquadrado = false;
+salvarStorage();
+renderizarTudo();
+fecharOverlayOtimizacao();
+mostrarToast('⚡ Rota otimizada pelas vias', 'sucesso');
+
+}catch(erro){
+console.error('Falha na otimização da rota:', erro);
+fecharOverlayOtimizacao();
+
+if(erro && erro.message === 'LOCALIZACAO_INDISPONIVEL'){
+mostrarToast('⚠️ Não consegui sua localização. No PC, use 📌 no mapa e tente novamente.', 'alerta');
+abrirModalOtimizacao(false);
+return;
+}
+if(erro && erro.message === 'DESTINO_NAO_SELECIONADO'){
+mostrarToast('⚠️ Escolha o ponto final no mapa', 'alerta');
+abrirModalOtimizacao(false);
+abrirSeletorDestinoFinal();
+return;
+}
+if(erro && erro.message === 'SEM_COORDENADAS'){
+mostrarToast('⚠️ A rota não possui coordenadas válidas para otimizar', 'alerta');
+abrirModalOtimizacao(false);
+return;
+}
+
+mostrarToast('⚠️ Não foi possível otimizar agora. Tente novamente.', 'alerta');
+abrirModalOtimizacao(false);
+}
+}
+
+function formatarDuracaoRota(segundos){
+if(!Number.isFinite(segundos)) return null;
+const totalMin = Math.max(1, Math.round(segundos/60));
+const h = Math.floor(totalMin/60);
+const m = totalMin%60;
+return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m} min`;
+}
+
+function formatarDistanciaRota(metros){
+if(!Number.isFinite(metros)) return null;
+return metros >= 1000 ? `${(metros/1000).toFixed(metros >= 10000 ? 0 : 1)} km` : `${Math.round(metros)} m`;
+}
+
+function htmlComparacaoTempoRota(){
+if(!metaRota) return '';
+const tempoShopee = formatarDuracaoRota(metaRota.duracaoShopeeSegundos);
+const tempoOtimizado = formatarDuracaoRota(metaRota.duracaoSegundos);
+const distShopee = formatarDistanciaRota(metaRota.distanciaShopeeMetros);
+const distOtimizada = formatarDistanciaRota(metaRota.distanciaMetros);
+
+if(!tempoShopee && !tempoOtimizado) return '';
+
+let diferencaHtml = '';
+if(Number.isFinite(metaRota.duracaoShopeeSegundos) && Number.isFinite(metaRota.duracaoSegundos)){
+const diferenca = metaRota.duracaoShopeeSegundos - metaRota.duracaoSegundos;
+const abs = formatarDuracaoRota(Math.abs(diferenca));
+if(diferenca > 30){
+diferencaHtml = `<div class="economia-rota">⏱️ Economia estimada de deslocamento: ${abs}</div>`;
+}else if(diferenca < -30){
+diferencaHtml = `<div class="economia-rota pior">↔️ Esta configuração acrescenta cerca de ${abs} de deslocamento, mas respeita o ponto final escolhido.</div>`;
+}else{
+diferencaHtml = `<div class="economia-rota">≈ Tempo de deslocamento semelhante à ordem da Shopee</div>`;
+}
+}
+
+return `
+<div class="comparacao-rota">
+<div class="comparacao-grid">
+<div class="comparacao-item">
+📦 Ordem Shopee
+<strong>${tempoShopee || '—'}${distShopee ? ` · ${distShopee}` : ''}</strong>
+</div>
+<div class="comparacao-item otimizada">
+⚡ Otimizada
+<strong>${tempoOtimizado || '—'}${distOtimizada ? ` · ${distOtimizada}` : ''}</strong>
+</div>
+</div>
+${diferencaHtml}
+<div class="comparacao-nota">Estimativa de deslocamento pelas vias. Não inclui o tempo parado em cada entrega.</div>
+</div>`;
+}
+
+function atualizarStatusOtimizacaoRota(){
+const el = document.getElementById('statusOtimizacaoRota');
+if(!el) return;
+
+if(!grupos.length){
+el.style.display = 'none';
+return;
+}
+
+el.style.display = 'block';
+
+if(!metaRota || !['rapida','endereco'].includes(metaRota.modo)){
+el.innerHTML = `<div class="linha-status-rota">⚡ Rota aguardando otimização</div><div>A escolha de otimização será aplicada antes de iniciar a rota.</div>`;
+return;
+}
+
+const destino = metaRota.modo === 'endereco' && metaRota.destinoFinal
+? `<div style="margin-top:6px;">🏁 Termina perto de: <strong>${escaparHtmlTexto(metaRota.destinoFinal.texto || 'Ponto escolhido')}</strong></div>`
+: '';
+
+el.innerHTML = `
+<div class="linha-status-rota">⚡ Rota otimizada</div>
+${htmlComparacaoTempoRota()}
+${destino}
+`;
+}
+
+function htmlReferenciaRota(grupo){
+if(!temOrdemOtimizada(grupo)) return '';
+const shopee = ehStopValido(grupo.stopOriginal ?? grupo.stop) ? String(grupo.stopOriginal ?? grupo.stop) : 'Extra';
+return `
+<div class="rota-referencia">
+<span class="rota-otimizada-pill">⚡ Otimizada: <strong>${grupo.ordemOtimizada}</strong></span>
+<span class="rota-shopee-pill">📦 Shopee: <strong>${shopee}</strong></span>
+</div>`;
+}
+
+// ----------------------------------------------------------------------
+// LÓGICA DE "É O MESMO LOCAL?" (usada no agrupamento da importação)
+// ----------------------------------------------------------------------
+
+// Remove acentos, baixa a caixa e limpa espaços - facilita comparar texto
+function normalizarTexto(texto){
+return String(texto || "")
+.normalize("NFD")
+.replace(/[\u0300-\u036f]/g, "")
+.toLowerCase()
+.replace(/\s+/g, " ")
+.trim();
+}
+
+// Procura menções de apartamento/unidade/bloco/casa no endereço e monta
+// uma "assinatura" com os números encontrados. Ex: "Bloco B apto 607"
+// e "907 Bloco B" tem assinaturas diferentes -> são unidades diferentes.
+function assinaturaUnidade(enderecoNormalizado){
+const regex = /\b(?:apto|ap|apartamento|unidade|un|casa|bloco|bl|sala|loja|lote|quadra|qd)\.?\s*([a-z0-9\-]+)/gi;
+const encontrados = [];
+let m;
+while((m = regex.exec(enderecoNormalizado)) !== null){
+encontrados.push(m[1]);
+}
+if(encontrados.length === 0) return null;
+return encontrados.sort().join("|");
+}
+
+// Posições (início/fim) dos números que pertencem a uma menção de
+// apto/bloco/unidade - usado pra não confundir esses números com o
+// número da casa/prédio.
+function posicoesDeNumeroDeUnidade(enderecoNormalizado){
+const regex = /\b(?:apto|ap|apartamento|unidade|un|casa|bloco|bl|sala|loja|lote|quadra|qd)\.?\s*([a-z0-9\-]+)/gi;
+const posicoes = [];
+let m;
+while((m = regex.exec(enderecoNormalizado)) !== null){
+const inicioValor = m.index + m[0].length - m[1].length;
+posicoes.push({ inicio: inicioValor, fim: inicioValor + m[1].length });
+}
+return posicoes;
+}
+
+// Acha o nome da rua e o número da casa/prédio juntos: o número da casa
+// é o primeiro número "livre" do endereço (que não faz parte de um
+// "apto X"/"bloco Y"), esteja ele separado por vírgula ou não
+// (cobre tanto "Rua Tal, 349" quanto "Rua Tal 349"). A rua é tudo que
+// vem antes desse número.
+function extrairRuaENumero(enderecoNormalizado){
+
+const numeroRegex = /\d+/g;
+const posicoesUnidade = posicoesDeNumeroDeUnidade(enderecoNormalizado);
+let m;
+
+while((m = numeroRegex.exec(enderecoNormalizado)) !== null){
+
+const dentroDeUnidade = posicoesUnidade.some(
+p => m.index >= p.inicio && m.index < p.fim
+);
+
+if(!dentroDeUnidade){
+
+let rua = enderecoNormalizado
+.slice(0, m.index)
+.replace(/,\s*$/, "")
+.trim();
+
+rua = rua
+.replace(/^r\.?\s+/, "rua ")
+.replace(/^av\.?\s+/, "avenida ")
+.replace(/^al\.?\s+/, "alameda ")
+.replace(/^tv\.?\s+/, "travessa ")
+.replace(/^estr\.?\s+/, "estrada ")
+.trim();
+
+return { rua: rua || null, numero: m[0] };
+
+}
+
+}
+
+return { rua: null, numero: null };
+
+}
+
+// Distância real em metros entre duas coordenadas (fórmula de Haversine)
+function distanciaMetros(lat1, lng1, lat2, lng2){
+const R = 6371000;
+const rad = Math.PI / 180;
+const dLat = (lat2 - lat1) * rad;
+const dLng = (lng2 - lng1) * rad;
+const a = Math.sin(dLat/2) ** 2 +
+Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng/2) ** 2;
+const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+return R * c;
+}
+
+// Raio (em metros) dentro do qual duas coordenadas ainda contam como
+// "o mesmo prédio/local", cobrindo a variação natural do GPS.
+const RAIO_MESMO_LOCAL_METROS = 25;
+
+function paradasMesmoLocal(a, b){
+
+const enderecoA = normalizarTexto(a.endereco);
+const enderecoB = normalizarTexto(b.endereco);
+
+const infoA = extrairRuaENumero(enderecoA);
+const infoB = extrairRuaENumero(enderecoB);
+const ruaA = infoA.rua;
+const ruaB = infoB.rua;
+const numeroA = infoA.numero;
+const numeroB = infoB.numero;
+
+// 1ª camada (a mais forte): número da casa/prédio diferente = SEMPRE
+// locais diferentes, mesmo que a coordenada esteja bem perto - é
+// exatamente o caso de duas casas vizinhas com GPS parecido.
+if(numeroA && numeroB && numeroA !== numeroB){
+return false;
+}
+
+// Reforça com o nome da rua: se além do número, a rua também bate,
+// e os dois tiverem essa informação, é o mesmo prédio - MESMO que os
+// apartamentos sejam diferentes. Isso é seguro agora porque cada pacote
+// já controla seu próprio status individual (ver "Ocorrência só neste
+// pacote"), então não precisamos mais separar por apto pra isso.
+const ruaENumeroBatem = !!(ruaA && ruaB && numeroA && numeroB && ruaA === ruaB && numeroA === numeroB);
+
+if(ruaENumeroBatem){
+return true;
+}
+
+// 2ª camada: sem rua+número suficiente pra confirmar o prédio, usa
+// unidade/apto/bloco como pista de que é o mesmo local.
+const unidadeA = assinaturaUnidade(enderecoA);
+const unidadeB = assinaturaUnidade(enderecoB);
+
+if(unidadeA && unidadeB){
+return unidadeA === unidadeB;
+}
+
+// 3ª camada: sem informação de endereço suficiente, decide pela
+// distância real entre as coordenadas.
+const latA = parseFloat(a.lat);
+const lngA = parseFloat(a.lng);
+const latB = parseFloat(b.lat);
+const lngB = parseFloat(b.lng);
+
+if(!isNaN(latA) && !isNaN(lngA) && !isNaN(latB) && !isNaN(lngB)){
+return distanciaMetros(latA, lngA, latB, lngB) <= RAIO_MESMO_LOCAL_METROS;
+}
+
+// Último recurso (sem coordenada nenhuma): compara o texto normalizado
+return enderecoA === enderecoB;
+
+}
+
+// ----------------------------------------------------------------------
+// ORDENAÇÃO E RENDERIZAÇÃO DA LISTA
+// ----------------------------------------------------------------------
+
+function ordemStatus(status){
+if(status === 'pendente') return 0;
+if(status === 'ocorrencia') return 1;
+return 2; // entregue vai para o final
+}
+
+function listaOrdenada(){
+return grupos
+.map((g,indiceOriginal)=>({g,indiceOriginal}))
+.sort((a,b)=>{
+const diff = ordemStatus(statusEfetivoGrupo(a.g)) - ordemStatus(statusEfetivoGrupo(b.g));
+if(diff !== 0) return diff;
+return a.indiceOriginal - b.indiceOriginal;
+})
+.map(x=>x.g);
+}
+
+// Lista da aba principal: some daqui só quando TODOS os pacotes da parada
+// estão em ocorrência (falha total - nada mais a fazer ali). Casos mistos
+// (ex: 4 entregues + 1 ocorrência) continuam aqui, porque ainda há
+// trabalho pendente/ativo nessa parada.
+function listaPrincipal(){
+return listaOrdenada().filter(g => !g.pacotes.every(p => p.status === 'ocorrencia'));
+}
+
+// Um Stop é considerado "de verdade" quando existe e não é só um
+// traço/vazio. Cobre casos de planilha sem coluna Stop, Stop vazio
+// ou com valor "-" (o que antes aparecia errado como "Parada -").
+function ehStopValido(stop){
+return !!stop && String(stop).trim() !== '' && String(stop).trim() !== '-';
+}
+
+function temOrdemOtimizada(grupo){
+return grupo && grupo.ordemOtimizada !== null && grupo.ordemOtimizada !== undefined && grupo.ordemOtimizada !== '' && Number.isFinite(Number(grupo.ordemOtimizada));
+}
+
+function tituloParada(grupo){
+if(temOrdemOtimizada(grupo)){
+return "📍 Parada " + grupo.ordemOtimizada;
+}
+return ehStopValido(grupo.stop) ? ("📍 Parada " + grupo.stop) : "⭐ Extra";
+}
+
+// Extrai só o primeiro nome do destinatário (evita expor o sobrenome completo)
+function primeiroNome(nomeCompleto){
+if(!nomeCompleto) return "";
+return String(nomeCompleto).trim().split(/\s+/)[0];
+}
+
+// Monta o conteúdo interno de UMA localização (endereço, status, pacotes,
+// Waze e botões de ação) - usado tanto para paradas sozinhas quanto para
+// cada "sub-local" dentro de uma Parada composta (ex: casa 43/45/1).
+function construirConteudoLocal(grupo){
+
+let htmlPacotes = "";
+
+grupo.pacotes.forEach((pacote, indice)=>{
+
+let acaoPacoteHtml = "";
+
+if(pacote.status === 'ocorrencia'){
+acaoPacoteHtml = `
+<div class="ocorrencia-pacote-texto">⚠️ Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
+<div class="btn-linha-pacote">
+<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">✅ Entregar</button>
+<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">↩️ Desfazer</button>
+</div>
+`;
+}else{
+acaoPacoteHtml = `
+<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">⚠️ Ocorrência só neste pacote</button>
+`;
+}
+
+htmlPacotes += `
+
+<div class="pacote pacote-status-${pacote.status}">
+
+<div class="codigo">
+${pacote.codigo}
+</div>
+
+${pacote.destinatario ? `<div class="nome-cliente-pacote">👤 ${primeiroNome(pacote.destinatario)}</div>` : ''}
+
+<div class="detalhe">
+${pacote.endereco}
+</div>
+
+${pacote.status === 'entregue' ? '<div class="entregue-pacote-texto">✅ Entregue</div>' : acaoPacoteHtml}
+
+</div>
+
+`;
+
+});
+
+const badgeStatusHtml = badgeStatusGrupoHtml(grupo);
+
+return `
+
+<div class="endereco">
+${grupo.endereco}
+</div>
+${htmlReferenciaRota(grupo)}
+
+<div class="badge">
+${grupo.pacotes.length}
+pacote(s) neste local
+</div>
+${badgeStatusHtml}
+
+<button
+class="toggle"
+onclick="alternarPacotes('${grupo.id}')">
+Mostrar/Ocultar pacotes
+</button>
+
+<div
+id="pacotes_${grupo.id}"
+class="pacotes"
+style="${painelPacotesAbertos.has(grupo.id) ? 'display:block;' : ''}">
+
+${htmlPacotes}
+
+</div>
+
+<button
+class="waze"
+onclick="
+abrirWaze(
+'${grupo.lat}',
+'${grupo.lng}'
+)">
+Abrir no Waze</button>
+
+<div class="btn-linha">
+<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">✅ Entregue</button>
+<button class="ocorrencia-btn" onclick="abrirModalMotivo('${grupo.id}')">⚠️ Ocorrência</button>
+<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">↩️ Desfazer</button>
+</div>
+
+`;
+
+}
+
+function renderizarTudo(){
+
+const lista =
+document.getElementById("lista");
+
+lista.innerHTML = "";
+
+const ordenados = listaPrincipal();
+
+document.getElementById("locais")
+.innerText = grupos.length;
+
+let divisoriaEntreguesInserida = false;
+
+// Agrupa visualmente execuções consecutivas com o mesmo número de Parada
+// (só na aba Lista - o mapa e a aba Ocorrências continuam tratando cada
+// endereço como um item independente, sem nenhuma mudança lá).
+let i = 0;
+
+while(i < ordenados.length){
+
+const grupo = ordenados[i];
+const statusGrupo = statusEfetivoGrupo(grupo);
+
+if(statusGrupo === 'entregue' && !divisoriaEntreguesInserida){
+lista.innerHTML += `<div class="divisoria-entregues"><span>✅ Entregues</span></div>`;
+divisoriaEntreguesInserida = true;
+}
+
+const bloco = [grupo];
+let j = i + 1;
+
+while(
+j < ordenados.length &&
+!temOrdemOtimizada(grupo) &&
+ehStopValido(grupo.stop) &&
+ordenados[j].stop === grupo.stop &&
+statusEfetivoGrupo(ordenados[j]) === statusGrupo
+){
+bloco.push(ordenados[j]);
+j++;
+}
+
+if(bloco.length === 1){
+
+lista.innerHTML += `
+<div class="grupo status-${statusGrupo}" id="grupo_${grupo.id}">
+<h3>${tituloParada(grupo)}</h3>
+${construirConteudoLocal(grupo)}
+</div>
+`;
+
+}else{
+
+let subLocaisHtml = "";
+let totalPacotesBloco = 0;
+
+bloco.forEach(item=>{
+totalPacotesBloco += item.pacotes.length;
+subLocaisHtml += `
+<div class="sub-local status-${statusEfetivoGrupo(item)}" id="grupo_${item.id}">
+${construirConteudoLocal(item)}
+</div>
+`;
+});
+
+lista.innerHTML += `
+<div class="parada-composta">
+<h3>${tituloParada(grupo)}</h3>
+<div class="badge-total-parada">📦 ${totalPacotesBloco} pacote(s) ao todo nesta parada</div>
+${subLocaisHtml}
+</div>
+`;
+
+}
+
+i = j;
+
+}
+
+atualizarEstatisticas();
+atualizarMapa();
+renderizarOcorrencias();
+atualizarStatusOtimizacaoRota();
+
+}
+
+function renderizarOcorrencias(){
+
+const container = document.getElementById('listaOcorrencias');
+const ocorrencias = grupos.filter(g => g.pacotes.some(p => p.status === 'ocorrencia'));
+
+if(ocorrencias.length === 0){
+container.innerHTML = `<div class="aviso-vazio">Nenhuma ocorrência no momento 🎉</div>`;
+return;
+}
+
+container.innerHTML = "";
+
+ocorrencias.forEach(grupo=>{
+
+let htmlPacotes = "";
+
+grupo.pacotes.forEach((pacote, indice)=>{
+
+let acaoPacoteHtml = "";
+
+if(pacote.status === 'ocorrencia'){
+acaoPacoteHtml = `
+<div class="ocorrencia-pacote-texto">⚠️ Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
+<div class="btn-linha-pacote">
+<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">✅ Entregar</button>
+<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">↩️ Desfazer</button>
+</div>
+`;
+}else{
+acaoPacoteHtml = `
+<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">⚠️ Ocorrência só neste pacote</button>
+`;
+}
+
+htmlPacotes += `
+<div class="pacote pacote-status-${pacote.status}">
+<div class="codigo">${pacote.codigo}</div>
+${pacote.destinatario ? `<div class="nome-cliente-pacote">👤 ${primeiroNome(pacote.destinatario)}</div>` : ''}
+<div class="detalhe">${pacote.endereco}</div>
+${pacote.status === 'entregue' ? '<div class="entregue-pacote-texto">✅ Entregue</div>' : acaoPacoteHtml}
+</div>
+`;
+
+});
+
+container.innerHTML += `
+<div class="grupo status-${statusEfetivoGrupo(grupo)}" id="grupo_oc_${grupo.id}">
+<h3>${tituloParada(grupo)}</h3>
+<div class="endereco">${grupo.endereco}</div>
+${htmlReferenciaRota(grupo)}
+<div class="badge">${grupo.pacotes.length} pacote(s) neste local</div>
+${badgeStatusGrupoHtml(grupo)}
+
+<button class="toggle" onclick="alternarPacotes('oc_${grupo.id}')">Mostrar/Ocultar pacotes</button>
+<div id="pacotes_oc_${grupo.id}" class="pacotes" style="${painelPacotesAbertos.has('oc_' + grupo.id) ? 'display:block;' : ''}">${htmlPacotes}</div>
+
+<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">Abrir no Waze</button>
+
+<div class="btn-linha">
+<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">✅ Entregue</button>
+<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">↩️ Desfazer</button>
+</div>
+</div>
+`;
+
+});
+
+}
+
+function alternarPacotes(id){
+
+const elemento =
+document.getElementById(
+"pacotes_" + id
+);
+
+if(
+elemento.style.display ===
+"block"
+){
+
+elemento.style.display =
+"none";
+
+painelPacotesAbertos.delete(id);
+
+}else{
+
+elemento.style.display =
+"block";
+
+painelPacotesAbertos.add(id);
+
+}
+
+}
+
+function abrirWaze(lat,lng){
+
+if(!lat || !lng){
+
+alert(
+"Latitude ou Longitude não encontrada."
+);
+
+return;
+
+}
+
+window.open(
+`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`,
+'_blank'
+);
+
+}
+
+// ----------------------------------------------------------------------
+// V4.1 - STATUS (agora por PACOTE, não mais por parada inteira)
+// Os botões grandes continuam agindo em massa (toda a parada de uma vez);
+// cada pacote também pode ter seu próprio status individual, para os
+// casos em que só 1 de vários pacotes no mesmo local dá problema.
+// ----------------------------------------------------------------------
+
+function encontrarGrupo(id){
+return grupos.find(g => g.id === id);
+}
+
+// Calcula o status "efetivo" da parada a partir dos pacotes dela:
+// só é 'entregue' se TODOS os pacotes estiverem entregues; é 'ocorrencia'
+// se PELO MENOS UM pacote estiver com ocorrência (mesmo com outros já
+// entregues); caso contrário, é 'pendente'.
+function statusEfetivoGrupo(grupo){
+if(grupo.pacotes.every(p => p.status === 'entregue')) return 'entregue';
+if(grupo.pacotes.some(p => p.status === 'ocorrencia')) return 'ocorrencia';
+return 'pendente';
+}
+
+// Monta o selo de status da parada, já considerando casos mistos
+// (ex: 4 entregues e 1 com ocorrência no mesmo local)
+function badgeStatusGrupoHtml(grupo){
+
+const total = grupo.pacotes.length;
+const entregues = grupo.pacotes.filter(p => p.status === 'entregue').length;
+const ocorrencias = grupo.pacotes.filter(p => p.status === 'ocorrencia').length;
+const pendentes = total - entregues - ocorrencias;
+
+const misto = (ocorrencias > 0 && (entregues > 0 || pendentes > 0));
+
+if(misto){
+let partes = [];
+if(pendentes > 0) partes.push(`🟡 ${pendentes} pendente(s)`);
+if(entregues > 0) partes.push(`✅ ${entregues} entregue(s)`);
+if(ocorrencias > 0) partes.push(`⚠️ ${ocorrencias} ocorrência(s)`);
+return `<span class="badge-status misto">${partes.join(' · ')}</span>`;
+}
+
+if(entregues === total) return `<span class="badge-status entregue">✅ Entregue</span>`;
+if(ocorrencias === total) return `<span class="badge-status ocorrencia">⚠️ Ocorrência</span>`;
+return `<span class="badge-status pendente">🟡 Pendente</span>`;
+
+}
+
+// Ação em massa (botão grande "Entregue"): marca como entregue todo
+// pacote que ainda não estiver com ocorrência registrada individualmente
+// - assim não sobrescreve uma exceção que você já marcou pacote a pacote.
+function marcarEntregue(id){
+
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+
+let algumPacoteMudou = false;
+
+grupo.pacotes.forEach(p => {
+if(p.status !== 'ocorrencia' && p.status !== 'entregue'){
+p.status = 'entregue';
+algumPacoteMudou = true;
+}
+});
+
+salvarStorage();
+renderizarTudo();
+
+if(algumPacoteMudou){
+mostrarToast(fraseAleatoria(FRASES_ENTREGA), 'sucesso');
+tocarSomEntrega();
+}else{
+mostrarToast('⚠️ Só tem pacote em ocorrência aqui - abra "Mostrar/Ocultar pacotes" e resolva ele direto', 'alerta');
+}
+
+}
+
+// Versão "sem exceção" usada só no painel do mapa: como lá não existe
+// controle por pacote individual, o botão Entregue precisa resolver
+// TUDO da parada de uma vez, inclusive pacotes já em ocorrência -
+// senão o clique não tem efeito nenhum quando só havia ocorrência ali.
+function marcarEntregueSemExcecao(id){
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+grupo.pacotes.forEach(p => {
+p.status = 'entregue';
+p.motivo = null;
+});
+salvarStorage();
+renderizarTudo();
+mostrarToast(fraseAleatoria(FRASES_ENTREGA), 'sucesso');
+tocarSomEntrega();
+}
+
+// Alvo do modal de motivo: pode ser a parada inteira ({tipo:'grupo'}) ou
+// um pacote específico dentro dela ({tipo:'pacote', indice}).
+let alvoAguardandoMotivo = null;
+
+function abrirModalMotivo(id){
+alvoAguardandoMotivo = { tipo:'grupo', grupoId:id };
+document.getElementById('modalMotivo').classList.add('aberto');
+}
+
+// Exceção individual: marca ocorrência só num pacote específico da lista,
+// sem afetar os demais pacotes daquela mesma parada.
+function abrirModalMotivoPacote(grupoId, indice){
+alvoAguardandoMotivo = { tipo:'pacote', grupoId:grupoId, indice:indice };
+document.getElementById('modalMotivo').classList.add('aberto');
+}
+
+function fecharModalMotivo(){
+alvoAguardandoMotivo = null;
+document.getElementById('modalMotivo').classList.remove('aberto');
+}
+
+function confirmarOcorrencia(motivo){
+
+if(!alvoAguardandoMotivo){ fecharModalMotivo(); return; }
+
+const grupo = encontrarGrupo(alvoAguardandoMotivo.grupoId);
+
+if(grupo){
+
+if(alvoAguardandoMotivo.tipo === 'grupo'){
+// Ação em massa: toda a parada (todos os pacotes) vira ocorrência
+grupo.pacotes.forEach(p => {
+p.status = 'ocorrencia';
+p.motivo = motivo;
+});
+mostrarToast(fraseAleatoria(FRASES_OCORRENCIA), 'alerta');
+}else{
+// Exceção: só o pacote específico vira ocorrência
+const pacote = grupo.pacotes[alvoAguardandoMotivo.indice];
+if(pacote){
+pacote.status = 'ocorrencia';
+pacote.motivo = motivo;
+mostrarToast(fraseAleatoria(FRASES_OCORRENCIA), 'alerta');
+}
+}
+
+salvarStorage();
+renderizarTudo();
+
+}
+
+fecharModalMotivo();
+
+}
+
+// Ação em massa (botão grande "Desfazer"): volta todos os pacotes da
+// parada para pendente, inclusive os que tinham ocorrência individual.
+function desfazerStatus(id){
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+grupo.pacotes.forEach(p => {
+p.status = 'pendente';
+p.motivo = null;
+});
+salvarStorage();
+renderizarTudo();
+mostrarToast('↩️ Status desfeito', 'neutro');
+}
+
+// Desfazer individual: volta só 1 pacote específico para pendente
+function desfazerStatusPacote(grupoId, indice){
+const grupo = encontrarGrupo(grupoId);
+if(!grupo) return;
+const pacote = grupo.pacotes[indice];
+if(!pacote) return;
+pacote.status = 'pendente';
+pacote.motivo = null;
+salvarStorage();
+renderizarTudo();
+mostrarToast('↩️ Pacote voltou a pendente', 'neutro');
+}
+
+// Resolve uma ocorrência marcando o pacote como entregue direto, sem
+// precisar desfazer primeiro (ex: você resolveu o problema na hora e
+// conseguiu entregar mesmo assim).
+function marcarEntreguePacote(grupoId, indice){
+const grupo = encontrarGrupo(grupoId);
+if(!grupo) return;
+const pacote = grupo.pacotes[indice];
+if(!pacote) return;
+pacote.status = 'entregue';
+pacote.motivo = null;
+salvarStorage();
+renderizarTudo();
+mostrarToast(fraseAleatoria(FRASES_ENTREGA), 'sucesso');
+tocarSomEntrega();
+}
+
+// ----------------------------------------------------------------------
+// TOAST DE CONFIRMAÇÃO (animação rápida ao marcar status)
+// ----------------------------------------------------------------------
+
+let idTimeoutToast = null;
+
+// Um pouco de personalidade nas mensagens - em vez de repetir sempre a
+// mesma frase, sorteia entre algumas variações.
+const FRASES_ENTREGA = [
+'✅ Entrega confirmada!',
+'🚚 Mandou bem, mais uma na conta!',
+'📦 Show, entregue!',
+'✅ Boa! Seguindo o baile.'
+];
+
+const FRASES_OCORRENCIA = [
+'⚠️ Ocorrência registrada',
+'⚠️ Anotado, bora pra próxima',
+'⚠️ Beleza, já ficou registrado'
+];
+
+function fraseAleatoria(lista){
+return lista[Math.floor(Math.random() * lista.length)];
+}
+
+function mostrarToast(mensagem, tipo){
+
+let toast = document.getElementById('toastCopiloto');
+
+if(!toast){
+toast = document.createElement('div');
+toast.id = 'toastCopiloto';
+document.body.appendChild(toast);
+}
+
+toast.textContent = mensagem;
+toast.className = 'toast-copiloto toast-' + tipo + ' aparecer';
+
+// Reinicia o timer se o usuário disparar outra ação rapidinho em seguida
+if(idTimeoutToast) clearTimeout(idTimeoutToast);
+
+idTimeoutToast = setTimeout(()=>{
+toast.classList.remove('aparecer');
+}, 1600);
+
+}
+
+// ----------------------------------------------------------------------
+// V6 - ESTATÍSTICAS DA ROTA
+// ----------------------------------------------------------------------
+
+function atualizarEstatisticas(){
+
+const totalParadas = grupos.length;
+const todosPacotes = grupos.flatMap(g => g.pacotes);
+
+const pacotesPendentes = todosPacotes.filter(p => p.status === 'pendente').length;
+const pacotesEntregues = todosPacotes.filter(p => p.status === 'entregue').length;
+const pacotesOcorrencia = todosPacotes.filter(p => p.status === 'ocorrencia').length;
+
+// Os cards de estatística agora mostram quantidade de PACOTES, não de
+// paradas - fica mais preciso quando uma parada tem status misto
+// (alguns pacotes entregues, outro com ocorrência, no mesmo local).
+document.getElementById('qtdPendentes').innerText = pacotesPendentes;
+document.getElementById('qtdEntregues').innerText = pacotesEntregues;
+document.getElementById('qtdOcorrencias').innerText = pacotesOcorrencia;
+
+// Contadores das abas = mesma base (quantidade de pacotes)
+document.getElementById('contadorLista').innerText = pacotesPendentes;
+document.getElementById('contadorOcorrencias').innerText = pacotesOcorrencia;
+
+const totalPacotes = todosPacotes.length;
+const percentual = totalPacotes > 0
+? Math.round((pacotesEntregues / totalPacotes) * 100)
+: 0;
+
+// Marcos de progresso da rota - avisa uma vez cada quando cruza 25/50/75%
+const MARCOS_PROGRESSO = [
+{ valor: 25, mensagem: '🚀 25% da rota! Bom começo.' },
+{ valor: 50, mensagem: '💪 Metade do caminho!' },
+{ valor: 75, mensagem: '🔥 75%! Reta final chegando.' }
+];
+
+MARCOS_PROGRESSO.forEach(marco => {
+if(percentual >= marco.valor && !marcosMostrados.has(marco.valor)){
+marcosMostrados.add(marco.valor);
+mostrarToast(marco.mensagem, 'sucesso');
+}
+});
+
+// Compara com o histórico salvo pra avisar quando bater o recorde do dia
+atualizarHistoricoEAvisarRecorde(pacotesEntregues);
+
+const barra = document.getElementById('barraProgresso');
+barra.style.width = percentual + '%';
+barra.innerText = percentual + '%';
+
+// Uma comemoração quando a rota é 100% finalizada 🎉
+if(percentual === 100 && totalPacotes > 0){
+if(!celebracaoMostrada){
+celebracaoMostrada = true;
+mostrarToast('🎉 Rota finalizada! Mandou muito bem hoje.', 'sucesso');
+}
+}else{
+celebracaoMostrada = false;
+}
+
+}
+
+// Guarda, por dia, o maior número de pacotes entregues naquele dia -
+// e avisa (uma vez por rota) quando o dia de hoje supera o melhor dia
+// anterior já registrado.
+function dataDeHojeChave(){
+const d = new Date();
+return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function carregarHistoricoEntregas(){
+try{
+const bruto = localStorage.getItem(HISTORICO_STORAGE_KEY);
+return bruto ? JSON.parse(bruto) : {};
+}catch(erro){
+return {};
+}
+}
+
+function salvarHistoricoEntregas(historico){
+try{
+localStorage.setItem(HISTORICO_STORAGE_KEY, JSON.stringify(historico));
+}catch(erro){
+console.warn("Não foi possível salvar o histórico de entregas:", erro);
+}
+}
+
+function atualizarHistoricoEAvisarRecorde(pacotesEntreguesHoje){
+
+const historico = carregarHistoricoEntregas();
+const hoje = dataDeHojeChave();
+
+const recordeAnterior = Object.keys(historico)
+.filter(dia => dia !== hoje)
+.reduce((max, dia) => Math.max(max, historico[dia] || 0), 0);
+
+historico[hoje] = Math.max(historico[hoje] || 0, pacotesEntreguesHoje);
+salvarHistoricoEntregas(historico);
+
+if(!recordeAvisado && recordeAnterior > 0 && pacotesEntreguesHoje > recordeAnterior){
+recordeAvisado = true;
+mostrarToast(`🏆 Novo recorde! Hoje já passou seu melhor dia (${recordeAnterior} → ${pacotesEntreguesHoje})`, 'sucesso');
+}
+
+}
+
+// ----------------------------------------------------------------------
+// V4.2 - PERSISTÊNCIA COM localStorage
+// ----------------------------------------------------------------------
+
+function salvarStorage(){
+try{
+localStorage.setItem(CHAVE_STORAGE, JSON.stringify(grupos));
+localStorage.setItem(META_ROTA_STORAGE_KEY, JSON.stringify(metaRota));
+}catch(erro){
+console.error("Não foi possível salvar a rota localmente:", erro);
+}
+}
+
+function carregarStorage(){
+try{
+const salvo = localStorage.getItem(CHAVE_STORAGE);
+if(!salvo) return;
+grupos = JSON.parse(salvo);
+
+// Migração suave de rotas salvas antes da V7.
+grupos.forEach((g,indice)=>{
+if(g.stopOriginal === undefined) g.stopOriginal = g.stop;
+if(g.ordemOtimizada === undefined) g.ordemOtimizada = null;
+if(!Number.isFinite(g.indiceImportacao)) g.indiceImportacao = indice;
+});
+
+const metaSalva = localStorage.getItem(META_ROTA_STORAGE_KEY);
+if(metaSalva){
+try{ metaRota = JSON.parse(metaSalva); }catch(erro){}
+}
+
+const totalPacotes = grupos.reduce((acc,g)=>acc + g.pacotes.length, 0);
+document.getElementById("pacotes").innerText = totalPacotes;
+
+renderizarTudo();
+}catch(erro){
+console.error("Não foi possível carregar a rota salva:", erro);
+}
+}
+
+// ----------------------------------------------------------------------
+// V5 - MAPA INTEGRADO (Leaflet)
+// ----------------------------------------------------------------------
+
+function inicializarMapaSeNecessario(){
+if(mapa) return;
+
+mapa = L.map('mapa', {
+rotate: true,        // habilita a rotação do mapa
+touchRotate: true,    // gira com o gesto de dois dedos no celular
+rotateControl: false, // vamos usar nosso próprio botão de bússola
+zoomControl: false,   // desliga o padrão (fica em cima da legenda) - recriamos embaixo
+bearing: 0
+}).setView([-23.5505,-46.6333], 12);
+
+L.control.zoom({ position: 'bottomleft' }).addTo(mapa);
+
+// Camada base do mapa sem necessidade de API key. A versão anterior
+// usava CARTO e passou a exibir "API KEY REQUIRED" em alguns acessos.
+// Agora a Esri World Street Map é a camada principal. Se houver falhas
+// repetidas de tiles, o app troca sozinho para a camada Humanitarian do
+// OpenStreetMap, sem exigir configuração do usuário.
+let errosTilesMapa = 0;
+let fallbackMapaAtivado = false;
+let camadaFallbackMapa = null;
+
+const camadaBasePrincipal = L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+{
+maxZoom: 19,
+attribution: 'Tiles &copy; Esri'
+}
+);
+
+camadaBasePrincipal.on('tileerror', function(){
+errosTilesMapa++;
+
+// Um erro isolado pode ser apenas oscilação de conexão. Só muda de camada
+// depois de várias falhas na mesma abertura do mapa.
+if(errosTilesMapa >= 4 && !fallbackMapaAtivado){
+fallbackMapaAtivado = true;
+
+if(mapa.hasLayer(camadaBasePrincipal)){
+mapa.removeLayer(camadaBasePrincipal);
+}
+
+camadaFallbackMapa = L.tileLayer(
+'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+{
+subdomains: 'abc',
+maxZoom: 19,
+attribution: '&copy; OpenStreetMap contributors, Tiles style by HOT'
+}
+);
+
+camadaFallbackMapa.addTo(mapa);
+mostrarToast('🗺️ Camada alternativa do mapa ativada', 'neutro');
+}
+});
+
+camadaBasePrincipal.addTo(mapa);
+
+// Fallback manual de localização: quando ativado pelo botão 📌, o próximo
+// toque no mapa vira a posição do usuário. É útil principalmente no PC,
+// onde normalmente não existe GPS e a localização por rede pode ser imprecisa.
+mapa.on('click', function(e){
+if(!modoAjustePosicaoManual) return;
+definirPosicaoManual(e.latlng);
+});
+
+}
+
+// Volta o mapa para a orientação normal (norte para cima)
+// e pede uma leitura NOVA quando o usuário toca no alvo. Não usamos cache
+// nessa ação porque o objetivo aqui é obter a posição mais precisa possível.
+function centralizarMinhaLocalizacao(){
+
+if(typeof mapa.setBearing === 'function'){
+mapa.setBearing(0);
+}
+
+if(localizacaoManualAtiva && meuMarcador){
+mapa.setView(meuMarcador.getLatLng(), Math.max(mapa.getZoom(), 17));
+mostrarToast('📌 Usando a posição ajustada manualmente', 'neutro');
+return;
+}
+
+if(!geolocalizacaoPodeFuncionarAqui()){
+atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra o Copiloto pelo link HTTPS ou use o botão 📌.', 'erro');
+mostrarToast('⚠️ Arquivo aberto fora de HTTPS: use o link publicado ou ajuste com 📌', 'alerta');
+return;
+}
+
+atualizarStatusLocalizacao('🎯 Buscando localização precisa...', 'alerta');
+mostrarToast('🎯 Refinando sua localização...', 'neutro');
+solicitarLocalizacaoPrecisa(true);
+iniciarRastreamentoLocalizacao();
+}
+
+function geolocalizacaoPodeFuncionarAqui(){
+const protocolo = String(window.location.protocol || '').toLowerCase();
+const host = String(window.location.hostname || '').toLowerCase();
+
+// Geolocation do navegador exige contexto seguro. O content:// usado ao
+// abrir um HTML vindo do WhatsApp e arquivos locais equivalentes não
+// oferecem um contexto confiável para o GPS no Chrome Android.
+if(protocolo === 'content:' || protocolo === 'file:') return false;
+if(window.isSecureContext) return true;
+if(host === 'localhost' || host === '127.0.0.1') return true;
+return false;
+}
+
+function atualizarStatusLocalizacao(texto, tipo){
+const el = document.getElementById('statusLocalizacaoMapa');
+if(!el) return;
+el.textContent = texto;
+el.className = tipo || '';
+}
+
+function mensagemErroGeolocalizacao(erro){
+if(!geolocalizacaoPodeFuncionarAqui()){
+return 'GPS bloqueado porque o Copiloto foi aberto como arquivo. Abra o link HTTPS publicado ou use 📌.';
+}
+if(erro && erro.code === 1) return 'Permissão de localização negada. Libere Localização para este site no navegador.';
+if(erro && erro.code === 2) return 'Localização indisponível. Ative o GPS e tente novamente.';
+if(erro && erro.code === 3) return 'O GPS demorou para responder. Tente novamente em local aberto.';
+return 'Não foi possível obter sua localização agora.';
+}
+
+function criarOuAtualizarMarcadorUsuario(lat, lng, precisao, centralizar){
+
+if(!mapa) return;
+
+const icone = L.divIcon({
+html: '<div class="pin-usuario"></div>',
+className:'',
+iconSize:[18,18],
+iconAnchor:[9,9]
+});
+
+if(!meuMarcador){
+meuMarcador = L.marker([lat,lng], {icon:icone, zIndexOffset:1000}).addTo(mapa);
+}else{
+meuMarcador.setLatLng([lat,lng]);
+}
+
+// A margem de erro é importante principalmente no PC: ela mostra visualmente
+// quando o navegador só conseguiu estimar a posição por rede/Wi-Fi.
+if(Number.isFinite(precisao) && precisao > 0){
+if(!circuloPrecisaoUsuario){
+circuloPrecisaoUsuario = L.circle([lat,lng], {
+radius:precisao,
+weight:1,
+opacity:.7,
+fillOpacity:.08
+}).addTo(mapa);
+}else{
+circuloPrecisaoUsuario.setLatLng([lat,lng]);
+circuloPrecisaoUsuario.setRadius(precisao);
+}
+}else if(circuloPrecisaoUsuario){
+mapa.removeLayer(circuloPrecisaoUsuario);
+circuloPrecisaoUsuario = null;
+}
+
+if(centralizar){
+mapa.setView([lat,lng], Math.max(mapa.getZoom(), 17));
+}
+}
+
+function aplicarPosicaoGeolocalizada(posicao, centralizarForcado){
+if(!posicao || !posicao.coords || localizacaoManualAtiva) return;
+
+const lat = Number(posicao.coords.latitude);
+const lng = Number(posicao.coords.longitude);
+const precisao = Number(posicao.coords.accuracy);
+if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+ultimaPosicaoUsuario = { lat, lng, precisao, timestamp:posicao.timestamp || Date.now() };
+precisaoLocalizacaoMetros = Number.isFinite(precisao) ? precisao : null;
+
+let tipo = 'alerta';
+let descricaoPrecisao = 'precisão desconhecida';
+
+if(Number.isFinite(precisao)){
+const arredondada = Math.max(1, Math.round(precisao));
+descricaoPrecisao = `±${arredondada} m`;
+if(precisao <= 30) tipo = 'ok';
+else if(precisao <= 100) tipo = 'alerta';
+else tipo = 'erro';
+}
+
+atualizarStatusLocalizacao(`📍 GPS ${descricaoPrecisao}${precisao > 100 ? ' — baixa precisão' : ''}`, tipo);
+
+// Na primeira leitura automática só centraliza sozinha quando já temos uma
+// precisão razoável. Assim o mapa não "salta" para uma estimativa grosseira
+// do PC e depois precisa voltar quando o GPS refina.
+const deveCentralizar = !!centralizarForcado || (!primeiraCentralizacaoGPSFeita && (!Number.isFinite(precisao) || precisao <= 80));
+criarOuAtualizarMarcadorUsuario(lat, lng, precisao, deveCentralizar);
+
+if(deveCentralizar) primeiraCentralizacaoGPSFeita = true;
+}
+
+function solicitarLocalizacaoPrecisa(centralizarAoObter){
+
+if(!navigator.geolocation || !geolocalizacaoPodeFuncionarAqui()) return;
+
+navigator.geolocation.getCurrentPosition(
+function(posicao){
+aplicarPosicaoGeolocalizada(posicao, !!centralizarAoObter);
+
+const precisao = Number(posicao.coords && posicao.coords.accuracy);
+if(Number.isFinite(precisao) && precisao <= 30){
+mostrarToast(`✅ Localização precisa: ±${Math.round(precisao)} m`, 'sucesso');
+}else if(Number.isFinite(precisao)){
+mostrarToast(`📍 Precisão atual: ±${Math.round(precisao)} m`, precisao <= 100 ? 'neutro' : 'alerta');
+}
+},
+function(erro){
+const mensagem = mensagemErroGeolocalizacao(erro);
+atualizarStatusLocalizacao('⚠️ ' + mensagem, 'erro');
+mostrarToast('⚠️ ' + mensagem, 'alerta');
+},
+{
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:30000
+}
+);
+}
+
+// Mostra a localização do usuário no mapa e vai atualizando conforme ele anda.
+// maximumAge=0 evita reutilizar uma posição antiga e enableHighAccuracy pede GPS
+// sempre que o aparelho tiver esse recurso disponível.
+function iniciarRastreamentoLocalizacao(){
+
+if(localizacaoManualAtiva) return;
+
+if(!navigator.geolocation){
+atualizarStatusLocalizacao('⚠️ Este navegador não oferece geolocalização. Use 📌.', 'erro');
+return;
+}
+
+if(!geolocalizacaoPodeFuncionarAqui()){
+atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra pelo link HTTPS ou use 📌.', 'erro');
+return;
+}
+
+if(idRastreamento !== null) return; // já está rastreando
+
+atualizarStatusLocalizacao('📍 Aguardando sinal do GPS...', 'alerta');
+
+idRastreamento = navigator.geolocation.watchPosition(
+function(posicao){
+aplicarPosicaoGeolocalizada(posicao, false);
+},
+function(erro){
+const mensagem = mensagemErroGeolocalizacao(erro);
+console.warn('Não foi possível obter a localização:', mensagem);
+atualizarStatusLocalizacao('⚠️ ' + mensagem, 'erro');
+},
+{
+enableHighAccuracy:true,
+maximumAge:0,
+timeout:30000
+}
+);
+}
+
+function alternarAjustePosicaoManual(){
+
+const botao = document.getElementById('botaoAjustarPosicao');
+
+// Se já está usando uma posição manual, o mesmo botão volta para o GPS.
+if(localizacaoManualAtiva){
+localizacaoManualAtiva = false;
+modoAjustePosicaoManual = false;
+if(botao) botao.classList.remove('ativo');
+primeiraCentralizacaoGPSFeita = false;
+atualizarStatusLocalizacao('📍 Voltando para o GPS...', 'alerta');
+mostrarToast('📍 Voltando para a localização automática', 'neutro');
+solicitarLocalizacaoPrecisa(true);
+iniciarRastreamentoLocalizacao();
+return;
+}
+
+modoAjustePosicaoManual = !modoAjustePosicaoManual;
+if(botao) botao.classList.toggle('ativo', modoAjustePosicaoManual);
+
+if(modoAjustePosicaoManual){
+atualizarStatusLocalizacao('📌 Toque no ponto exato onde você está', 'alerta');
+mostrarToast('📌 Agora toque no seu ponto exato no mapa', 'neutro');
+}else{
+atualizarStatusLocalizacao('📍 Ajuste manual cancelado', 'alerta');
+}
+}
+
+function definirPosicaoManual(latlng){
+if(!latlng) return;
+
+localizacaoManualAtiva = true;
+modoAjustePosicaoManual = false;
+precisaoLocalizacaoMetros = 0;
+ultimaPosicaoUsuario = { lat:latlng.lat, lng:latlng.lng, precisao:0, timestamp:Date.now() };
+
+const botao = document.getElementById('botaoAjustarPosicao');
+if(botao) botao.classList.add('ativo');
+
+if(circuloPrecisaoUsuario){
+mapa.removeLayer(circuloPrecisaoUsuario);
+circuloPrecisaoUsuario = null;
+}
+
+criarOuAtualizarMarcadorUsuario(latlng.lat, latlng.lng, null, true);
+atualizarStatusLocalizacao('📌 Posição ajustada manualmente', 'ok');
+mostrarToast('✅ Posição manual definida. Toque em 📌 de novo para voltar ao GPS.', 'sucesso');
+}
+
+function corPorStatus(status){
+if(status === 'entregue') return '#9ca3af';
+if(status === 'ocorrencia') return '#e74c3c';
+return '#ff6a00'; // laranja padrão Shopee, igual ao resto do site
+}
+
+// ----- Painel inferior (bottom sheet) ao clicar num pin do mapa -----
+
+function conteudoInfoHtml(grupo){
+
+return `
+<h3 style="margin:0;">${tituloParada(grupo)}</h3>
+${grupo.destinatario ? `<div class="nome-destinatario">👤 ${primeiroNome(grupo.destinatario)}</div>` : ''}
+<div class="endereco">${grupo.endereco}</div>
+${htmlReferenciaRota(grupo)}
+<div class="badge">${grupo.pacotes.length} pacote(s) neste local</div>
+${badgeStatusGrupoHtml(grupo)}
+
+<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">Abrir no Waze</button>
+<button class="toggle" onclick="verNaLista('${grupo.id}')">📋 Ver na lista</button>
+<button class="toggle" onclick="verificarLocalizacaoPin('${grupo.id}')">🔍 Verificar localização</button>
+
+<div class="btn-linha">
+<button class="entregue-btn" onclick="acaoNoPainelInfo('${grupo.id}','entregue')">✅ Entregue</button>
+<button class="ocorrencia-btn" onclick="acaoNoPainelInfo('${grupo.id}','ocorrencia')">⚠️ Ocorrência</button>
+<button class="desfazer-btn" onclick="acaoNoPainelInfo('${grupo.id}','desfazer')">↩️ Desfazer</button>
+</div>
+`;
+}
+
+let marcadorSelecionadoId = null;
+
+function abrirInfoMapa(id){
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+document.getElementById('conteudoInfoMapa').innerHTML = conteudoInfoHtml(grupo);
+document.getElementById('fundoInfoMapa').classList.add('aberto');
+document.getElementById('painelInfoMapa').classList.add('aberto');
+destacarMarcador(id);
+}
+
+function fecharInfoMapa(){
+document.getElementById('fundoInfoMapa').classList.remove('aberto');
+document.getElementById('painelInfoMapa').classList.remove('aberto');
+destacarMarcador(null);
+}
+
+// Dá destaque visual ao marcador da parada selecionada (maior, com anel
+// laranja), tirando o destaque do que estava selecionado antes.
+function destacarMarcador(id){
+
+if(marcadorSelecionadoId && marcadores[marcadorSelecionadoId]){
+const elAnterior = marcadores[marcadorSelecionadoId].getElement();
+const pinAnterior = elAnterior ? elAnterior.querySelector('.pin-mapa') : null;
+if(pinAnterior) pinAnterior.classList.remove('marcador-selecionado');
+marcadores[marcadorSelecionadoId].setZIndexOffset(0);
+}
+
+marcadorSelecionadoId = id;
+
+if(id && marcadores[id]){
+const el = marcadores[id].getElement();
+const pin = el ? el.querySelector('.pin-mapa') : null;
+if(pin) pin.classList.add('marcador-selecionado');
+marcadores[id].setZIndexOffset(1000);
+}
+
+}
+
+// ----------------------------------------------------------------------
+// CLIQUE "INTELIGENTE" NO MAPA: quando há paradas muito próximas/
+// sobrepostas na tela, cliques repetidos no mesmo ponto ciclam entre
+// elas, em vez de sempre reabrir a mesma parada de cima.
+// ----------------------------------------------------------------------
+
+const RAIO_CICLO_PIXELS = 24;
+let estadoCicloClique = { ponto:null, indice:0 };
+
+function aoClicarMarcador(grupoIdClicado, evento){
+
+const pontoClique = mapa.mouseEventToContainerPoint(evento.originalEvent);
+
+// Todos os marcadores cujo ícone está perto (na tela) do ponto clicado
+const candidatos = Object.keys(marcadores)
+.map(id => ({ id, ponto: mapa.latLngToContainerPoint(marcadores[id].getLatLng()) }))
+.filter(m => pontoClique.distanceTo(m.ponto) <= RAIO_CICLO_PIXELS)
+.sort((a,b) => pontoClique.distanceTo(a.ponto) - pontoClique.distanceTo(b.ponto));
+
+if(candidatos.length <= 1){
+estadoCicloClique = { ponto:null, indice:0 };
+abrirInfoMapa(grupoIdClicado);
+return;
+}
+
+const cliqueNoMesmoPonto = estadoCicloClique.ponto &&
+pontoClique.distanceTo(estadoCicloClique.ponto) <= RAIO_CICLO_PIXELS;
+
+estadoCicloClique.indice = cliqueNoMesmoPonto
+? (estadoCicloClique.indice + 1) % candidatos.length
+: 0;
+
+estadoCicloClique.ponto = pontoClique;
+
+abrirInfoMapa(candidatos[estadoCicloClique.indice].id);
+
+}
+
+// Ações disparadas de dentro do painel inferior do mapa
+function acaoNoPainelInfo(id, acao){
+if(acao === 'entregue') marcarEntregueSemExcecao(id);
+if(acao === 'ocorrencia'){ fecharInfoMapa(); abrirModalMotivo(id); return; }
+if(acao === 'desfazer') desfazerStatus(id);
+fecharInfoMapa();
+}
+
+// Leva o usuário até o card da parada na aba Lista (ou Ocorrências, se for o caso)
+function verNaLista(id){
+const grupo = encontrarGrupo(id);
+if(!grupo) return;
+
+fecharInfoMapa();
+
+if(grupo.pacotes.some(p => p.status === 'ocorrencia')){
+irParaAba(2);
+setTimeout(()=> destacarElemento('grupo_oc_' + id), 200);
+}else{
+irParaAba(0);
+setTimeout(()=> destacarElemento('grupo_' + id), 200);
+}
+}
+
+function destacarElemento(elementId){
+const el = document.getElementById(elementId);
+if(!el) return;
+el.scrollIntoView({behavior:'smooth', block:'center'});
+el.classList.add('destaque-temporario');
+setTimeout(()=> el.classList.remove('destaque-temporario'), 1600);
+}
+
+let ocultarEntreguesMapa = false;
+let painelPacotesAbertos = new Set(); // ids das listas de pacotes que o usuário deixou abertas
+
+function atualizarResumoMapa(){
+const todosPacotes = grupos.flatMap(g => g.pacotes);
+const pendentes = todosPacotes.filter(p => p.status === 'pendente').length;
+const ocorrencias = todosPacotes.filter(p => p.status === 'ocorrencia').length;
+document.getElementById('resumoMapaTexto').innerText = pendentes + ' pendente(s)';
+document.getElementById('resumoMapaOcorrencias').innerText = ocorrencias + ' ocorrência(s)';
+}
+
+// Esconde/mostra os pins já entregues no mapa, pra desafogar a
+// visualização numa rota com muita parada
+function alternarOcultarEntreguesMapa(){
+ocultarEntreguesMapa = !ocultarEntreguesMapa;
+document.getElementById('botaoOcultarEntregues').classList.toggle('ativo', ocultarEntreguesMapa);
+atualizarMapa();
+}
+
+// Busca uma parada pelo número e leva o mapa até ela, destacando o pin
+// Abre/fecha o campo de busca (fica escondido por padrão pra não
+// atrapalhar a visualização do mapa)
+function alternarBuscaMapa(){
+const painel = document.getElementById('painelBuscaMapa');
+const abrindo = !painel.classList.contains('aberto');
+painel.classList.toggle('aberto', abrindo);
+if(abrindo){
+setTimeout(()=> document.getElementById('buscaParadaMapa').focus(), 100);
+}
+}
+
+function buscarParadaNoMapa(){
+
+const valor = document.getElementById('buscaParadaMapa').value.trim();
+if(!valor) return;
+
+const grupo = grupos.find(g => temOrdemOtimizada(g) && String(g.ordemOtimizada) === valor)
+|| grupos.find(g => ehStopValido(g.stop) && String(g.stop) === valor);
+
+if(!grupo){
+mostrarToast('⚠️ Parada não encontrada', 'alerta');
+return;
+}
+
+const lat = parseFloat(grupo.lat);
+const lng = parseFloat(grupo.lng);
+
+if(isNaN(lat) || isNaN(lng)){
+mostrarToast('⚠️ Essa parada não tem coordenada válida', 'alerta');
+return;
+}
+
+mapa.setView([lat, lng], Math.max(mapa.getZoom(), 17));
+destacarMarcador(grupo.id);
+document.getElementById('buscaParadaMapa').value = '';
+document.getElementById('buscaParadaMapa').blur();
+document.getElementById('painelBuscaMapa').classList.remove('aberto');
+
+}
+
+function atualizarMapa(){
+
+if(!mapa) return;
+
+Object.values(marcadores).forEach(m => mapa.removeLayer(m));
+marcadores = {};
+
+const pontosValidos = [];
+
+grupos.forEach(grupo=>{
+
+const lat = parseFloat(grupo.lat);
+const lng = parseFloat(grupo.lng);
+if(isNaN(lat) || isNaN(lng)) return;
+
+const statusGrupo = statusEfetivoGrupo(grupo);
+
+// Oculta pins totalmente entregues quando o filtro estiver ativo
+if(ocultarEntreguesMapa && statusGrupo === 'entregue') return;
+
+const rotulo = temOrdemOtimizada(grupo)
+? grupo.ordemOtimizada
+: (ehStopValido(grupo.stop) ? grupo.stop : '★');
+const tamanhoNumeroPin = String(rotulo).length >= 3 ? '8px' : '10px';
+
+const icone = L.divIcon({
+html: `<div class="pin-mapa" style="color:${corPorStatus(statusGrupo)}"><div class="pin-corpo"><span style="font-size:${tamanhoNumeroPin}">${rotulo}</span></div></div>`,
+className:'',
+iconSize:[25,34],
+iconAnchor:[12.5,34],
+popupAnchor:[0,-34]
+});
+
+const marcador = L.marker([lat,lng], {icon: icone}).addTo(mapa);
+marcador.on('click', function(e){ aoClicarMarcador(grupo.id, e); });
+marcadores[grupo.id] = marcador;
+
+pontosValidos.push([lat,lng]);
+
+});
+
+// Endereço final escolhido no modo “Terminar perto de...”
+if(marcadorDestinoRota){
+mapa.removeLayer(marcadorDestinoRota);
+marcadorDestinoRota = null;
+}
+if(metaRota && metaRota.modo === 'endereco' && metaRota.destinoFinal &&
+Number.isFinite(Number(metaRota.destinoFinal.lat)) && Number.isFinite(Number(metaRota.destinoFinal.lng))){
+const iconeDestino = L.divIcon({
+html:'<div class="pin-destino-final">🏁</div>',
+className:'',
+iconSize:[30,30],
+iconAnchor:[15,15]
+});
+marcadorDestinoRota = L.marker([Number(metaRota.destinoFinal.lat), Number(metaRota.destinoFinal.lng)], {icon:iconeDestino, zIndexOffset:900}).addTo(mapa);
+marcadorDestinoRota.bindTooltip('Destino final: ' + metaRota.destinoFinal.texto);
+pontosValidos.push([Number(metaRota.destinoFinal.lat), Number(metaRota.destinoFinal.lng)]);
+}
+
+if(pontosValidos.length > 0 && !mapaFoiEnquadrado){
+mapa.fitBounds(pontosValidos, {padding:[30,30]});
+mapaFoiEnquadrado = true;
+}
+
+atualizarResumoMapa();
+
+}
+
+
+// ----------------------------------------------------------------------
+// NAVEGAÇÃO POR ABAS (Lista / Mapa / Ocorrências) + SWIPE
+// ----------------------------------------------------------------------
+
+const painéis = ['painelLista','painelMapa','painelOcorrencias'];
+const botõesAba = ['btnAbaLista','btnAbaMapa','btnAbaOcorrencias'];
+
+function irParaAba(indice){
+
+if(indice < 0) indice = 0;
+if(indice > 2) indice = 2;
+
+abaAtual = indice;
+
+painéis.forEach((idPainel, i)=>{
+document.getElementById(idPainel).classList.toggle('ativo', i === indice);
+});
+
+botõesAba.forEach((idBtn, i)=>{
+document.getElementById(idBtn).classList.toggle('ativa', i === indice);
+});
+
+// Ao entrar na aba do mapa, garante que ele já existe e recalcula o
+// tamanho (necessário porque ele estava com display:none)
+if(indice === 1){
+inicializarMapaSeNecessario();
+iniciarRastreamentoLocalizacao();
+setTimeout(()=>{
+mapa.invalidateSize();
+atualizarMapa();
+}, 100);
+}
+
+}
+
+// ----------------------------------------------------------------------
+// UM POUCO DE PERSONALIDADE 🚚
+// ----------------------------------------------------------------------
+
+// ----------------------------------------------------------------------
+// SOM DE CONFIRMAÇÃO (opcional, com botão pra silenciar)
+// ----------------------------------------------------------------------
+
+let somAtivado = true;
+let contextoAudio = null;
+
+function carregarPreferenciaSom(){
+try{
+const salvo = localStorage.getItem(SOM_STORAGE_KEY);
+somAtivado = salvo === null ? true : salvo === 'true';
+}catch(erro){
+somAtivado = true;
+}
+atualizarIconeSom();
+}
+
+function alternarSom(){
+somAtivado = !somAtivado;
+try{ localStorage.setItem(SOM_STORAGE_KEY, String(somAtivado)); }catch(erro){}
+atualizarIconeSom();
+if(somAtivado) tocarSomEntrega(); // dá um exemplo do som ao ligar
+}
+
+function atualizarIconeSom(){
+const botao = document.getElementById('botaoSom');
+if(botao) botao.innerText = somAtivado ? '🔊' : '🔇';
+}
+
+// Toca um "ding" curtinho sintetizado (sem precisar de arquivo de áudio)
+function tocarSomEntrega(){
+
+if(!somAtivado) return;
+
+try{
+
+if(!contextoAudio){
+contextoAudio = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+const agora = contextoAudio.currentTime;
+
+// Duas notas rápidas subindo, tipo um "ding" de confirmação
+[ {freq:880, inicio:0}, {freq:1318.5, inicio:0.08} ].forEach(nota=>{
+
+const osc = contextoAudio.createOscillator();
+const ganho = contextoAudio.createGain();
+
+osc.type = 'sine';
+osc.frequency.value = nota.freq;
+
+ganho.gain.setValueAtTime(0.0001, agora + nota.inicio);
+ganho.gain.exponentialRampToValueAtTime(0.2, agora + nota.inicio + 0.01);
+ganho.gain.exponentialRampToValueAtTime(0.0001, agora + nota.inicio + 0.25);
+
+osc.connect(ganho);
+ganho.connect(contextoAudio.destination);
+
+osc.start(agora + nota.inicio);
+osc.stop(agora + nota.inicio + 0.3);
+
+});
+
+}catch(erro){
+console.warn("Não foi possível tocar o som de confirmação:", erro);
+}
+
+}
+
+function aplicarSaudacao(){
+
+const hora = new Date().getHours();
+let frases;
+
+if(hora >= 5 && hora < 12){
+frases = [
+"Bom dia! Vamos nessa 🚀",
+"Bom dia! Café tomado, rota na mão ☕",
+"Bora começar antes que o sol esquente 🌤️",
+"Dia novo, rota nova. Foco no trajeto 🧭",
+"Bom dia! Bora fazer essa rota render 🚚"
+];
+}else if(hora >= 12 && hora < 18){
+frases = [
+"Boa tarde! Só mais um pouco 💪",
+"Boa tarde! Bora manter o ritmo 🔥",
+"Metade do dia já foi, segue o fluxo 🚚",
+"Boa tarde! Hidrata e continua firme 💧",
+"Ritmo bom, entregador. Segue assim"
+];
+}else{
+frases = [
+"Boa noite! Reta final 🌙",
+"Boa noite! Já deu pra hoje, quase lá 🌙",
+"Últimas entregas do dia, capricha 🌆",
+"Boa noite! Farol ligado e foco na via 🚗💡",
+"Fechando o dia com estilo 🌙"
+];
+}
+
+document.getElementById('saudacaoHeader').innerText =
+frases[Math.floor(Math.random() * frases.length)];
+
+}
+
+aplicarSaudacao();
+carregarPreferenciaSom();
+
+// ----------------------------------------------------------------------
+// INICIALIZAÇÃO
+// ----------------------------------------------------------------------
+
+carregarStorage();
+
+// V7.1 é focada no celular: começa a pedir/acompanhar o GPS já ao abrir o
+// Copiloto, para a otimização ter um ponto inicial pronto antes da importação.
+iniciarRastreamentoLocalizacao();
+
+</script>
+
+</body>
+
+</html>
