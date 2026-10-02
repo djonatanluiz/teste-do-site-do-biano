@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.4</title>
+<title>Copiloto Entregas V7.5</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -892,7 +892,7 @@ margin-top:14px;
 
 
 /* ====================================================================== */
-/* V7.4 - OTIMIZAÇÃO GLOBAL DE ROTA                                      */
+/* V7.5 - OTIMIZAÇÃO OPERACIONAL POR MICRO-REGIÃO + RUAS                 */
 /* ====================================================================== */
 
 .config-otimizacao-btn{
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.4</div>
+<div class="versao-copiloto">Copiloto V7.5</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1481,7 +1481,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.4: escolha/configuração do modo de otimização -->
+<!-- V7.5: escolha/configuração do modo de otimização -->
 <div class="otimizacao-fundo" id="modalOtimizacao">
 <div class="otimizacao-caixa">
 <div class="alca-painel"></div>
@@ -1513,7 +1513,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.4: escolha do ponto final diretamente no mapa -->
+<!-- V7.5: escolha do ponto final diretamente no mapa -->
 <div class="otimizacao-fundo" id="modalDestinoFinal">
 <div class="otimizacao-caixa destino-picker-caixa">
 <div class="alca-painel"></div>
@@ -1540,7 +1540,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.4: tela de cálculo -->
+<!-- V7.5: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
 <div class="otimizando-spinner"></div>
@@ -1642,6 +1642,128 @@ reader.readAsArrayBuffer(arquivo);
 
 }
 
+
+// ----------------------------------------------------------------------
+// V7.5 - RESTRIÇÕES OPERACIONAIS OPCIONAIS
+// A planilha atual da Shopee normalmente não traz janelas de horário. Estas
+// regras só entram em ação quando houver colunas compatíveis; nada é inventado.
+// ----------------------------------------------------------------------
+
+function primeiroValorPlanilha(item, nomes){
+for(const nome of nomes){
+const valor = item ? item[nome] : null;
+if(valor !== undefined && valor !== null && String(valor).trim() !== '') return valor;
+}
+return null;
+}
+
+function horaParaMinutos(valor){
+if(valor === undefined || valor === null || valor === '') return null;
+if(valor instanceof Date && !isNaN(valor.getTime())) return valor.getHours()*60 + valor.getMinutes();
+
+if(typeof valor === 'number' && Number.isFinite(valor)){
+// Excel pode entregar horários como fração de um dia ou serial com fração.
+const fracao = valor >= 0 ? valor % 1 : 0;
+if(fracao > 0 || (valor >= 0 && valor < 1)) return Math.round(fracao * 24 * 60);
+}
+
+const txt = String(valor).trim().toLowerCase();
+const m = txt.match(/(?:^|\D)([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?/i);
+if(m) return Number(m[1])*60 + Number(m[2] || 0);
+return null;
+}
+
+function janelaPreferencialTexto(valor){
+if(valor === undefined || valor === null || valor === '') return {inicio:null,fim:null};
+const txt = normalizarTexto(String(valor));
+if(/manha/.test(txt)) return {inicio:8*60,fim:12*60};
+if(/tarde/.test(txt)) return {inicio:12*60,fim:18*60};
+if(/noite/.test(txt)) return {inicio:18*60,fim:22*60};
+
+const encontrados = [...String(valor).matchAll(/([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?/gi)]
+.map(m=>Number(m[1])*60 + Number(m[2] || 0));
+if(encontrados.length >= 2) return {inicio:encontrados[0],fim:encontrados[1]};
+return {inicio:null,fim:null};
+}
+
+function enderecoParecePredio(endereco){
+const txt = normalizarTexto(endereco);
+return /\b(apto|apartamento|bloco|condominio|condominio|edificio|residencial|torre|unidade)\b/.test(txt);
+}
+
+function extrairRestricoesOperacionaisLinha(item, endereco){
+const hardBruto = primeiroValorPlanilha(item,[
+'Horário Limite','Horario Limite','Entrega até','Entrega ate','Deadline',
+'Delivery Deadline','Time Window End','Janela Fim','End Time'
+]);
+
+const softBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial','Preferência de Horário','Preferencia de Horario',
+'Preferred Time','Preferred Window','Preference'
+]);
+const softInicioBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial Início','Janela Preferencial Inicio','Preferred Start','Time Window Start'
+]);
+const softFimBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial Fim','Preferred End'
+]);
+
+let soft = janelaPreferencialTexto(softBruto);
+const inicioSeparado = horaParaMinutos(softInicioBruto);
+const fimSeparado = horaParaMinutos(softFimBruto);
+if(Number.isFinite(inicioSeparado)) soft.inicio = inicioSeparado;
+if(Number.isFinite(fimSeparado)) soft.fim = fimSeparado;
+
+const servicoBruto = primeiroValorPlanilha(item,[
+'Tempo de Serviço (min)','Tempo de Servico (min)','Tempo de Serviço','Tempo de Servico',
+'Service Time (min)','Service Minutes','Service Time'
+]);
+let servicoSegundos = null;
+const nServico = Number(String(servicoBruto ?? '').replace(',','.'));
+if(Number.isFinite(nServico) && nServico > 0 && nServico <= 180) servicoSegundos = Math.round(nServico*60);
+
+// Regra solicitada para o teste: casa = 2 min; prédio/condomínio = 7 min.
+if(!Number.isFinite(servicoSegundos)) servicoSegundos = enderecoParecePredio(endereco) ? 7*60 : 2*60;
+
+return {
+janelaHardMin:horaParaMinutos(hardBruto),
+janelaSoftInicioMin:Number.isFinite(soft.inicio) ? soft.inicio : null,
+janelaSoftFimMin:Number.isFinite(soft.fim) ? soft.fim : null,
+tempoServicoSegundos:servicoSegundos
+};
+}
+
+function combinarRestricoesGrupo(grupo, restricao){
+if(!grupo || !restricao) return;
+
+if(Number.isFinite(restricao.janelaHardMin)){
+grupo.janelaHardMin = Number.isFinite(grupo.janelaHardMin)
+? Math.min(grupo.janelaHardMin, restricao.janelaHardMin)
+: restricao.janelaHardMin;
+}
+
+// Preferência soft: quando vários pacotes no mesmo local têm janelas, usamos
+// a interseção possível. Se forem conflitantes, preservamos a primeira em vez
+// de inventar uma preferência nova.
+if(Number.isFinite(restricao.janelaSoftInicioMin) && Number.isFinite(restricao.janelaSoftFimMin)){
+if(!Number.isFinite(grupo.janelaSoftInicioMin) || !Number.isFinite(grupo.janelaSoftFimMin)){
+grupo.janelaSoftInicioMin = restricao.janelaSoftInicioMin;
+grupo.janelaSoftFimMin = restricao.janelaSoftFimMin;
+}else{
+const inicio = Math.max(grupo.janelaSoftInicioMin, restricao.janelaSoftInicioMin);
+const fim = Math.min(grupo.janelaSoftFimMin, restricao.janelaSoftFimMin);
+if(inicio <= fim){
+grupo.janelaSoftInicioMin = inicio;
+grupo.janelaSoftFimMin = fim;
+}
+}
+}
+
+if(Number.isFinite(restricao.tempoServicoSegundos)){
+grupo.tempoServicoSegundos = Math.max(Number(grupo.tempoServicoSegundos)||0, restricao.tempoServicoSegundos);
+}
+}
+
 async function processarEntregas(dados){
 
 // Nova planilha = nova rota (zera tudo, inclusive o que estava salvo)
@@ -1656,6 +1778,8 @@ const endereco =
 item["Destination Address"] ||
 item["Address"] ||
 "-";
+
+const restricoesOperacionais = extrairRestricoesOperacionaisLinha(item, endereco);
 
 const bairro =
 item["Bairro"] ||
@@ -1735,6 +1859,10 @@ destinatario:destinatario,
 bairro:bairro,
 cidade:cidade,
 cep:cep,
+janelaHardMin:null,
+janelaSoftInicioMin:null,
+janelaSoftFimMin:null,
+tempoServicoSegundos:null,
 pacotes:[]
 // status não fica mais aqui - é calculado por pacote (ver statusEfetivoGrupo)
 }
@@ -1747,6 +1875,8 @@ baldes[chaveBalde].push(cluster);
 if(!cluster.grupo.destinatario && destinatario){
 cluster.grupo.destinatario = destinatario;
 }
+
+combinarRestricoesGrupo(cluster.grupo, restricoesOperacionais);
 
 cluster.grupo.pacotes.push({
 
@@ -1926,17 +2056,34 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 
 // ======================================================================
-// V7.4 - OTIMIZAÇÃO GLOBAL DE ROTA
+// V7.5 - PERFIL EXPERIMENTAL DE OTIMIZAÇÃO OPERACIONAL
 // ======================================================================
-// Estratégia V7.4:
-// 1) considera TODAS as paradas da rota simultaneamente;
-// 2) monta uma matriz DIRECIONAL global de tempo + distância pelas vias;
-// 3) A -> B pode custar diferente de B -> A (mão única, retornos e acessos);
-// 4) gera várias sequências iniciais e permite mover qualquer parada para
-//    qualquer posição da rota - não existem mais janelas de 10 em 10;
-// 5) refina globalmente com realocação + 2-opt direcional;
-// 6) escolhe uma única rota pelo equilíbrio 50% tempo + 50% quilômetros;
-// 7) compara o resultado final com a ordem original da Shopee.
+/*
+PROMPT EXPERIMENTAL SALVO — se o teste piorar a rota, voltar ao motor V7.4
+sem misturar estas regras:
+
+1) Janelas de Tempo Hard (restrição obrigatória): ETA deve ser <= horário
+   limite; sequências que estouram o prazo são descartadas.
+2) Agrupamento Geográfico (otimização primária): dividir endereços em
+   micro-regiões antes de ordenar o tráfego, evitando abandonar a região/rua
+   e voltar depois.
+3) Janelas de Tempo Soft (otimização secundária): preferência de horário gera
+   penalidade virtual, mas não quebra a rota se isso destruir o restante.
+4) Tempo de Serviço: Casa = +2 min; Prédio/Condomínio = +7 min, salvo valor
+   explícito na planilha.
+5) Custos de Deslocamento: matriz direcional de tempo + distância pelas vias.
+
+Hierarquia efetiva do teste:
+HARD > MICRO-REGIÃO > RUA > SOFT > TEMPO DE SERVIÇO > TEMPO+KM PELAS VIAS.
+*/
+// Estratégia V7.5:
+// 1) monta a matriz DIRECIONAL global de todas as paradas;
+// 2) cria micro-regiões geográficas adaptativas (sem tamanho fixo de 10);
+// 3) dentro de cada micro-região, trata cada rua como um bloco contínuo;
+// 4) janelas hard podem quebrar clustering/rua porque são obrigatórias;
+// 5) janelas soft apenas penalizam uma sequência;
+// 6) ETAs e tempo total incluem tempo de serviço estimado em cada parada;
+// 7) escolhe uma única rota pelo equilíbrio 50% tempo + 50% quilômetros.
 // As alternativas analisadas ficam internas e não poluem a interface.
 
 function carregarPreferenciaOtimizacao(){
@@ -2644,7 +2791,7 @@ const tempo = valorMatriz(resultado.duracoes, origem, destino);
 const distancia = valorMatriz(resultado.distancias, origem, destino);
 if(!Number.isFinite(tempo) || !Number.isFinite(distancia)) return Infinity;
 
-// Critério central da V7.4: peso IGUAL para tempo e quilômetros.
+// Critério final da V7.5: peso IGUAL para tempo e quilômetros.
 return 0.5 * (tempo / norm.tempo) + 0.5 * (distancia / norm.distancia);
 }
 
@@ -3000,6 +3147,364 @@ const melhor = escolherMelhorAvaliacao(avaliadas, referencia);
 return {melhor, avaliadas, referencia};
 }
 
+
+// ----------------------------------------------------------------------
+// V7.5 - CLUSTERING + CONTINUIDADE DE RUA + JANELAS DE TEMPO
+// ----------------------------------------------------------------------
+
+const RAIO_MICRO_REGIAO_METROS = 280;
+const DIAMETRO_MAX_MICRO_REGIAO_METROS = 720;
+const PESO_SOFT_SECUNDARIO = 0.08;
+
+function grupoPorIndiceMatriz(indice, validos){
+return Number.isInteger(indice) && indice >= 1 && indice <= validos.length ? validos[indice-1] : null;
+}
+
+function chaveRuaGrupo(grupo){
+if(!grupo) return 'sem-rua';
+const norm = normalizarTexto(grupo.endereco || '');
+const info = extrairRuaENumero(norm);
+if(info && info.rua) return info.rua;
+return norm.replace(/\d.*$/,'').replace(/[,;\-]+$/,'').trim() || ('local-' + grupo.id);
+}
+
+function tempoServicoGrupoSegundos(grupo){
+if(!grupo) return 0;
+const salvo = Number(grupo.tempoServicoSegundos);
+if(Number.isFinite(salvo) && salvo >= 0) return salvo;
+return enderecoParecePredio(grupo.endereco) ? 7*60 : 2*60;
+}
+
+function distanciaGeograficaIndices(i, j, validos){
+const a = grupoPorIndiceMatriz(i, validos);
+const b = grupoPorIndiceMatriz(j, validos);
+if(!a || !b) return Infinity;
+return distanciaMetros(Number(a.lat),Number(a.lng),Number(b.lat),Number(b.lng));
+}
+
+function dividirClusterPorDiametro(indices, validos){
+if(indices.length <= 2) return [indices];
+let maior = -1;
+let sementes = [indices[0], indices[1]];
+for(let a=0;a<indices.length;a++){
+for(let b=a+1;b<indices.length;b++){
+const d = distanciaGeograficaIndices(indices[a],indices[b],validos);
+if(Number.isFinite(d) && d > maior){ maior=d; sementes=[indices[a],indices[b]]; }
+}
+}
+if(maior <= DIAMETRO_MAX_MICRO_REGIAO_METROS) return [indices];
+
+const esquerda=[];
+const direita=[];
+indices.forEach(i=>{
+const dA = distanciaGeograficaIndices(i,sementes[0],validos);
+const dB = distanciaGeograficaIndices(i,sementes[1],validos);
+(dA <= dB ? esquerda : direita).push(i);
+});
+
+if(!esquerda.length || !direita.length){
+const ordenados=[...indices].sort((a,b)=>{
+const ga=grupoPorIndiceMatriz(a,validos), gb=grupoPorIndiceMatriz(b,validos);
+return Number(ga.lat)-Number(gb.lat) || Number(ga.lng)-Number(gb.lng);
+});
+const meio=Math.ceil(ordenados.length/2);
+return [ordenados.slice(0,meio),ordenados.slice(meio)].flatMap(c=>dividirClusterPorDiametro(c,validos));
+}
+return [esquerda,direita].flatMap(c=>dividirClusterPorDiametro(c,validos));
+}
+
+function clusterizarMicroRegioesV75(validos){
+const indices=validos.map((_,i)=>i+1);
+const naoVisitados=new Set(indices);
+const componentes=[];
+
+while(naoVisitados.size){
+const primeiro=naoVisitados.values().next().value;
+naoVisitados.delete(primeiro);
+const fila=[primeiro];
+const comp=[];
+while(fila.length){
+const atual=fila.shift();
+comp.push(atual);
+for(const cand of [...naoVisitados]){
+const d=distanciaGeograficaIndices(atual,cand,validos);
+if(Number.isFinite(d) && d <= RAIO_MICRO_REGIAO_METROS){
+naoVisitados.delete(cand);
+fila.push(cand);
+}
+}
+}
+componentes.push(...dividirClusterPorDiametro(comp,validos));
+}
+
+return componentes.map((membros,id)=>({id,membros:[...membros]}));
+}
+
+function custoEntreConjuntosMatriz(origens, destinos, resultado, norm){
+let melhor=Infinity;
+for(const a of origens){
+for(const b of destinos){
+const c=custoMatrizEquilibrado(resultado,a,b,norm);
+if(Number.isFinite(c) && c<melhor) melhor=c;
+}
+}
+return melhor;
+}
+
+function ordemClustersVizinhoV75(clusters, resultado, norm, primeiroId){
+const restantes=[...clusters];
+const ordem=[];
+let atual=[0];
+
+if(Number.isInteger(primeiroId)){
+const pos=restantes.findIndex(c=>c.id===primeiroId);
+if(pos>=0){
+const escolhido=restantes.splice(pos,1)[0];
+ordem.push(escolhido);
+atual=escolhido.membros;
+}
+}
+
+while(restantes.length){
+let melhorPos=0, melhorC=Infinity;
+restantes.forEach((c,pos)=>{
+const custo=custoEntreConjuntosMatriz(atual,c.membros,resultado,norm);
+if(custo<melhorC){melhorC=custo;melhorPos=pos;}
+});
+const escolhido=restantes.splice(melhorPos,1)[0];
+ordem.push(escolhido);
+atual=escolhido.membros;
+}
+return ordem;
+}
+
+function gerarOrdensClustersV75(clusters, validos, resultado, norm){
+const ordens=[];
+const vistas=new Set();
+function add(nome,ordem){
+const sig=ordem.map(c=>c.id).join('>');
+if(!sig || vistas.has(sig)) return;
+vistas.add(sig); ordens.push({nome,ordem});
+}
+
+const original=[...clusters].sort((a,b)=>{
+const ia=Math.min(...a.membros.map(i=>validos[i-1].indiceImportacao ?? Infinity));
+const ib=Math.min(...b.membros.map(i=>validos[i-1].indiceImportacao ?? Infinity));
+return ia-ib;
+});
+add('clusters-shopee',original);
+add('clusters-vizinho',ordemClustersVizinhoV75(clusters,resultado,norm,null));
+add('clusters-invertida',[...original].reverse());
+
+const primeiros=[...clusters]
+.map(c=>({id:c.id,c:custoEntreConjuntosMatriz([0],c.membros,resultado,norm)}))
+.filter(x=>Number.isFinite(x.c)).sort((a,b)=>a.c-b.c).slice(0,Math.min(5,clusters.length));
+primeiros.forEach((x,k)=>add('clusters-inicio-'+(k+1),ordemClustersVizinhoV75(clusters,resultado,norm,x.id)));
+return ordens;
+}
+
+function candidatosOrdemRuaV75(membros, atual, alvosSaida, resultado, norm, validos){
+const candidatas=[];
+const vistas=new Set();
+function add(arr){
+if(!arr || arr.length!==membros.length) return;
+const sig=arr.join('>');
+if(!vistas.has(sig)){vistas.add(sig);candidatas.push(arr);}
+}
+
+// Vizinho direcional partindo da posição real de entrada na rua.
+let rest=[...membros];
+let cur=atual;
+const greedy=[];
+while(rest.length){
+let p=0,c=Infinity;
+rest.forEach((idx,k)=>{
+const cc=custoMatrizEquilibrado(resultado,cur,idx,norm);
+if(cc<c){c=cc;p=k;}
+});
+const escolhido=rest.splice(p,1)[0];
+greedy.push(escolhido); cur=escolhido;
+}
+add(greedy);
+add([...greedy].reverse());
+
+const shopee=[...membros].sort((a,b)=>(validos[a-1].indiceImportacao??0)-(validos[b-1].indiceImportacao??0));
+add(shopee); add([...shopee].reverse());
+
+function custo(arr){
+let total=0,ant=atual;
+for(const x of arr){
+const c=custoMatrizEquilibrado(resultado,ant,x,norm);
+if(!Number.isFinite(c)) return Infinity;
+total+=c;ant=x;
+}
+if(alvosSaida && alvosSaida.length){
+const saida=custoEntreConjuntosMatriz([ant],alvosSaida,resultado,norm);
+if(Number.isFinite(saida)) total+=saida;
+}
+return total;
+}
+return candidatas.sort((a,b)=>custo(a)-custo(b))[0] || [...membros];
+}
+
+function expandirClustersERuasV75(ordemClusters, validos, resultado, norm, indiceDestinoFinal){
+const rota=[];
+let atual=0;
+
+for(let ci=0;ci<ordemClusters.length;ci++){
+const cluster=ordemClusters[ci];
+const ruasMap=new Map();
+cluster.membros.forEach(idx=>{
+const chave=chaveRuaGrupo(validos[idx-1]);
+if(!ruasMap.has(chave)) ruasMap.set(chave,[]);
+ruasMap.get(chave).push(idx);
+});
+let ruas=[...ruasMap.entries()].map(([chave,membros])=>({chave,membros}));
+
+while(ruas.length){
+let melhorPos=0,melhorC=Infinity;
+ruas.forEach((r,pos)=>{
+const c=custoEntreConjuntosMatriz([atual],r.membros,resultado,norm);
+if(c<melhorC){melhorC=c;melhorPos=pos;}
+});
+const rua=ruas.splice(melhorPos,1)[0];
+
+const alvosSaida=ruas.flatMap(r=>r.membros);
+if(!alvosSaida.length && ci<ordemClusters.length-1) alvosSaida.push(...ordemClusters[ci+1].membros);
+if(!alvosSaida.length && Number.isInteger(indiceDestinoFinal)) alvosSaida.push(indiceDestinoFinal);
+
+// REGRA CENTRAL DO TESTE: ao entrar numa rua, todas as entregas dessa rua
+// dentro da micro-região são resolvidas de forma contínua antes de sair.
+const ordemRua=candidatosOrdemRuaV75(rua.membros,atual,alvosSaida,resultado,norm,validos);
+rota.push(...ordemRua);
+atual=ordemRua[ordemRua.length-1] ?? atual;
+}
+}
+return rota;
+}
+
+function minutosAgoraDia(){
+const d=new Date();
+return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;
+}
+
+function avaliarJanelasRotaV75(ordem, resultado, validos){
+let atual=0;
+let tempoSeg=0;
+const inicioMin=minutosAgoraDia();
+const violacoesHard=[];
+let atrasoHardMin=0;
+let penalidadeSoftMin=0;
+const etas=new Map();
+
+for(const idx of ordem){
+const viagem=valorMatriz(resultado.duracoes,atual,idx);
+if(Number.isFinite(viagem)) tempoSeg+=viagem;
+const chegadaMin=inicioMin+tempoSeg/60;
+etas.set(idx,chegadaMin);
+const g=grupoPorIndiceMatriz(idx,validos);
+
+if(g && Number.isFinite(g.janelaHardMin) && chegadaMin>g.janelaHardMin){
+const atraso=chegadaMin-g.janelaHardMin;
+violacoesHard.push({idx,atraso,limite:g.janelaHardMin,eta:chegadaMin});
+atrasoHardMin+=atraso;
+}
+
+if(g && Number.isFinite(g.janelaSoftInicioMin) && Number.isFinite(g.janelaSoftFimMin)){
+if(chegadaMin<g.janelaSoftInicioMin) penalidadeSoftMin += g.janelaSoftInicioMin-chegadaMin;
+else if(chegadaMin>g.janelaSoftFimMin) penalidadeSoftMin += chegadaMin-g.janelaSoftFimMin;
+}
+
+tempoSeg+=tempoServicoGrupoSegundos(g);
+atual=idx;
+}
+return {violacoesHard,atrasoHardMin,penalidadeSoftMin,etas,tempoOperacionalSegundos:tempoSeg};
+}
+
+function moverIndiceRota(ordem,de,para){
+const n=[...ordem];
+const [x]=n.splice(de,1);
+n.splice(Math.max(0,Math.min(para,n.length)),0,x);
+return n;
+}
+
+function repararJanelasHardV75(ordemInicial, resultado, validos){
+let ordem=[...ordemInicial];
+for(let tentativa=0;tentativa<Math.min(20,ordem.length);tentativa++){
+const atual=avaliarJanelasRotaV75(ordem,resultado,validos);
+if(!atual.violacoesHard.length) return ordem;
+const alvo=[...atual.violacoesHard].sort((a,b)=>a.limite-b.limite || b.atraso-a.atraso)[0];
+const posAtual=ordem.indexOf(alvo.idx);
+if(posAtual<=0) break;
+let melhor=null;
+for(let novaPos=0;novaPos<posAtual;novaPos++){
+const cand=moverIndiceRota(ordem,posAtual,novaPos);
+const av=avaliarJanelasRotaV75(cand,resultado,validos);
+const chave=[av.violacoesHard.length,av.atrasoHardMin,av.penalidadeSoftMin];
+if(!melhor || chave[0]<melhor.chave[0] || (chave[0]===melhor.chave[0] && (chave[1]<melhor.chave[1]-0.01 || (Math.abs(chave[1]-melhor.chave[1])<0.01 && chave[2]<melhor.chave[2])))){
+melhor={ordem:cand,chave};
+}
+}
+if(!melhor || (melhor.chave[0]>=atual.violacoesHard.length && melhor.chave[1]>=atual.atrasoHardMin-0.01)) break;
+ordem=melhor.ordem;
+}
+return ordem;
+}
+
+function metricasOperacionaisMatrizV75(ordem, resultado, indiceDestinoFinal, validos){
+const base=metricasOrdemNaMatriz(ordem,resultado,indiceDestinoFinal);
+const servico=ordem.reduce((acc,idx)=>acc+tempoServicoGrupoSegundos(grupoPorIndiceMatriz(idx,validos)),0);
+return {...base,duracao:Number.isFinite(base.duracao)?base.duracao+servico:null,tempoServico:servico};
+}
+
+function gerarCandidatasV75(validos, ordemShopee, resultado, indiceDestinoFinal){
+const norm=normalizadoresMatriz(resultado);
+const clusters=clusterizarMicroRegioesV75(validos);
+const ordensClusters=gerarOrdensClustersV75(clusters,validos,resultado,norm);
+const candidatas=[];
+const vistas=new Set();
+
+for(const c of ordensClusters){
+let ordemIndices=expandirClustersERuasV75(c.ordem,validos,resultado,norm,indiceDestinoFinal);
+ordemIndices=repararJanelasHardV75(ordemIndices,resultado,validos);
+const sig=ordemIndices.join('>');
+if(!vistas.has(sig)){
+vistas.add(sig);
+candidatas.push({nome:c.nome,ordemIndices});
+}
+}
+
+// A ordem Shopee NÃO entra como candidata de otimização nesta versão. Ela é
+// calculada separadamente apenas para comparação. Isso impede o motor de
+// escolher uma sequência que viole micro-regiões/continuidade de rua só
+// porque a ordem original teve um score matemático menor.
+return {candidatas,clusters};
+}
+
+function escolherMelhorV75(candidatas, resultado, indiceDestinoFinal, validos){
+const avaliadas=candidatas.map(c=>{
+const janelas=avaliarJanelasRotaV75(c.ordemIndices,resultado,validos);
+const metricas=metricasOperacionaisMatrizV75(c.ordemIndices,resultado,indiceDestinoFinal,validos);
+return {...c,janelas,metricas};
+});
+const factiveis=avaliadas.filter(a=>a.janelas.violacoesHard.length===0 && metricasRotaValidas(a.metricas));
+const base=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
+if(!base.length) return {melhor:null,avaliadas,referencia:null};
+const referencia=referenciaEquilibrio(base);
+let melhor=null;
+for(const a of base){
+let score=pontuacaoEquilibrada(a.metricas,referencia);
+if(!Number.isFinite(score)) continue;
+// Hard é obrigatório: se nenhuma candidata for factível, atraso recebe custo
+// enorme para escolher a menos ruim e avisar o usuário.
+if(a.janelas.violacoesHard.length) score += 1000 + a.janelas.atrasoHardMin*10;
+// Soft é secundário e jamais domina tempo+quilometragem.
+score += PESO_SOFT_SECUNDARIO * (a.janelas.penalidadeSoftMin / Math.max(1,a.metricas.duracao/60));
+if(!melhor || score<melhor.score) melhor={...a,score};
+}
+return {melhor,avaliadas,referencia};
+}
+
 async function consultarTrechoDirectionsOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
@@ -3125,9 +3630,9 @@ let avaliacoes = [];
 try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
-atualizarProgressoOtimizacao('Otimizando a rota completa de uma vez...');
-const candidatasGlobais = gerarCandidatasGlobaisMatriz(validos, ordemShopee, matrizGlobal, indiceDestinoFinal);
-const escolhaGlobal = escolherMelhorGlobalMatriz(candidatasGlobais, matrizGlobal, indiceDestinoFinal);
+atualizarProgressoOtimizacao('Agrupando micro-regiões e organizando as ruas...');
+const geradasV75 = gerarCandidatasV75(validos, ordemShopee, matrizGlobal, indiceDestinoFinal);
+const escolhaGlobal = escolherMelhorV75(geradasV75.candidatas, matrizGlobal, indiceDestinoFinal, validos);
 avaliacoes = escolhaGlobal.avaliadas || [];
 
 if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
@@ -3135,36 +3640,40 @@ if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
 ordem = escolhaGlobal.melhor.ordemIndices.map(i=>validos[i-1]);
 metricasMelhor = escolhaGlobal.melhor.metricas;
 
+if(escolhaGlobal.melhor.janelas && escolhaGlobal.melhor.janelas.violacoesHard.length){
+mostrarToast('⚠️ Nenhuma sequência conseguiu cumprir todos os horários limite', 'alerta');
+}
+
 const idParaIndice = new Map(validos.map((g,i)=>[g.id,i+1]));
 const ordemShopeeIndices = ordemShopee.map(g=>idParaIndice.get(g.id)).filter(Number.isInteger);
-metricasShopee = metricasOrdemNaMatriz(ordemShopeeIndices, matrizGlobal, indiceDestinoFinal);
+metricasShopee = metricasOperacionaisMatrizV75(ordemShopeeIndices, matrizGlobal, indiceDestinoFinal, validos);
 
 }catch(erroGlobal){
 console.warn('Matriz global indisponível; usando fallback viário completo:', erroGlobal);
 
-// Fallback sem janelas: continua avaliando a rota COMPLETA por vias, apenas
-// sem a matriz all-to-all. Não há retorno ao antigo refinamento 10 em 10.
-atualizarProgressoOtimizacao('Usando modo viário compatível para a rota completa...');
-const candidatas = gerarCandidatasIniciais(validos, ordemShopee, inicio, destino);
-const avaliadas = await avaliarCandidatasPelasVias(candidatas, inicio, destino);
-avaliacoes = avaliadas;
-const referenciaFallback = referenciaEquilibrio(avaliadas);
-const melhorFallback = escolherMelhorAvaliacao(avaliadas, referenciaFallback);
-
-if(melhorFallback){
-ordem = [...melhorFallback.ordem];
-metricasMelhor = melhorFallback.metricas;
-}else{
-ordem = destino
-? rotaInsercaoComDestino(validos, inicio, destino)
-: rotaVizinhoMaisProximo(validos, inicio);
-ordem = melhorarRota2Opt(ordem, inicio, destino);
-metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
+// Fallback: preserva o perfil experimental (micro-região + rua) usando uma
+// matriz geográfica estimada. Só perdemos a inteligência de mão única se o
+// roteador global estiver indisponível; nunca voltamos ao salto livre da V7.4.
+atualizarProgressoOtimizacao('Roteador indisponível; preservando micro-regiões e ruas...');
+const pontosFallback=[inicio,...validos.map(pontoGrupo)];
+if(destino) pontosFallback.push(destino);
+const distFallback=matrizDistanciaGeografica(pontosFallback);
+const durFallback=distFallback.map(l=>l.map(m=>Number.isFinite(m)?m/(30000/3600):Infinity));
+matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_V75'};
+const geradasFallback=gerarCandidatasV75(validos,ordemShopee,matrizGlobal,indiceDestinoFinal);
+const escolhaFallback=escolherMelhorV75(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos);
+if(!escolhaFallback.melhor) throw erroGlobal;
+ordem=escolhaFallback.melhor.ordemIndices.map(i=>validos[i-1]);
+avaliacoes=escolhaFallback.avaliadas || [];
+metricasMelhor=await calcularMetricasRota(ordem,inicio,destino);
+if(metricasRotaValidas(metricasMelhor)){
+metricasMelhor.duracao += ordem.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 }
-
-const avaliacaoShopeeFallback = avaliadas.find(a=>a.nome === 'shopee' && metricasRotaValidas(a.metricas));
-metricasShopee = avaliacaoShopeeFallback ? avaliacaoShopeeFallback.metricas : await calcularMetricasRota(ordemShopee, inicio, destino);
-mostrarToast('⚠️ Matriz global indisponível; rota completa otimizada em modo compatível', 'alerta');
+metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
+if(metricasRotaValidas(metricasShopee)){
+metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
+}
+mostrarToast('⚠️ Sem matriz viária completa; mantive micro-regiões e ruas no fallback', 'alerta');
 }
 
 atualizarProgressoOtimizacao('Validando o melhor equilíbrio entre tempo e quilômetros...');
@@ -3184,8 +3693,8 @@ atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...
 
 metaRota = {
 modo,
-provedor:matrizGlobal ? 'OSRM_GLOBAL' : 'OSRM',
-criterio:'tempo_distancia_equilibrados_global',
+provedor:(matrizGlobal && matrizGlobal.provedor) ? matrizGlobal.provedor : 'OSRM',
+criterio:'v7_5_hard_cluster_rua_soft_servico_tempo_distancia',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -3286,7 +3795,7 @@ return `
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Otimização global da rota inteira por tempo + quilômetros pelas vias. Não inclui o tempo parado em cada entrega.</div>
+<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota prioriza micro-regiões e continuidade de rua antes do refinamento por tempo + quilômetros.</div>
 </div>`;
 }
 
