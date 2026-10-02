@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.2</title>
+<title>Copiloto Entregas V7.3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -892,7 +892,7 @@ margin-top:14px;
 
 
 /* ====================================================================== */
-/* V7.2 - OTIMIZAÇÃO DE ROTA                                              */
+/* V7.3 - OTIMIZAÇÃO DE ROTA                                              */
 /* ====================================================================== */
 
 .config-otimizacao-btn{
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.2</div>
+<div class="versao-copiloto">Copiloto V7.3</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1481,7 +1481,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.2: escolha/configuração do modo de otimização -->
+<!-- V7.3: escolha/configuração do modo de otimização -->
 <div class="otimizacao-fundo" id="modalOtimizacao">
 <div class="otimizacao-caixa">
 <div class="alca-painel"></div>
@@ -1489,10 +1489,10 @@ Importar Rota
 <div class="otimizacao-subtitulo">Antes da primeira rota você escolhe como o Copiloto deve otimizar. Se marcar “Lembrar minha escolha”, as próximas rotas usam a mesma configuração automaticamente. A numeração original da Shopee continua preservada nos detalhes.</div>
 
 <button class="otimizacao-opcao" onclick="selecionarModoOtimizacao('rapida')">
-<span class="icone-opcao">⏱️</span>
+<span class="icone-opcao">⚖️</span>
 <span>
-<div class="titulo-opcao">Mais rápida</div>
-<div class="desc-opcao">Começa da sua localização atual e busca uma sequência eficiente pelas vias.</div>
+<div class="titulo-opcao">Rota mais otimizada</div>
+<div class="desc-opcao">Começa da sua localização atual e equilibra tempo + quilômetros, respeitando os caminhos e sentidos das vias.</div>
 </span>
 </button>
 
@@ -1513,7 +1513,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.2: escolha do ponto final diretamente no mapa -->
+<!-- V7.3: escolha do ponto final diretamente no mapa -->
 <div class="otimizacao-fundo" id="modalDestinoFinal">
 <div class="otimizacao-caixa destino-picker-caixa">
 <div class="alca-painel"></div>
@@ -1540,7 +1540,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.2: tela de cálculo -->
+<!-- V7.3: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
 <div class="otimizando-spinner"></div>
@@ -1926,15 +1926,16 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 
 // ======================================================================
-// V7.2 - OTIMIZAÇÃO DE ROTA
+// V7.3 - OTIMIZAÇÃO DE ROTA
 // ======================================================================
-// Estratégia:
-// 1) cria uma rota-base geográfica rápida (sem força bruta);
-// 2) divide a rota em janelas pequenas;
-// 3) consulta tempos de deslocamento pelas vias para refinar cada janela;
-// 4) compara o tempo estimado da ordem original da Shopee com a otimizada.
-// Isso escala muito melhor do que tentar calcular uma matriz N x N inteira
-// para 80/100+ paradas no celular.
+// Estratégia V7.3:
+// 1) gera várias sequências candidatas por métodos diferentes;
+// 2) mede cada candidata pelas VIAS reais, considerando tempo e quilômetros;
+// 3) escolhe a melhor pelo equilíbrio 50% tempo + 50% distância;
+// 4) refina a vencedora em janelas com matriz DIRECIONAL de vias, então
+//    A -> B pode custar diferente de B -> A (mão única, retorno, acesso etc.);
+// 5) compara a ordem original da Shopee com a rota final otimizada.
+// As alternativas analisadas ficam totalmente internas e não aparecem na UI.
 
 function carregarPreferenciaOtimizacao(){
 try{
@@ -2389,9 +2390,33 @@ atual = pontoGrupo(proximo);
 return ordem;
 }
 
+function rotaVizinhoMaisProximoComPrimeiro(gruposEntrada, inicio, primeiro){
+if(!primeiro) return rotaVizinhoMaisProximo(gruposEntrada, inicio);
+const restantes = gruposEntrada.filter(g => g !== primeiro);
+const ordem = [primeiro];
+let atual = pontoGrupo(primeiro);
+
+while(restantes.length){
+let melhorIndice = 0;
+let melhorDistancia = Infinity;
+for(let i=0;i<restantes.length;i++){
+const d = distanciaPontos(atual, pontoGrupo(restantes[i]));
+if(d < melhorDistancia){
+melhorDistancia = d;
+melhorIndice = i;
+}
+}
+const proximo = restantes.splice(melhorIndice,1)[0];
+ordem.push(proximo);
+atual = pontoGrupo(proximo);
+}
+
+return ordem;
+}
+
 function rotaInsercaoComDestino(gruposEntrada, inicio, destino){
-// Cheapest insertion com início/fim fixos. Isso tende naturalmente a deixar
-// as últimas entregas perto do endereço final escolhido.
+// Cheapest insertion com início/fim fixos. É uma das candidatas quando existe
+// ponto final escolhido; depois ela ainda será medida pelas vias reais.
 const restantes = [...gruposEntrada];
 const caminho = [inicio, destino];
 
@@ -2418,6 +2443,8 @@ return caminho.slice(1,-1).map(p=>p.grupo);
 }
 
 function melhorarRota2Opt(rota, inicio, destino){
+// Pré-refino geométrico barato. A decisão final nunca depende só dele: a rota
+// depois é medida/refinada pelas vias direcionais do roteador.
 if(rota.length < 4) return [...rota];
 
 const inicioVirtual = {lat:Number(inicio.lat), lng:Number(inicio.lng), virtual:true};
@@ -2459,39 +2486,177 @@ melhorou = true;
 return nos.filter(n=>!n.virtual).map(n=>n.grupo);
 }
 
+function centroGeografico(gruposEntrada){
+if(!gruposEntrada.length) return {lat:0,lng:0};
+let lat = 0;
+let lng = 0;
+gruposEntrada.forEach(g=>{
+lat += Number(g.lat);
+lng += Number(g.lng);
+});
+return {lat:lat/gruposEntrada.length, lng:lng/gruposEntrada.length};
+}
+
+function rotacionarSequenciaParaInicio(seq, inicio, destino){
+if(seq.length <= 1) return [...seq];
+let melhor = [...seq];
+let melhorCusto = Infinity;
+
+for(let i=0;i<seq.length;i++){
+const rot = [...seq.slice(i), ...seq.slice(0,i)];
+let custo = distanciaPontos(inicio, pontoGrupo(rot[0]));
+if(destino) custo += distanciaPontos(pontoGrupo(rot[rot.length-1]), destino);
+if(custo < melhorCusto){
+melhorCusto = custo;
+melhor = rot;
+}
+}
+return melhor;
+}
+
+function rotaVarreduraAngular(gruposEntrada, inicio, destino, sentido){
+const centro = centroGeografico(gruposEntrada);
+const ordenada = [...gruposEntrada].sort((a,b)=>{
+const aa = Math.atan2(Number(a.lat)-centro.lat, Number(a.lng)-centro.lng);
+const ab = Math.atan2(Number(b.lat)-centro.lat, Number(b.lng)-centro.lng);
+return sentido >= 0 ? aa-ab : ab-aa;
+});
+return rotacionarSequenciaParaInicio(ordenada, inicio, destino);
+}
+
+function assinaturaOrdem(ordem){
+return ordem.map(g=>String(g.id)).join('>');
+}
+
+function gerarCandidatasIniciais(validos, ordemShopee, inicio, destino){
+const candidatas = [];
+const vistas = new Set();
+
+function adicionar(nome, ordem, aplicar2Opt){
+if(!ordem || ordem.length !== validos.length) return;
+const final = aplicar2Opt ? melhorarRota2Opt(ordem, inicio, destino) : [...ordem];
+const assinatura = assinaturaOrdem(final);
+if(vistas.has(assinatura)) return;
+vistas.add(assinatura);
+candidatas.push({nome, ordem:final});
+}
+
+// A ordem Shopee entra como candidata real. Assim a otimização nunca escolhe
+// conscientemente algo pior nos DOIS critérios quando a Shopee já estiver boa.
+adicionar('shopee', ordemShopee, false);
+adicionar('vizinho', rotaVizinhoMaisProximo(validos, inicio), true);
+
+if(destino){
+adicionar('insercao-destino', rotaInsercaoComDestino(validos, inicio, destino), true);
+}
+
+adicionar('varredura-horaria', rotaVarreduraAngular(validos, inicio, destino, 1), true);
+adicionar('varredura-antihoraria', rotaVarreduraAngular(validos, inicio, destino, -1), true);
+adicionar('shopee-invertida', [...ordemShopee].reverse(), true);
+
+// Variações de início ajudam a escapar do problema clássico do vizinho mais
+// próximo: uma primeira escolha aparentemente boa pode obrigar uma volta ruim
+// várias paradas depois.
+const primeiros = [...validos]
+.sort((a,b)=>distanciaPontos(inicio,pontoGrupo(a))-distanciaPontos(inicio,pontoGrupo(b)))
+.slice(0,3);
+
+primeiros.forEach((primeiro,indice)=>{
+adicionar(`multi-inicio-${indice+1}`, rotaVizinhoMaisProximoComPrimeiro(validos, inicio, primeiro), true);
+});
+
+// Limita o custo de rede em rotas grandes sem perder diversidade suficiente.
+return candidatas.slice(0,8);
+}
+
 function stringCoordenadas(pontos){
 return pontos.map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`).join(';');
 }
 
+function matrizDistanciaGeografica(pontos){
+return pontos.map((a,i)=>pontos.map((b,j)=>{
+if(i === j) return 0;
+return distanciaPontos(a,b);
+}));
+}
+
 async function consultarMatrizOSRM(pontos){
 const coords = stringCoordenadas(pontos);
-const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration`;
+const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration,distance`;
 const resposta = await fetch(url);
 if(!resposta.ok) throw new Error('OSRM_MATRIX_' + resposta.status);
 const dados = await resposta.json();
 if(!dados || !Array.isArray(dados.durations)) throw new Error('OSRM_MATRIX_INVALIDA');
-return {matriz:dados.durations, provedor:'OSRM'};
+
+// Alguns servidores podem não devolver "distances" mesmo aceitando a tabela.
+// Nesse caso mantemos o tempo viário direcional e usamos distância geográfica
+// só como fallback do segundo critério local.
+const distancias = Array.isArray(dados.distances)
+? dados.distances
+: matrizDistanciaGeografica(pontos);
+
+return {
+duracoes:dados.durations,
+distancias,
+provedor:'OSRM'
+};
 }
 
 async function consultarMatrizRoteamento(pontos){
 return await consultarMatrizOSRM(pontos);
 }
 
-function custoMatriz(matriz, origem, destino){
+function valoresFinitosMatriz(matriz){
+const valores = [];
+(matriz || []).forEach((linha,i)=>{
+(linha || []).forEach((v,j)=>{
+if(i !== j && Number.isFinite(v) && v > 0) valores.push(v);
+});
+});
+return valores;
+}
+
+function mediana(valores){
+if(!valores.length) return 1;
+const ordenados = [...valores].sort((a,b)=>a-b);
+const meio = Math.floor(ordenados.length/2);
+return ordenados.length % 2
+? ordenados[meio]
+: (ordenados[meio-1] + ordenados[meio]) / 2;
+}
+
+function normalizadoresMatriz(resultado){
+return {
+tempo:Math.max(1, mediana(valoresFinitosMatriz(resultado.duracoes))),
+distancia:Math.max(1, mediana(valoresFinitosMatriz(resultado.distancias)))
+};
+}
+
+function valorMatriz(matriz, origem, destino){
 const valor = matriz && matriz[origem] ? matriz[origem][destino] : null;
 return Number.isFinite(valor) ? valor : Infinity;
 }
 
-function otimizarJanelaComMatriz(matriz, quantidadeParadas, temAncoraFinal){
+function custoMatrizEquilibrado(resultado, origem, destino, norm){
+const tempo = valorMatriz(resultado.duracoes, origem, destino);
+const distancia = valorMatriz(resultado.distancias, origem, destino);
+if(!Number.isFinite(tempo) || !Number.isFinite(distancia)) return Infinity;
+
+// Critério central da V7.3: peso IGUAL para tempo e quilômetros.
+return 0.5 * (tempo / norm.tempo) + 0.5 * (distancia / norm.distancia);
+}
+
+function otimizarJanelaComMatriz(resultado, quantidadeParadas, temAncoraFinal){
 const n = quantidadeParadas;
 if(n <= 1) return [...Array(n).keys()];
 
+const norm = normalizadoresMatriz(resultado);
 const totalMascaras = 1 << n;
 const dp = Array.from({length:totalMascaras},()=>Array(n).fill(Infinity));
 const pai = Array.from({length:totalMascaras},()=>Array(n).fill(-1));
 
 for(let j=0;j<n;j++){
-dp[1<<j][j] = custoMatriz(matriz, 0, j+1);
+dp[1<<j][j] = custoMatrizEquilibrado(resultado, 0, j+1, norm);
 }
 
 for(let mask=1;mask<totalMascaras;mask++){
@@ -2500,7 +2665,7 @@ if(!(mask & (1<<j)) || !Number.isFinite(dp[mask][j])) continue;
 for(let k=0;k<n;k++){
 if(mask & (1<<k)) continue;
 const proximoMask = mask | (1<<k);
-const custo = dp[mask][j] + custoMatriz(matriz, j+1, k+1);
+const custo = dp[mask][j] + custoMatrizEquilibrado(resultado, j+1, k+1, norm);
 if(custo < dp[proximoMask][k]){
 dp[proximoMask][k] = custo;
 pai[proximoMask][k] = j;
@@ -2516,7 +2681,9 @@ const indiceAncoraFinal = n + 1;
 
 for(let j=0;j<n;j++){
 let custo = dp[cheia][j];
-if(temAncoraFinal) custo += custoMatriz(matriz, j+1, indiceAncoraFinal);
+if(temAncoraFinal){
+custo += custoMatrizEquilibrado(resultado, j+1, indiceAncoraFinal, norm);
+}
 if(custo < melhorCusto){
 melhorCusto = custo;
 melhorFim = j;
@@ -2538,15 +2705,18 @@ atual = anterior;
 return ordemReversa.reverse();
 }
 
-async function refinarRotaPorTrechos(ordemInicial, inicio, destino){
+async function refinarRotaPorTrechos(ordemInicial, inicio, destino, deslocamentoInicial){
 let ordem = [...ordemInicial];
-const tamanhoJanela = 8; // origem + até 8 paradas + âncora final
+const tamanhoJanela = 10; // origem + até 10 paradas + âncora final
 let falhas = 0;
-const totalJanelas = Math.ceil(ordem.length / tamanhoJanela);
+const deslocamento = Math.max(0, Math.min(Number(deslocamentoInicial)||0, ordem.length));
+const totalJanelas = Math.max(1, Math.ceil(Math.max(0, ordem.length-deslocamento) / tamanhoJanela));
+let numeroJanela = 0;
 
-for(let base=0,numeroJanela=1;base<ordem.length;base+=tamanhoJanela,numeroJanela++){
+for(let base=deslocamento;base<ordem.length;base+=tamanhoJanela){
 const janela = ordem.slice(base, base+tamanhoJanela);
 if(janela.length <= 1) continue;
+numeroJanela++;
 
 const ancoraInicio = base === 0 ? inicio : pontoGrupo(ordem[base-1]);
 const proximoFora = ordem[base+tamanhoJanela];
@@ -2554,11 +2724,11 @@ const ancoraFim = proximoFora ? pontoGrupo(proximoFora) : (destino || null);
 const pontos = [ancoraInicio, ...janela.map(pontoGrupo)];
 if(ancoraFim) pontos.push(ancoraFim);
 
-atualizarProgressoOtimizacao(`Analisando as vias · trecho ${numeroJanela}/${totalJanelas}...`);
+atualizarProgressoOtimizacao(`Refinando sentidos e caminhos das vias...`);
 
 try{
 const resultado = await consultarMatrizRoteamento(pontos);
-const permutacao = otimizarJanelaComMatriz(resultado.matriz, janela.length, !!ancoraFim);
+const permutacao = otimizarJanelaComMatriz(resultado, janela.length, !!ancoraFim);
 const reordenada = permutacao.map(i=>janela[i]);
 ordem.splice(base, janela.length, ...reordenada);
 }catch(erro){
@@ -2604,6 +2774,58 @@ return {duracao:null, distancia:null, provedor:null};
 }
 }
 
+function metricasRotaValidas(m){
+return m && Number.isFinite(m.duracao) && m.duracao > 0 && Number.isFinite(m.distancia) && m.distancia > 0;
+}
+
+function referenciaEquilibrio(avaliacoes){
+const validas = avaliacoes.filter(a=>metricasRotaValidas(a.metricas));
+if(!validas.length) return null;
+return {
+menorTempo:Math.min(...validas.map(a=>a.metricas.duracao)),
+menorDistancia:Math.min(...validas.map(a=>a.metricas.distancia))
+};
+}
+
+function pontuacaoEquilibrada(metricas, referencia){
+if(!metricasRotaValidas(metricas) || !referencia) return Infinity;
+const tempoRel = metricas.duracao / Math.max(1, referencia.menorTempo);
+const distanciaRel = metricas.distancia / Math.max(1, referencia.menorDistancia);
+
+// Mesmo peso para os dois objetivos. Uma rota que economiza muito tempo mas
+// desperdiça muitos quilômetros (ou o contrário) perde para uma mais equilibrada.
+return 0.5 * tempoRel + 0.5 * distanciaRel;
+}
+
+async function avaliarCandidatasPelasVias(candidatas, inicio, destino){
+const avaliacoes = [];
+for(let i=0;i<candidatas.length;i++){
+atualizarProgressoOtimizacao('Comparando caminhos possíveis pelas vias...');
+const cand = candidatas[i];
+const metricas = await calcularMetricasRota(cand.ordem, inicio, destino);
+avaliacoes.push({...cand, metricas});
+if(i < candidatas.length-1) await esperar(100);
+}
+return avaliacoes;
+}
+
+function escolherMelhorAvaliacao(avaliacoes, referencia){
+let melhor = null;
+for(const avaliacao of avaliacoes){
+const score = pontuacaoEquilibrada(avaliacao.metricas, referencia);
+if(!Number.isFinite(score)) continue;
+if(!melhor || score < melhor.score - 0.0001){
+melhor = {...avaliacao, score};
+}else if(melhor && Math.abs(score - melhor.score) <= 0.0001){
+// Empate praticamente perfeito: menor quilometragem reduz combustível.
+if(avaliacao.metricas.distancia < melhor.metricas.distancia){
+melhor = {...avaliacao, score};
+}
+}
+}
+return melhor;
+}
+
 async function executarOtimizacaoRota(modo, destinoFinal){
 abrirOverlayOtimizacao('Buscando sua localização atual...');
 
@@ -2626,37 +2848,86 @@ texto:destinoFinal.texto || destinoFinal.nome || destinoFinal.endereco || 'Ponto
 };
 }
 
-// Mantém uma cópia da ordem original da Shopee para a comparação de tempo.
 const ordemShopee = [...validos].sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 
-atualizarProgressoOtimizacao('Montando a melhor sequência inicial...');
-let ordem = modo === 'endereco'
+atualizarProgressoOtimizacao('Criando alternativas de rota...');
+const candidatas = gerarCandidatasIniciais(validos, ordemShopee, inicio, destino);
+const avaliacoes = await avaliarCandidatasPelasVias(candidatas, inicio, destino);
+let referencia = referenciaEquilibrio(avaliacoes);
+let melhor = escolherMelhorAvaliacao(avaliacoes, referencia);
+
+// Se o serviço de métricas falhar totalmente, ainda há uma rota geográfica
+// funcional. Quando a rede responde, todo o restante passa a ser viário.
+if(!melhor){
+let fallback = destino
 ? rotaInsercaoComDestino(validos, inicio, destino)
 : rotaVizinhoMaisProximo(validos, inicio);
+fallback = melhorarRota2Opt(fallback, inicio, destino);
+melhor = {nome:'fallback', ordem:fallback, metricas:{duracao:null,distancia:null,provedor:null}, score:Infinity};
+}
 
-ordem = melhorarRota2Opt(ordem, inicio, destino);
+let ordem = [...melhor.ordem];
+let metricasMelhor = melhor.metricas;
 
-const refinamento = await refinarRotaPorTrechos(ordem, inicio, destino);
-ordem = refinamento.ordem;
+// Refino direcional: é aqui que o Copiloto entende na prática que A -> B
+// pode ser muito diferente de B -> A por mão única, retornos ou acessos.
+const refinamento1 = await refinarRotaPorTrechos(ordem, inicio, destino, 0);
+let ordemRefinada = refinamento1.ordem;
+
+// Em rotas médias fazemos uma segunda passagem deslocada para quebrar as
+// fronteiras das janelas. Em rotas muito grandes preservamos desempenho móvel.
+if(ordemRefinada.length <= 80 && ordemRefinada.length > 10){
+const refinamento2 = await refinarRotaPorTrechos(ordemRefinada, inicio, destino, 5);
+ordemRefinada = refinamento2.ordem;
+}
+
+atualizarProgressoOtimizacao('Validando o melhor equilíbrio entre tempo e quilômetros...');
+const metricasRefinadas = await calcularMetricasRota(ordemRefinada, inicio, destino);
+
+if(metricasRotaValidas(metricasRefinadas)){
+const comparacao = [
+{nome:'antes-refino', ordem, metricas:metricasMelhor},
+{nome:'refinada', ordem:ordemRefinada, metricas:metricasRefinadas}
+].filter(a=>metricasRotaValidas(a.metricas));
+
+const refFinal = referenciaEquilibrio([
+...avaliacoes.filter(a=>metricasRotaValidas(a.metricas)),
+...comparacao
+]);
+const melhorFinal = escolherMelhorAvaliacao(comparacao, refFinal);
+if(melhorFinal){
+ordem = melhorFinal.ordem;
+metricasMelhor = melhorFinal.metricas;
+referencia = refFinal;
+}
+}
 
 // Preserva pontos sem coordenada no final e mantém a referência original.
 invalidos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 grupos = [...ordem, ...invalidos];
 grupos.forEach((g,indice)=>{ g.ordemOtimizada = indice + 1; });
 
-atualizarProgressoOtimizacao('Calculando o tempo da ordem da Shopee...');
-const metricasShopee = await calcularMetricasRota(ordemShopee, inicio, destino);
+atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...');
+let metricasShopee = null;
+const avaliacaoShopee = avaliacoes.find(a=>a.nome === 'shopee' && metricasRotaValidas(a.metricas));
+if(avaliacaoShopee){
+metricasShopee = avaliacaoShopee.metricas;
+}else{
+metricasShopee = await calcularMetricasRota(ordemShopee, inicio, destino);
+}
 
-atualizarProgressoOtimizacao('Calculando o tempo da rota otimizada...');
-const metricasOtimizadas = await calcularMetricasRota(ordem, inicio, destino);
+if(!metricasRotaValidas(metricasMelhor)){
+metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
+}
 
 metaRota = {
 modo,
 provedor:'OSRM',
-distanciaMetros:Number.isFinite(metricasOtimizadas.distancia) ? metricasOtimizadas.distancia : null,
-duracaoSegundos:Number.isFinite(metricasOtimizadas.duracao) ? metricasOtimizadas.duracao : null,
-distanciaShopeeMetros:Number.isFinite(metricasShopee.distancia) ? metricasShopee.distancia : null,
-duracaoShopeeSegundos:Number.isFinite(metricasShopee.duracao) ? metricasShopee.duracao : null,
+criterio:'tempo_distancia_equilibrados',
+distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
+duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
+distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
+duracaoShopeeSegundos:Number.isFinite(metricasShopee && metricasShopee.duracao) ? metricasShopee.duracao : null,
 destinoFinal:destino ? {...destino} : null,
 inicio:{lat:inicio.lat,lng:inicio.lng,precisao:inicio.precisao ?? null},
 atualizadoEm:Date.now()
@@ -2666,7 +2937,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Rota otimizada pelas vias', 'sucesso');
+mostrarToast('⚡ Rota otimizada por tempo + quilômetros', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
@@ -2681,11 +2952,6 @@ if(erro && erro.message === 'DESTINO_NAO_SELECIONADO'){
 mostrarToast('⚠️ Escolha o ponto final no mapa', 'alerta');
 abrirModalOtimizacao(false);
 abrirSeletorDestinoFinal();
-return;
-}
-if(erro && erro.message === 'SEM_COORDENADAS'){
-mostrarToast('⚠️ A rota não possui coordenadas válidas para otimizar', 'alerta');
-abrirModalOtimizacao(false);
 return;
 }
 
@@ -2714,18 +2980,34 @@ const tempoOtimizado = formatarDuracaoRota(metaRota.duracaoSegundos);
 const distShopee = formatarDistanciaRota(metaRota.distanciaShopeeMetros);
 const distOtimizada = formatarDistanciaRota(metaRota.distanciaMetros);
 
-if(!tempoShopee && !tempoOtimizado) return '';
+if(!tempoShopee && !tempoOtimizado && !distShopee && !distOtimizada) return '';
 
 let diferencaHtml = '';
-if(Number.isFinite(metaRota.duracaoShopeeSegundos) && Number.isFinite(metaRota.duracaoSegundos)){
-const diferenca = metaRota.duracaoShopeeSegundos - metaRota.duracaoSegundos;
-const abs = formatarDuracaoRota(Math.abs(diferenca));
-if(diferenca > 30){
-diferencaHtml = `<div class="economia-rota">⏱️ Economia estimada de deslocamento: ${abs}</div>`;
-}else if(diferenca < -30){
-diferencaHtml = `<div class="economia-rota pior">↔️ Esta configuração acrescenta cerca de ${abs} de deslocamento, mas respeita o ponto final escolhido.</div>`;
+const temTempo = Number.isFinite(metaRota.duracaoShopeeSegundos) && Number.isFinite(metaRota.duracaoSegundos);
+const temDistancia = Number.isFinite(metaRota.distanciaShopeeMetros) && Number.isFinite(metaRota.distanciaMetros);
+
+if(temTempo || temDistancia){
+const deltaTempo = temTempo ? metaRota.duracaoShopeeSegundos - metaRota.duracaoSegundos : 0;
+const deltaDist = temDistancia ? metaRota.distanciaShopeeMetros - metaRota.distanciaMetros : 0;
+const partes = [];
+
+if(temTempo && Math.abs(deltaTempo) > 30){
+partes.push(deltaTempo > 0
+? `${formatarDuracaoRota(deltaTempo)} mais rápida`
+: `${formatarDuracaoRota(Math.abs(deltaTempo))} a mais`);
+}
+
+if(temDistancia && Math.abs(deltaDist) > 100){
+partes.push(deltaDist > 0
+? `${formatarDistanciaRota(deltaDist)} a menos`
+: `${formatarDistanciaRota(Math.abs(deltaDist))} a mais`);
+}
+
+if(partes.length){
+const ambosMelhores = (!temTempo || deltaTempo >= -30) && (!temDistancia || deltaDist >= -100) && (deltaTempo > 30 || deltaDist > 100);
+diferencaHtml = `<div class="economia-rota${ambosMelhores ? '' : ' pior'}">${ambosMelhores ? '⚡' : '⚖️'} ${partes.join(' · ')}</div>`;
 }else{
-diferencaHtml = `<div class="economia-rota">≈ Tempo de deslocamento semelhante à ordem da Shopee</div>`;
+diferencaHtml = `<div class="economia-rota">≈ Resultado muito próximo da ordem da Shopee</div>`;
 }
 }
 
@@ -2742,7 +3024,7 @@ return `
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Estimativa de deslocamento pelas vias. Não inclui o tempo parado em cada entrega.</div>
+<div class="comparacao-nota">Otimização equilibrada entre tempo + quilômetros pelas vias. Não inclui o tempo parado em cada entrega.</div>
 </div>`;
 }
 
