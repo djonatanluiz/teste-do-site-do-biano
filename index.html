@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.3</title>
+<title>Copiloto Entregas V7.4</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -892,7 +892,7 @@ margin-top:14px;
 
 
 /* ====================================================================== */
-/* V7.3 - OTIMIZAÇÃO DE ROTA                                              */
+/* V7.4 - OTIMIZAÇÃO GLOBAL DE ROTA                                      */
 /* ====================================================================== */
 
 .config-otimizacao-btn{
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.3</div>
+<div class="versao-copiloto">Copiloto V7.4</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1481,7 +1481,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.3: escolha/configuração do modo de otimização -->
+<!-- V7.4: escolha/configuração do modo de otimização -->
 <div class="otimizacao-fundo" id="modalOtimizacao">
 <div class="otimizacao-caixa">
 <div class="alca-painel"></div>
@@ -1513,7 +1513,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.3: escolha do ponto final diretamente no mapa -->
+<!-- V7.4: escolha do ponto final diretamente no mapa -->
 <div class="otimizacao-fundo" id="modalDestinoFinal">
 <div class="otimizacao-caixa destino-picker-caixa">
 <div class="alca-painel"></div>
@@ -1540,7 +1540,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.3: tela de cálculo -->
+<!-- V7.4: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
 <div class="otimizando-spinner"></div>
@@ -1926,16 +1926,18 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 
 // ======================================================================
-// V7.3 - OTIMIZAÇÃO DE ROTA
+// V7.4 - OTIMIZAÇÃO GLOBAL DE ROTA
 // ======================================================================
-// Estratégia V7.3:
-// 1) gera várias sequências candidatas por métodos diferentes;
-// 2) mede cada candidata pelas VIAS reais, considerando tempo e quilômetros;
-// 3) escolhe a melhor pelo equilíbrio 50% tempo + 50% distância;
-// 4) refina a vencedora em janelas com matriz DIRECIONAL de vias, então
-//    A -> B pode custar diferente de B -> A (mão única, retorno, acesso etc.);
-// 5) compara a ordem original da Shopee com a rota final otimizada.
-// As alternativas analisadas ficam totalmente internas e não aparecem na UI.
+// Estratégia V7.4:
+// 1) considera TODAS as paradas da rota simultaneamente;
+// 2) monta uma matriz DIRECIONAL global de tempo + distância pelas vias;
+// 3) A -> B pode custar diferente de B -> A (mão única, retornos e acessos);
+// 4) gera várias sequências iniciais e permite mover qualquer parada para
+//    qualquer posição da rota - não existem mais janelas de 10 em 10;
+// 5) refina globalmente com realocação + 2-opt direcional;
+// 6) escolhe uma única rota pelo equilíbrio 50% tempo + 50% quilômetros;
+// 7) compara o resultado final com a ordem original da Shopee.
+// As alternativas analisadas ficam internas e não poluem a interface.
 
 function carregarPreferenciaOtimizacao(){
 try{
@@ -2642,102 +2644,360 @@ const tempo = valorMatriz(resultado.duracoes, origem, destino);
 const distancia = valorMatriz(resultado.distancias, origem, destino);
 if(!Number.isFinite(tempo) || !Number.isFinite(distancia)) return Infinity;
 
-// Critério central da V7.3: peso IGUAL para tempo e quilômetros.
+// Critério central da V7.4: peso IGUAL para tempo e quilômetros.
 return 0.5 * (tempo / norm.tempo) + 0.5 * (distancia / norm.distancia);
 }
 
-function otimizarJanelaComMatriz(resultado, quantidadeParadas, temAncoraFinal){
-const n = quantidadeParadas;
-if(n <= 1) return [...Array(n).keys()];
-
-const norm = normalizadoresMatriz(resultado);
-const totalMascaras = 1 << n;
-const dp = Array.from({length:totalMascaras},()=>Array(n).fill(Infinity));
-const pai = Array.from({length:totalMascaras},()=>Array(n).fill(-1));
-
-for(let j=0;j<n;j++){
-dp[1<<j][j] = custoMatrizEquilibrado(resultado, 0, j+1, norm);
+// Consulta a matriz GLOBAL em blocos técnicos. Os blocos existem apenas para
+// respeitar o tamanho das requisições HTTP do roteador; a otimização recebe
+// no fim UMA matriz única contendo TODAS as paradas da rota.
+async function consultarMatrizGlobalOSRM(pontos){
+const total = pontos.length;
+const duracoes = Array.from({length:total},()=>Array(total).fill(Infinity));
+const distancias = Array.from({length:total},()=>Array(total).fill(Infinity));
+for(let i=0;i<total;i++){
+duracoes[i][i] = 0;
+distancias[i][i] = 0;
 }
 
-for(let mask=1;mask<totalMascaras;mask++){
-for(let j=0;j<n;j++){
-if(!(mask & (1<<j)) || !Number.isFinite(dp[mask][j])) continue;
-for(let k=0;k<n;k++){
-if(mask & (1<<k)) continue;
-const proximoMask = mask | (1<<k);
-const custo = dp[mask][j] + custoMatrizEquilibrado(resultado, j+1, k+1, norm);
-if(custo < dp[proximoMask][k]){
-dp[proximoMask][k] = custo;
-pai[proximoMask][k] = j;
+// 40 origens + 40 destinos = no máximo 80 coordenadas por chamada.
+// Isso mantém folga para servidores OSRM que limitam o tamanho da tabela.
+const TAMANHO_BLOCO = 40;
+const blocos = Math.ceil(total / TAMANHO_BLOCO);
+let concluido = 0;
+const totalConsultas = blocos * blocos;
+
+for(let inicioOrigem=0; inicioOrigem<total; inicioOrigem+=TAMANHO_BLOCO){
+const indicesOrigem = [];
+for(let i=inicioOrigem;i<Math.min(total,inicioOrigem+TAMANHO_BLOCO);i++) indicesOrigem.push(i);
+
+for(let inicioDestino=0; inicioDestino<total; inicioDestino+=TAMANHO_BLOCO){
+const indicesDestino = [];
+for(let j=inicioDestino;j<Math.min(total,inicioDestino+TAMANHO_BLOCO);j++) indicesDestino.push(j);
+
+const coords = [
+...indicesOrigem.map(i=>pontos[i]),
+...indicesDestino.map(i=>pontos[i])
+];
+
+const fontes = indicesOrigem.map((_,i)=>i).join(';');
+const deslocamentoDestino = indicesOrigem.length;
+const destinos = indicesDestino.map((_,i)=>deslocamentoDestino+i).join(';');
+const url = `https://router.project-osrm.org/table/v1/driving/${stringCoordenadas(coords)}?sources=${fontes}&destinations=${destinos}&annotations=duration,distance`;
+
+let dados = null;
+let ultimoErro = null;
+for(let tentativa=0; tentativa<2 && !dados; tentativa++){
+try{
+const resposta = await fetch(url);
+if(!resposta.ok) throw new Error('OSRM_MATRIX_GLOBAL_' + resposta.status);
+const recebido = await resposta.json();
+if(!recebido || !Array.isArray(recebido.durations)) throw new Error('OSRM_MATRIX_GLOBAL_INVALIDA');
+dados = recebido;
+}catch(erro){
+ultimoErro = erro;
+if(tentativa === 0) await esperar(450);
 }
 }
+if(!dados) throw ultimoErro || new Error('OSRM_MATRIX_GLOBAL_FALHOU');
+
+for(let a=0;a<indicesOrigem.length;a++){
+for(let b=0;b<indicesDestino.length;b++){
+const oi = indicesOrigem[a];
+const dj = indicesDestino[b];
+const t = dados.durations && dados.durations[a] ? dados.durations[a][b] : null;
+const d = dados.distances && dados.distances[a] ? dados.distances[a][b] : null;
+if(Number.isFinite(t)) duracoes[oi][dj] = t;
+if(Number.isFinite(d)) distancias[oi][dj] = d;
+else if(Number.isFinite(t)) distancias[oi][dj] = distanciaPontos(pontos[oi], pontos[dj]);
 }
 }
 
-const cheia = totalMascaras - 1;
-let melhorFim = -1;
+concluido++;
+const percentual = Math.round((concluido/Math.max(1,totalConsultas))*100);
+atualizarProgressoOtimizacao(`Lendo todas as vias da rota... ${percentual}%`);
+if(concluido < totalConsultas) await esperar(180);
+}
+}
+
+return {duracoes, distancias, provedor:'OSRM_GLOBAL'};
+}
+
+function metricasOrdemNaMatriz(ordemIndices, resultado, indiceDestinoFinal){
+let duracao = 0;
+let distancia = 0;
+let anterior = 0; // índice 0 = ponto inicial
+
+for(const atual of ordemIndices){
+const t = valorMatriz(resultado.duracoes, anterior, atual);
+const d = valorMatriz(resultado.distancias, anterior, atual);
+if(!Number.isFinite(t) || !Number.isFinite(d)) return {duracao:null,distancia:null,provedor:null};
+duracao += t;
+distancia += d;
+anterior = atual;
+}
+
+if(Number.isInteger(indiceDestinoFinal)){
+const t = valorMatriz(resultado.duracoes, anterior, indiceDestinoFinal);
+const d = valorMatriz(resultado.distancias, anterior, indiceDestinoFinal);
+if(!Number.isFinite(t) || !Number.isFinite(d)) return {duracao:null,distancia:null,provedor:null};
+duracao += t;
+distancia += d;
+}
+
+return {duracao, distancia, provedor:'OSRM_GLOBAL'};
+}
+
+function custoOrdemGlobal(ordemIndices, resultado, norm, indiceDestinoFinal){
+let custo = 0;
+let anterior = 0;
+for(const atual of ordemIndices){
+const c = custoMatrizEquilibrado(resultado, anterior, atual, norm);
+if(!Number.isFinite(c)) return Infinity;
+custo += c;
+anterior = atual;
+}
+if(Number.isInteger(indiceDestinoFinal)){
+const c = custoMatrizEquilibrado(resultado, anterior, indiceDestinoFinal, norm);
+if(!Number.isFinite(c)) return Infinity;
+custo += c;
+}
+return custo;
+}
+
+function rotaVizinhoGlobalMatriz(indicesParadas, resultado, norm, primeiroForcado){
+const restantes = new Set(indicesParadas);
+const ordem = [];
+let atual = 0;
+
+if(Number.isInteger(primeiroForcado) && restantes.has(primeiroForcado)){
+ordem.push(primeiroForcado);
+restantes.delete(primeiroForcado);
+atual = primeiroForcado;
+}
+
+while(restantes.size){
+let melhor = null;
 let melhorCusto = Infinity;
-const indiceAncoraFinal = n + 1;
-
-for(let j=0;j<n;j++){
-let custo = dp[cheia][j];
-if(temAncoraFinal){
-custo += custoMatrizEquilibrado(resultado, j+1, indiceAncoraFinal, norm);
-}
+for(const candidato of restantes){
+const custo = custoMatrizEquilibrado(resultado, atual, candidato, norm);
 if(custo < melhorCusto){
 melhorCusto = custo;
-melhorFim = j;
+melhor = candidato;
+}
+}
+if(melhor === null) break;
+ordem.push(melhor);
+restantes.delete(melhor);
+atual = melhor;
+}
+return ordem;
+}
+
+function rotaInsercaoGlobalMatriz(indicesParadas, resultado, norm, indiceDestinoFinal){
+const restantes = new Set(indicesParadas);
+const rota = [];
+
+while(restantes.size){
+let melhor = null;
+
+for(const candidato of restantes){
+for(let pos=0;pos<=rota.length;pos++){
+const anterior = pos === 0 ? 0 : rota[pos-1];
+const seguinte = pos < rota.length ? rota[pos] : (Number.isInteger(indiceDestinoFinal) ? indiceDestinoFinal : null);
+
+let custoAntigo = 0;
+if(seguinte !== null) custoAntigo = custoMatrizEquilibrado(resultado, anterior, seguinte, norm);
+let custoNovo = custoMatrizEquilibrado(resultado, anterior, candidato, norm);
+if(seguinte !== null) custoNovo += custoMatrizEquilibrado(resultado, candidato, seguinte, norm);
+const delta = custoNovo - custoAntigo;
+
+if(Number.isFinite(delta) && (!melhor || delta < melhor.delta)){
+melhor = {candidato,pos,delta};
+}
 }
 }
 
-if(melhorFim < 0 || !Number.isFinite(melhorCusto)) return [...Array(n).keys()];
-
-const ordemReversa = [];
-let mask = cheia;
-let atual = melhorFim;
-while(atual >= 0){
-ordemReversa.push(atual);
-const anterior = pai[mask][atual];
-mask = mask & ~(1<<atual);
-atual = anterior;
+if(!melhor){
+// Se alguma combinação da matriz estiver indisponível, completa sem travar.
+for(const candidato of restantes) rota.push(candidato);
+break;
+}
+rota.splice(melhor.pos,0,melhor.candidato);
+restantes.delete(melhor.candidato);
+}
+return rota;
 }
 
-return ordemReversa.reverse();
+function deltaRealocacaoGlobal(ordem, i, novaPosicao, resultado, norm, indiceDestinoFinal){
+const x = ordem[i];
+const reduzida = [...ordem.slice(0,i), ...ordem.slice(i+1)];
+const pos = Math.max(0, Math.min(novaPosicao, reduzida.length));
+
+const prevRem = i === 0 ? 0 : ordem[i-1];
+const nextRem = i === ordem.length-1 ? (Number.isInteger(indiceDestinoFinal) ? indiceDestinoFinal : null) : ordem[i+1];
+let delta = -custoMatrizEquilibrado(resultado, prevRem, x, norm);
+if(nextRem !== null){
+delta -= custoMatrizEquilibrado(resultado, x, nextRem, norm);
+delta += custoMatrizEquilibrado(resultado, prevRem, nextRem, norm);
 }
 
-async function refinarRotaPorTrechos(ordemInicial, inicio, destino, deslocamentoInicial){
+const prevIns = pos === 0 ? 0 : reduzida[pos-1];
+const nextIns = pos < reduzida.length ? reduzida[pos] : (Number.isInteger(indiceDestinoFinal) ? indiceDestinoFinal : null);
+if(nextIns !== null){
+delta -= custoMatrizEquilibrado(resultado, prevIns, nextIns, norm);
+delta += custoMatrizEquilibrado(resultado, prevIns, x, norm);
+delta += custoMatrizEquilibrado(resultado, x, nextIns, norm);
+}else{
+delta += custoMatrizEquilibrado(resultado, prevIns, x, norm);
+}
+return delta;
+}
+
+function melhorRealocacaoGlobal(ordem, resultado, norm, indiceDestinoFinal){
+let melhor = null;
+for(let i=0;i<ordem.length;i++){
+for(let p=0;p<=ordem.length-1;p++){
+// Inserir no mesmo lugar após remover não muda a rota.
+if(p === i) continue;
+const delta = deltaRealocacaoGlobal(ordem, i, p, resultado, norm, indiceDestinoFinal);
+if(Number.isFinite(delta) && delta < -0.00001 && (!melhor || delta < melhor.delta)){
+melhor = {i,p,delta};
+}
+}
+}
+return melhor;
+}
+
+function aplicarRealocacao(ordem, movimento){
+const nova = [...ordem];
+const [x] = nova.splice(movimento.i,1);
+const pos = Math.max(0, Math.min(movimento.p, nova.length));
+nova.splice(pos,0,x);
+return nova;
+}
+
+function prefixoDiferencaReversao(ordem, resultado, norm){
+const pref = Array(ordem.length).fill(0);
+for(let k=0;k<ordem.length-1;k++){
+const ida = custoMatrizEquilibrado(resultado, ordem[k], ordem[k+1], norm);
+const volta = custoMatrizEquilibrado(resultado, ordem[k+1], ordem[k], norm);
+const dif = (Number.isFinite(ida) && Number.isFinite(volta)) ? (volta-ida) : Infinity;
+pref[k+1] = Number.isFinite(pref[k]) && Number.isFinite(dif) ? pref[k] + dif : Infinity;
+}
+return pref;
+}
+
+function melhor2OptDirecionalGlobal(ordem, resultado, norm, indiceDestinoFinal){
+if(ordem.length < 3) return null;
+const pref = prefixoDiferencaReversao(ordem, resultado, norm);
+let melhor = null;
+
+for(let i=0;i<ordem.length-1;i++){
+const prev = i === 0 ? 0 : ordem[i-1];
+for(let j=i+1;j<ordem.length;j++){
+const next = j === ordem.length-1 ? (Number.isInteger(indiceDestinoFinal) ? indiceDestinoFinal : null) : ordem[j+1];
+const a = ordem[i];
+const b = ordem[j];
+
+let delta = -custoMatrizEquilibrado(resultado, prev, a, norm)
++ custoMatrizEquilibrado(resultado, prev, b, norm);
+
+if(next !== null){
+delta -= custoMatrizEquilibrado(resultado, b, next, norm);
+delta += custoMatrizEquilibrado(resultado, a, next, norm);
+}
+
+const interno = pref[j] - pref[i];
+if(!Number.isFinite(delta) || !Number.isFinite(interno)) continue;
+delta += interno;
+
+if(delta < -0.00001 && (!melhor || delta < melhor.delta)) melhor = {i,j,delta};
+}
+}
+return melhor;
+}
+
+function aplicar2Opt(ordem, movimento){
+return [
+...ordem.slice(0,movimento.i),
+...ordem.slice(movimento.i,movimento.j+1).reverse(),
+...ordem.slice(movimento.j+1)
+];
+}
+
+function refinarRotaGlobalComMatriz(ordemInicial, resultado, indiceDestinoFinal){
 let ordem = [...ordemInicial];
-const tamanhoJanela = 10; // origem + até 10 paradas + âncora final
-let falhas = 0;
-const deslocamento = Math.max(0, Math.min(Number(deslocamentoInicial)||0, ordem.length));
-const totalJanelas = Math.max(1, Math.ceil(Math.max(0, ordem.length-deslocamento) / tamanhoJanela));
-let numeroJanela = 0;
+const norm = normalizadoresMatriz(resultado);
 
-for(let base=deslocamento;base<ordem.length;base+=tamanhoJanela){
-const janela = ordem.slice(base, base+tamanhoJanela);
-if(janela.length <= 1) continue;
-numeroJanela++;
-
-const ancoraInicio = base === 0 ? inicio : pontoGrupo(ordem[base-1]);
-const proximoFora = ordem[base+tamanhoJanela];
-const ancoraFim = proximoFora ? pontoGrupo(proximoFora) : (destino || null);
-const pontos = [ancoraInicio, ...janela.map(pontoGrupo)];
-if(ancoraFim) pontos.push(ancoraFim);
-
-atualizarProgressoOtimizacao(`Refinando sentidos e caminhos das vias...`);
-
-try{
-const resultado = await consultarMatrizRoteamento(pontos);
-const permutacao = otimizarJanelaComMatriz(resultado, janela.length, !!ancoraFim);
-const reordenada = permutacao.map(i=>janela[i]);
-ordem.splice(base, janela.length, ...reordenada);
-}catch(erro){
-console.warn('Falha ao refinar trecho da rota:', erro);
-falhas++;
-}
+// Realocação GLOBAL: cada parada pode ir para qualquer posição da rota.
+// Repetimos as melhores mudanças até estabilizar ou atingir um limite de
+// segurança de CPU para manter o uso confortável no celular.
+for(let iter=0;iter<Math.min(80, ordem.length*2);iter++){
+const mov = melhorRealocacaoGlobal(ordem, resultado, norm, indiceDestinoFinal);
+if(!mov) break;
+ordem = aplicarRealocacao(ordem, mov);
 }
 
-return {ordem, falhas};
+// 2-opt direcional GLOBAL: inverte segmentos inteiros levando em conta que
+// o custo das ruas muda conforme o sentido percorrido.
+for(let iter=0;iter<Math.min(30, ordem.length);iter++){
+const mov = melhor2OptDirecionalGlobal(ordem, resultado, norm, indiceDestinoFinal);
+if(!mov) break;
+ordem = aplicar2Opt(ordem, mov);
+}
+
+// Uma última rodada de realocação captura oportunidades abertas pelo 2-opt.
+for(let iter=0;iter<Math.min(40, ordem.length);iter++){
+const mov = melhorRealocacaoGlobal(ordem, resultado, norm, indiceDestinoFinal);
+if(!mov) break;
+ordem = aplicarRealocacao(ordem, mov);
+}
+
+return ordem;
+}
+
+function gerarCandidatasGlobaisMatriz(validos, ordemShopee, resultado, indiceDestinoFinal){
+const indices = validos.map((_,i)=>i+1);
+const idParaIndice = new Map(validos.map((g,i)=>[g.id,i+1]));
+const norm = normalizadoresMatriz(resultado);
+const candidatas = [];
+const vistas = new Set();
+
+function adicionar(nome, ordemIndices){
+if(!ordemIndices || ordemIndices.length !== indices.length) return;
+const assinatura = ordemIndices.join('>');
+if(vistas.has(assinatura)) return;
+vistas.add(assinatura);
+candidatas.push({nome, ordemIndices:[...ordemIndices]});
+}
+
+adicionar('shopee', ordemShopee.map(g=>idParaIndice.get(g.id)).filter(Number.isInteger));
+adicionar('vizinho-global', rotaVizinhoGlobalMatriz(indices, resultado, norm, null));
+adicionar('insercao-global', rotaInsercaoGlobalMatriz(indices, resultado, norm, indiceDestinoFinal));
+
+// Começos alternativos globais. O restante da rota continua podendo se mover
+// livremente durante o refinamento, então não criamos blocos ou setores fixos.
+const melhoresPrimeiros = [...indices]
+.map(i=>({i,c:custoMatrizEquilibrado(resultado,0,i,norm)}))
+.filter(x=>Number.isFinite(x.c))
+.sort((a,b)=>a.c-b.c)
+.slice(0,5);
+melhoresPrimeiros.forEach((x,k)=>adicionar(`inicio-global-${k+1}`, rotaVizinhoGlobalMatriz(indices, resultado, norm, x.i)));
+
+return candidatas;
+}
+
+function escolherMelhorGlobalMatriz(candidatas, resultado, indiceDestinoFinal){
+const avaliadas = candidatas.map(c=>{
+const refinada = refinarRotaGlobalComMatriz(c.ordemIndices, resultado, indiceDestinoFinal);
+const metricas = metricasOrdemNaMatriz(refinada, resultado, indiceDestinoFinal);
+return {...c, ordemIndices:refinada, metricas};
+});
+
+const referencia = referenciaEquilibrio(avaliadas);
+const melhor = escolherMelhorAvaliacao(avaliadas, referencia);
+return {melhor, avaliadas, referencia};
 }
 
 async function consultarTrechoDirectionsOSRM(pontos){
@@ -2850,56 +3110,69 @@ texto:destinoFinal.texto || destinoFinal.nome || destinoFinal.endereco || 'Ponto
 
 const ordemShopee = [...validos].sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 
-atualizarProgressoOtimizacao('Criando alternativas de rota...');
-const candidatas = gerarCandidatasIniciais(validos, ordemShopee, inicio, destino);
-const avaliacoes = await avaliarCandidatasPelasVias(candidatas, inicio, destino);
-let referencia = referenciaEquilibrio(avaliacoes);
-let melhor = escolherMelhorAvaliacao(avaliacoes, referencia);
+atualizarProgressoOtimizacao('Montando a matriz completa de todas as paradas...');
 
-// Se o serviço de métricas falhar totalmente, ainda há uma rota geográfica
-// funcional. Quando a rede responde, todo o restante passa a ser viário.
-if(!melhor){
-let fallback = destino
+const pontosGlobais = [inicio, ...validos.map(pontoGrupo)];
+const indiceDestinoFinal = destino ? pontosGlobais.length : null;
+if(destino) pontosGlobais.push(destino);
+
+let matrizGlobal = null;
+let ordem = null;
+let metricasMelhor = null;
+let metricasShopee = null;
+let avaliacoes = [];
+
+try{
+matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
+
+atualizarProgressoOtimizacao('Otimizando a rota completa de uma vez...');
+const candidatasGlobais = gerarCandidatasGlobaisMatriz(validos, ordemShopee, matrizGlobal, indiceDestinoFinal);
+const escolhaGlobal = escolherMelhorGlobalMatriz(candidatasGlobais, matrizGlobal, indiceDestinoFinal);
+avaliacoes = escolhaGlobal.avaliadas || [];
+
+if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
+
+ordem = escolhaGlobal.melhor.ordemIndices.map(i=>validos[i-1]);
+metricasMelhor = escolhaGlobal.melhor.metricas;
+
+const idParaIndice = new Map(validos.map((g,i)=>[g.id,i+1]));
+const ordemShopeeIndices = ordemShopee.map(g=>idParaIndice.get(g.id)).filter(Number.isInteger);
+metricasShopee = metricasOrdemNaMatriz(ordemShopeeIndices, matrizGlobal, indiceDestinoFinal);
+
+}catch(erroGlobal){
+console.warn('Matriz global indisponível; usando fallback viário completo:', erroGlobal);
+
+// Fallback sem janelas: continua avaliando a rota COMPLETA por vias, apenas
+// sem a matriz all-to-all. Não há retorno ao antigo refinamento 10 em 10.
+atualizarProgressoOtimizacao('Usando modo viário compatível para a rota completa...');
+const candidatas = gerarCandidatasIniciais(validos, ordemShopee, inicio, destino);
+const avaliadas = await avaliarCandidatasPelasVias(candidatas, inicio, destino);
+avaliacoes = avaliadas;
+const referenciaFallback = referenciaEquilibrio(avaliadas);
+const melhorFallback = escolherMelhorAvaliacao(avaliadas, referenciaFallback);
+
+if(melhorFallback){
+ordem = [...melhorFallback.ordem];
+metricasMelhor = melhorFallback.metricas;
+}else{
+ordem = destino
 ? rotaInsercaoComDestino(validos, inicio, destino)
 : rotaVizinhoMaisProximo(validos, inicio);
-fallback = melhorarRota2Opt(fallback, inicio, destino);
-melhor = {nome:'fallback', ordem:fallback, metricas:{duracao:null,distancia:null,provedor:null}, score:Infinity};
+ordem = melhorarRota2Opt(ordem, inicio, destino);
+metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
 
-let ordem = [...melhor.ordem];
-let metricasMelhor = melhor.metricas;
-
-// Refino direcional: é aqui que o Copiloto entende na prática que A -> B
-// pode ser muito diferente de B -> A por mão única, retornos ou acessos.
-const refinamento1 = await refinarRotaPorTrechos(ordem, inicio, destino, 0);
-let ordemRefinada = refinamento1.ordem;
-
-// Em rotas médias fazemos uma segunda passagem deslocada para quebrar as
-// fronteiras das janelas. Em rotas muito grandes preservamos desempenho móvel.
-if(ordemRefinada.length <= 80 && ordemRefinada.length > 10){
-const refinamento2 = await refinarRotaPorTrechos(ordemRefinada, inicio, destino, 5);
-ordemRefinada = refinamento2.ordem;
+const avaliacaoShopeeFallback = avaliadas.find(a=>a.nome === 'shopee' && metricasRotaValidas(a.metricas));
+metricasShopee = avaliacaoShopeeFallback ? avaliacaoShopeeFallback.metricas : await calcularMetricasRota(ordemShopee, inicio, destino);
+mostrarToast('⚠️ Matriz global indisponível; rota completa otimizada em modo compatível', 'alerta');
 }
 
 atualizarProgressoOtimizacao('Validando o melhor equilíbrio entre tempo e quilômetros...');
-const metricasRefinadas = await calcularMetricasRota(ordemRefinada, inicio, destino);
-
-if(metricasRotaValidas(metricasRefinadas)){
-const comparacao = [
-{nome:'antes-refino', ordem, metricas:metricasMelhor},
-{nome:'refinada', ordem:ordemRefinada, metricas:metricasRefinadas}
-].filter(a=>metricasRotaValidas(a.metricas));
-
-const refFinal = referenciaEquilibrio([
-...avaliacoes.filter(a=>metricasRotaValidas(a.metricas)),
-...comparacao
-]);
-const melhorFinal = escolherMelhorAvaliacao(comparacao, refFinal);
-if(melhorFinal){
-ordem = melhorFinal.ordem;
-metricasMelhor = melhorFinal.metricas;
-referencia = refFinal;
+if(!metricasRotaValidas(metricasMelhor)){
+metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
+if(!metricasRotaValidas(metricasShopee)){
+metricasShopee = await calcularMetricasRota(ordemShopee, inicio, destino);
 }
 
 // Preserva pontos sem coordenada no final e mantém a referência original.
@@ -2908,22 +3181,11 @@ grupos = [...ordem, ...invalidos];
 grupos.forEach((g,indice)=>{ g.ordemOtimizada = indice + 1; });
 
 atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...');
-let metricasShopee = null;
-const avaliacaoShopee = avaliacoes.find(a=>a.nome === 'shopee' && metricasRotaValidas(a.metricas));
-if(avaliacaoShopee){
-metricasShopee = avaliacaoShopee.metricas;
-}else{
-metricasShopee = await calcularMetricasRota(ordemShopee, inicio, destino);
-}
-
-if(!metricasRotaValidas(metricasMelhor)){
-metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
-}
 
 metaRota = {
 modo,
-provedor:'OSRM',
-criterio:'tempo_distancia_equilibrados',
+provedor:matrizGlobal ? 'OSRM_GLOBAL' : 'OSRM',
+criterio:'tempo_distancia_equilibrados_global',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -2937,7 +3199,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Rota otimizada por tempo + quilômetros', 'sucesso');
+mostrarToast('⚡ Rota completa otimizada por tempo + quilômetros', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
@@ -3024,7 +3286,7 @@ return `
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Otimização equilibrada entre tempo + quilômetros pelas vias. Não inclui o tempo parado em cada entrega.</div>
+<div class="comparacao-nota">Otimização global da rota inteira por tempo + quilômetros pelas vias. Não inclui o tempo parado em cada entrega.</div>
 </div>`;
 }
 
