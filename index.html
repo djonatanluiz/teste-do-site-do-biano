@@ -6,8 +6,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google" content="notranslate">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.1</title>
+<title>Copiloto Entregas V7.2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -889,7 +892,7 @@ margin-top:14px;
 
 
 /* ====================================================================== */
-/* V7.1 - OTIMIZAÇÃO DE ROTA                                              */
+/* V7.2 - OTIMIZAÇÃO DE ROTA                                              */
 /* ====================================================================== */
 
 .config-otimizacao-btn{
@@ -899,6 +902,15 @@ border:1px solid #ffd5b5;
 box-shadow:none;
 font-size:13.5px;
 padding:11px 12px;
+}
+
+.versao-copiloto{
+margin-top:7px;
+text-align:center;
+font-size:10.5px;
+font-weight:600;
+color:#a8a29e;
+letter-spacing:.2px;
 }
 
 .status-otimizacao-rota{
@@ -1362,6 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
+<div class="versao-copiloto">Copiloto V7.2</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1468,12 +1481,12 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.1: escolha/configuração do modo de otimização -->
+<!-- V7.2: escolha/configuração do modo de otimização -->
 <div class="otimizacao-fundo" id="modalOtimizacao">
 <div class="otimizacao-caixa">
 <div class="alca-painel"></div>
 <h2>⚡ Como deseja organizar sua rota?</h2>
-<div class="otimizacao-subtitulo">A rota é sempre otimizada antes de você começar. A numeração original da Shopee continua preservada nos detalhes para comparação.</div>
+<div class="otimizacao-subtitulo">Antes da primeira rota você escolhe como o Copiloto deve otimizar. Se marcar “Lembrar minha escolha”, as próximas rotas usam a mesma configuração automaticamente. A numeração original da Shopee continua preservada nos detalhes.</div>
 
 <button class="otimizacao-opcao" onclick="selecionarModoOtimizacao('rapida')">
 <span class="icone-opcao">⏱️</span>
@@ -1500,7 +1513,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.1: escolha do ponto final diretamente no mapa -->
+<!-- V7.2: escolha do ponto final diretamente no mapa -->
 <div class="otimizacao-fundo" id="modalDestinoFinal">
 <div class="otimizacao-caixa destino-picker-caixa">
 <div class="alca-painel"></div>
@@ -1527,7 +1540,7 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.1: tela de cálculo -->
+<!-- V7.2: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
 <div class="otimizando-spinner"></div>
@@ -1566,8 +1579,10 @@ const HISTORICO_STORAGE_KEY = "copiloto_entregas_historico";
 const SOM_STORAGE_KEY = "copiloto_entregas_som_ativado";
 const CHAVE_STORAGE = "copiloto_entregas_rota_atual";
 const META_ROTA_STORAGE_KEY = "copiloto_entregas_meta_rota_v7";
-const OTIMIZACAO_PREF_KEY = "copiloto_entregas_otimizacao_pref_v7_1";
-const DESTINOS_SALVOS_KEY = "copiloto_entregas_destinos_salvos_v7_1";
+const OTIMIZACAO_PREF_KEY = "copiloto_entregas_otimizacao_pref_v7_2";
+const OTIMIZACAO_PRIMEIRA_ESCOLHA_KEY = "copiloto_entregas_otimizacao_primeira_escolha_v7_2";
+const DESTINOS_SALVOS_KEY = "copiloto_entregas_destinos_salvos";
+const DESTINOS_SALVOS_LEGADO_KEY = "copiloto_entregas_destinos_salvos_v7_1";
 
 let metaRota = {
 modo:null,
@@ -1911,7 +1926,7 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 
 // ======================================================================
-// V7.1 - OTIMIZAÇÃO DE ROTA
+// V7.2 - OTIMIZAÇÃO DE ROTA
 // ======================================================================
 // Estratégia:
 // 1) cria uma rota-base geográfica rápida (sem força bruta);
@@ -1952,7 +1967,17 @@ console.warn('Não foi possível salvar a preferência de otimização:', erro);
 
 function carregarDestinosSalvos(){
 try{
-const bruto = localStorage.getItem(DESTINOS_SALVOS_KEY);
+let bruto = localStorage.getItem(DESTINOS_SALVOS_KEY);
+
+// Migra automaticamente locais salvos na V7.1 para a chave estável nova.
+if(!bruto){
+const legado = localStorage.getItem(DESTINOS_SALVOS_LEGADO_KEY);
+if(legado){
+bruto = legado;
+localStorage.setItem(DESTINOS_SALVOS_KEY, legado);
+}
+}
+
 const itens = bruto ? JSON.parse(bruto) : [];
 return Array.isArray(itens) ? itens.filter(pontoValido) : [];
 }catch(erro){
@@ -1998,8 +2023,32 @@ function abrirConfiguracaoOtimizacao(){
 abrirModalOtimizacao(true);
 }
 
+function primeiraEscolhaOtimizacaoConcluida(){
+try{
+return localStorage.getItem(OTIMIZACAO_PRIMEIRA_ESCOLHA_KEY) === 'true';
+}catch(erro){
+return false;
+}
+}
+
+function registrarPrimeiraEscolhaOtimizacao(){
+try{
+localStorage.setItem(OTIMIZACAO_PRIMEIRA_ESCOLHA_KEY, 'true');
+}catch(erro){
+console.warn('Não foi possível registrar a primeira configuração de otimização:', erro);
+}
+}
+
 function prepararOtimizacaoAposImportacao(){
 const pref = carregarPreferenciaOtimizacao();
+
+// Na primeira rota desta versão, SEMPRE mostramos a escolha pelo menos uma
+// vez. Isso evita que uma configuração antiga ou feita fora da rota pule a
+// etapa de onboarding sem o usuário entender como o Copiloto vai organizar.
+if(!primeiraEscolhaOtimizacaoConcluida()){
+abrirModalOtimizacao(false);
+return;
+}
 
 if(pref.lembrar && pref.modo === 'rapida'){
 executarEscolhaOtimizacao('rapida', null, true);
@@ -2011,8 +2060,7 @@ executarEscolhaOtimizacao('endereco', pref.destinoFinal, true);
 return;
 }
 
-// Sem preferência lembrada, a otimização é obrigatória: o usuário escolhe
-// como organizar, mas não existe mais a opção de seguir sem otimizar.
+// Se a pessoa não pediu para lembrar, mostramos a escolha em toda nova rota.
 abrirModalOtimizacao(false);
 }
 
@@ -2043,6 +2091,7 @@ return;
 }
 
 salvarPreferenciaOtimizacao(modo, destinoFinal, lembrar);
+registrarPrimeiraEscolhaOtimizacao();
 fecharSeletorDestinoFinal();
 fecharModalOtimizacao();
 executarOtimizacaoRota(modo, destinoFinal);
