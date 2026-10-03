@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.10</title>
+<title>Copiloto Entregas V7.11</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.10</div>
+<div class="versao-copiloto">Copiloto V7.11</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -5072,6 +5072,246 @@ melhor = {...avaliacao, score};
 return melhor;
 }
 
+
+// ----------------------------------------------------------------------
+// V7.11 - OTIMIZAÇÃO HUMANA / BASELINE-FIRST
+// ----------------------------------------------------------------------
+/*
+PRINCÍPIO V7.11
+
+O erro das versões anteriores foi permitir que Scanner, clustering e regras
+geométricas fossem capazes de vencer uma rota que, pelas próprias métricas
+viárias, era pior que a ordem original.
+
+A V7.11 trabalha como um motorista experiente:
+1) a ordem da Shopee é a BASELINE que precisa ser superada;
+2) Scanner/Fronteira/heurísticas só GERAM ideias de rota;
+3) cada ideia é refinada globalmente, podendo mover qualquer parada;
+4) tempo pelas vias é o critério primário e absoluto;
+5) quilômetros só decidem quando os tempos são praticamente iguais;
+6) se nenhuma alternativa superar a Shopee, MANTÉM A SHOPEE.
+
+Assim, uma rota nunca mais é chamada de "otimizada" quando aumenta o tempo.
+*/
+
+const V711_TOL_TEMPO_SEG = 2;
+const V711_TOL_DIST_METROS = 5;
+
+function compararMetricasV711(a,b){
+if(!metricasRotaValidas(a)) return metricasRotaValidas(b) ? 1 : 0;
+if(!metricasRotaValidas(b)) return -1;
+if(a.duracao < b.duracao - V711_TOL_TEMPO_SEG) return -1;
+if(a.duracao > b.duracao + V711_TOL_TEMPO_SEG) return 1;
+if(a.distancia < b.distancia - V711_TOL_DIST_METROS) return -1;
+if(a.distancia > b.distancia + V711_TOL_DIST_METROS) return 1;
+return 0;
+}
+
+function rotaVizinhoTempoV711(indices,resultado){
+const restantes=new Set(indices);
+const ordem=[];
+let atual=0;
+while(restantes.size){
+let melhor=null,melhorT=Infinity,melhorD=Infinity;
+for(const c of restantes){
+const t=valorMatriz(resultado.duracoes,atual,c);
+const d=valorMatriz(resultado.distancias,atual,c);
+if(!Number.isFinite(t)||!Number.isFinite(d)) continue;
+if(t<melhorT-V711_TOL_TEMPO_SEG || (Math.abs(t-melhorT)<=V711_TOL_TEMPO_SEG && d<melhorD)){
+melhor=c;melhorT=t;melhorD=d;
+}
+}
+if(melhor===null){for(const c of restantes) ordem.push(c);break;}
+ordem.push(melhor);restantes.delete(melhor);atual=melhor;
+}
+return ordem;
+}
+
+function rotaInsercaoTempoV711(indices,resultado,indiceDestinoFinal){
+const restantes=new Set(indices),rota=[];
+while(restantes.size){
+let melhor=null;
+for(const c of restantes){
+for(let pos=0;pos<=rota.length;pos++){
+const prev=pos===0?0:rota[pos-1];
+const next=pos<rota.length?rota[pos]:(Number.isInteger(indiceDestinoFinal)?indiceDestinoFinal:null);
+const tPC=valorMatriz(resultado.duracoes,prev,c),dPC=valorMatriz(resultado.distancias,prev,c);
+if(!Number.isFinite(tPC)||!Number.isFinite(dPC)) continue;
+let deltaT=tPC,deltaD=dPC;
+if(next!==null){
+const tCN=valorMatriz(resultado.duracoes,c,next),dCN=valorMatriz(resultado.distancias,c,next);
+const tPN=valorMatriz(resultado.duracoes,prev,next),dPN=valorMatriz(resultado.distancias,prev,next);
+if(![tCN,dCN,tPN,dPN].every(Number.isFinite)) continue;
+deltaT += tCN-tPN; deltaD += dCN-dPN;
+}
+if(!melhor || deltaT<melhor.deltaT-V711_TOL_TEMPO_SEG ||
+   (Math.abs(deltaT-melhor.deltaT)<=V711_TOL_TEMPO_SEG && deltaD<melhor.deltaD)){
+melhor={c,pos,deltaT,deltaD};
+}
+}
+}
+if(!melhor){for(const c of restantes) rota.push(c);break;}
+rota.splice(melhor.pos,0,melhor.c);restantes.delete(melhor.c);
+}
+return rota;
+}
+
+function deltaRealocacaoV711(ordem,i,pos,resultado,indiceDestinoFinal){
+const x=ordem[i];
+const reduzida=[...ordem.slice(0,i),...ordem.slice(i+1)];
+const p=Math.max(0,Math.min(pos,reduzida.length));
+if(p===i) return null;
+function edge(a,b){
+if(b===null) return {t:0,d:0};
+const t=valorMatriz(resultado.duracoes,a,b),d=valorMatriz(resultado.distancias,a,b);
+return Number.isFinite(t)&&Number.isFinite(d)?{t,d}:null;
+}
+const prevR=i===0?0:ordem[i-1];
+const nextR=i===ordem.length-1?(Number.isInteger(indiceDestinoFinal)?indiceDestinoFinal:null):ordem[i+1];
+const a=edge(prevR,x),b=edge(x,nextR),c=edge(prevR,nextR);
+if(!a||!b||!c) return null;
+let dt=-a.t-b.t+c.t,dd=-a.d-b.d+c.d;
+const prevI=p===0?0:reduzida[p-1];
+const nextI=p<reduzida.length?reduzida[p]:(Number.isInteger(indiceDestinoFinal)?indiceDestinoFinal:null);
+const old=edge(prevI,nextI),n1=edge(prevI,x),n2=edge(x,nextI);
+if(!old||!n1||!n2) return null;
+dt += -old.t+n1.t+n2.t; dd += -old.d+n1.d+n2.d;
+return {dt,dd};
+}
+
+function melhorDeltaV711(delta,melhor){
+if(!delta) return false;
+const melhora = delta.dt < -V711_TOL_TEMPO_SEG ||
+(Math.abs(delta.dt)<=V711_TOL_TEMPO_SEG && delta.dd < -V711_TOL_DIST_METROS);
+if(!melhora) return false;
+if(!melhor) return true;
+return delta.dt < melhor.dt-V711_TOL_TEMPO_SEG ||
+(Math.abs(delta.dt-melhor.dt)<=V711_TOL_TEMPO_SEG && delta.dd<melhor.dd);
+}
+
+function melhorRealocacaoV711(ordem,resultado,indiceDestinoFinal){
+let best=null;
+for(let i=0;i<ordem.length;i++){
+for(let p=0;p<=ordem.length-1;p++){
+const delta=deltaRealocacaoV711(ordem,i,p,resultado,indiceDestinoFinal);
+if(melhorDeltaV711(delta,best)) best={i,p,...delta};
+}
+}
+return best;
+}
+
+function prefixosReversaoV711(ordem,resultado){
+const pt=Array(ordem.length).fill(0),pd=Array(ordem.length).fill(0);
+for(let k=0;k<ordem.length-1;k++){
+const a=ordem[k],b=ordem[k+1];
+const tf=valorMatriz(resultado.duracoes,a,b),tr=valorMatriz(resultado.duracoes,b,a);
+const df=valorMatriz(resultado.distancias,a,b),dr=valorMatriz(resultado.distancias,b,a);
+if(![tf,tr,df,dr].every(Number.isFinite)){pt[k+1]=Infinity;pd[k+1]=Infinity;continue;}
+pt[k+1]=Number.isFinite(pt[k])?pt[k]+(tr-tf):Infinity;
+pd[k+1]=Number.isFinite(pd[k])?pd[k]+(dr-df):Infinity;
+}
+return {pt,pd};
+}
+
+function melhor2OptV711(ordem,resultado,indiceDestinoFinal){
+if(ordem.length<3) return null;
+const {pt,pd}=prefixosReversaoV711(ordem,resultado);
+let best=null;
+for(let i=0;i<ordem.length-1;i++){
+const prev=i===0?0:ordem[i-1];
+for(let j=i+1;j<ordem.length;j++){
+const next=j===ordem.length-1?(Number.isInteger(indiceDestinoFinal)?indiceDestinoFinal:null):ordem[j+1];
+const a=ordem[i],b=ordem[j];
+const t1=valorMatriz(resultado.duracoes,prev,a),t2=valorMatriz(resultado.duracoes,prev,b);
+const d1=valorMatriz(resultado.distancias,prev,a),d2=valorMatriz(resultado.distancias,prev,b);
+if(![t1,t2,d1,d2].every(Number.isFinite)) continue;
+let dt=t2-t1,dd=d2-d1;
+if(next!==null){
+const tOld=valorMatriz(resultado.duracoes,b,next),tNew=valorMatriz(resultado.duracoes,a,next);
+const dOld=valorMatriz(resultado.distancias,b,next),dNew=valorMatriz(resultado.distancias,a,next);
+if(![tOld,tNew,dOld,dNew].every(Number.isFinite)) continue;
+dt+=tNew-tOld;dd+=dNew-dOld;
+}
+const it=pt[j]-pt[i],id=pd[j]-pd[i];
+if(!Number.isFinite(it)||!Number.isFinite(id)) continue;
+dt+=it;dd+=id;
+if(melhorDeltaV711({dt,dd},best)) best={i,j,dt,dd};
+}
+}
+return best;
+}
+
+function refinarLexicograficoV711(ordemInicial,resultado,indiceDestinoFinal){
+let ordem=[...ordemInicial];
+for(let it=0;it<Math.min(90,ordem.length*2);it++){
+const m=melhorRealocacaoV711(ordem,resultado,indiceDestinoFinal);if(!m) break;
+ordem=aplicarRealocacao(ordem,m);
+}
+for(let it=0;it<Math.min(35,ordem.length);it++){
+const m=melhor2OptV711(ordem,resultado,indiceDestinoFinal);if(!m) break;
+ordem=aplicar2Opt(ordem,m);
+}
+for(let it=0;it<Math.min(45,ordem.length);it++){
+const m=melhorRealocacaoV711(ordem,resultado,indiceDestinoFinal);if(!m) break;
+ordem=aplicarRealocacao(ordem,m);
+}
+return ordem;
+}
+
+function otimizarComoMotoristaV711(validos,ordemShopee,resultado,indiceDestinoFinal,inicio,destino){
+const idIdx=new Map(validos.map((g,i)=>[g.id,i+1]));
+const todos=validos.map((_,i)=>i+1);
+const shopee=ordemShopee.map(g=>idIdx.get(g.id)).filter(Number.isInteger);
+const seeds=[],vistos=new Set();
+function add(nome,ordem){
+if(!ordem||ordem.length!==todos.length) return;
+const sig=ordem.join('>');if(vistos.has(sig)) return;vistos.add(sig);seeds.push({nome,ordemIndices:[...ordem]});
+}
+add('shopee',shopee);
+add('vizinho-tempo',rotaVizinhoTempoV711(todos,resultado));
+add('insercao-tempo',rotaInsercaoTempoV711(todos,resultado,indiceDestinoFinal));
+try{
+const sc=gerarCandidatasScannerAprendidoV710(validos,resultado,indiceDestinoFinal,inicio,destino);
+(sc.candidatas||[]).forEach((c,k)=>add('scanner-'+k,c.ordemIndices));
+}catch(e){console.warn('Scanner V7.10 não entrou como candidata:',e);}
+
+const avaliadas=[];
+for(const seed of seeds){
+let r=refinarLexicograficoV711(seed.ordemIndices,resultado,indiceDestinoFinal);
+r=repararJanelasHardV75(r,resultado,validos);
+const metricas=metricasOperacionaisMatrizV75(r,resultado,indiceDestinoFinal,validos);
+const janelas=avaliarJanelasRotaV75(r,resultado,validos);
+avaliadas.push({...seed,ordemIndices:r,metricas,janelas});
+}
+const baseShopee=avaliadas.find(a=>a.nome==='shopee') || {
+ordemIndices:shopee,
+metricas:metricasOperacionaisMatrizV75(shopee,resultado,indiceDestinoFinal,validos),
+janelas:avaliarJanelasRotaV75(shopee,resultado,validos),nome:'shopee'
+};
+const factiveis=avaliadas.filter(a=>metricasRotaValidas(a.metricas)&&a.janelas.violacoesHard.length===0);
+let pool=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
+if(!pool.length) return {melhor:baseShopee,baseline:baseShopee,avaliadas,manteveShopee:true};
+
+// Se a Shopee já cumpre janelas HARD, nenhuma alternativa mais lenta é aceita.
+if(baseShopee.janelas.violacoesHard.length===0 && metricasRotaValidas(baseShopee.metricas)){
+pool=pool.filter(a=>a.metricas.duracao<=baseShopee.metricas.duracao+V711_TOL_TEMPO_SEG);
+if(!pool.length) pool=[baseShopee];
+}
+pool.sort((a,b)=>compararMetricasV711(a.metricas,b.metricas));
+let melhor=pool[0]||baseShopee;
+
+// Trava final: sem janela HARD obrigando o contrário, jamais piora o tempo
+// da referência. Em empate de tempo, jamais aumenta km.
+if(baseShopee.janelas.violacoesHard.length===0 && metricasRotaValidas(baseShopee.metricas)){
+if(melhor.metricas.duracao>baseShopee.metricas.duracao+V711_TOL_TEMPO_SEG ||
+   (Math.abs(melhor.metricas.duracao-baseShopee.metricas.duracao)<=V711_TOL_TEMPO_SEG && melhor.metricas.distancia>baseShopee.metricas.distancia+V711_TOL_DIST_METROS)){
+melhor=baseShopee;
+}
+}
+const manteveShopee=melhor.ordemIndices.join('>')===baseShopee.ordemIndices.join('>');
+return {melhor,baseline:baseShopee,avaliadas,manteveShopee};
+}
+
 async function executarOtimizacaoRota(modo, destinoFinal){
 abrirOverlayOtimizacao('Buscando sua localização atual...');
 
@@ -5111,66 +5351,54 @@ let avaliacoes = [];
 try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
-atualizarProgressoOtimizacao('Varrendo a rota em formato Scanner e eliminando retornos...');
-const geradasScanner = gerarCandidatasScannerAprendidoV710(validos, matrizGlobal, indiceDestinoFinal, inicio, destino);
-const escolhaGlobal = escolherMelhorScannerAprendidoV710(geradasScanner.candidatas, matrizGlobal, indiceDestinoFinal, validos, inicio, destino);
-avaliacoes = escolhaGlobal.avaliadas || [];
+atualizarProgressoOtimizacao('Comparando a Shopee com alternativas e melhorando apenas o que realmente reduz tempo...');
+const decisaoV711 = otimizarComoMotoristaV711(validos, ordemShopee, matrizGlobal, indiceDestinoFinal, inicio, destino);
+avaliacoes = decisaoV711.avaliadas || [];
+if(!decisaoV711.melhor) throw new Error('SEM_ROTA_GLOBAL');
 
-if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
+ordem = decisaoV711.melhor.ordemIndices.map(i=>validos[i-1]);
+metricasMelhor = decisaoV711.melhor.metricas;
+metricasShopee = decisaoV711.baseline.metricas;
 
-ordem = escolhaGlobal.melhor.ordemIndices.map(i=>validos[i-1]);
-metricasMelhor = escolhaGlobal.melhor.metricas;
-
-// Segunda passagem: olha o CAMINHO REAL das ruas. Se a rota literalmente
-// passa ao lado de uma entrega que ficou para depois, tenta atendê-la agora.
-atualizarProgressoOtimizacao('Conferindo se a rota passa por entregas que ficaram para trás...');
-try{
-const reparada = await repararPassagensReaisV710(ordem, inicio, destino, matrizGlobal, validos, indiceDestinoFinal);
-if(reparada && reparada.length===ordem.length){
-ordem = reparada;
-const idParaIndiceReparo = new Map(validos.map((g,i)=>[g.id,i+1]));
-const idxReparo = ordem.map(g=>idParaIndiceReparo.get(g.id)).filter(Number.isInteger);
-metricasMelhor = metricasOperacionaisMatrizV75(idxReparo, matrizGlobal, indiceDestinoFinal, validos);
-}
-}catch(erroReparo){ console.warn('Checagem final do caminho real não pôde ser aplicada:', erroReparo); }
-
-if(escolhaGlobal.melhor.janelas && escolhaGlobal.melhor.janelas.violacoesHard.length){
+if(decisaoV711.melhor.janelas && decisaoV711.melhor.janelas.violacoesHard.length){
 mostrarToast('⚠️ Nenhuma sequência conseguiu cumprir todos os horários limite', 'alerta');
 }
 
-const idParaIndice = new Map(validos.map((g,i)=>[g.id,i+1]));
-const ordemShopeeIndices = ordemShopee.map(g=>idParaIndice.get(g.id)).filter(Number.isInteger);
-metricasShopee = metricasOperacionaisMatrizV75(ordemShopeeIndices, matrizGlobal, indiceDestinoFinal, validos);
+// A checagem de "passou perto" continua disponível, mas agora uma mudança
+// só permanece se não piorar a métrica lexicográfica tempo -> km.
+if(!decisaoV711.manteveShopee){
+atualizarProgressoOtimizacao('Conferindo entregas que ficaram no caminho sem permitir piora...');
+try{
+const antes=[...ordem];
+const antesMetricas={...metricasMelhor};
+const reparada=await repararPassagensReaisV710(ordem,inicio,destino,matrizGlobal,validos,indiceDestinoFinal);
+if(reparada&&reparada.length===ordem.length){
+const idIdx=new Map(validos.map((g,i)=>[g.id,i+1]));
+const idx=reparada.map(g=>idIdx.get(g.id)).filter(Number.isInteger);
+const m=metricasOperacionaisMatrizV75(idx,matrizGlobal,indiceDestinoFinal,validos);
+if(compararMetricasV711(m,antesMetricas)<=0){ordem=reparada;metricasMelhor=m;}
+else ordem=antes;
+}
+}catch(e){console.warn('Checagem de passagens ignorada:',e);}
+}
 
 }catch(erroGlobal){
 console.warn('Matriz global indisponível; usando fallback viário completo:', erroGlobal);
 
-// Fallback: mantém o formato Scanner mesmo sem matriz viária completa.
-// A precisão de mão única/retornos cai, mas a rota continua evitando saltos
-// e retornos geométricos desnecessários.
-atualizarProgressoOtimizacao('Roteador indisponível; mantendo varredura Scanner por geometria...');
-const pontosFallback=[inicio,...validos.map(pontoGrupo)];
-if(destino) pontosFallback.push(destino);
-const distFallback=matrizDistanciaGeografica(pontosFallback);
-const durFallback=distFallback.map(l=>l.map(m=>Number.isFinite(m)?m/(30000/3600):Infinity));
-matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_SCANNER_V710'};
-const geradasFallback=gerarCandidatasScannerAprendidoV710(validos,matrizGlobal,indiceDestinoFinal,inicio,destino);
-const escolhaFallback=escolherMelhorScannerAprendidoV710(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos,inicio,destino);
-if(!escolhaFallback.melhor) throw erroGlobal;
-ordem=escolhaFallback.melhor.ordemIndices.map(i=>validos[i-1]);
-avaliacoes=escolhaFallback.avaliadas || [];
-metricasMelhor=await calcularMetricasRota(ordem,inicio,destino);
-if(metricasRotaValidas(metricasMelhor)){
-metricasMelhor.duracao += ordem.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
-}
+// Sem matriz viária confiável não tentamos "inventar" uma otimização.
+// Mantemos a ordem Shopee, porque ela é a baseline segura da V7.11.
+atualizarProgressoOtimizacao('Roteador indisponível; mantendo a ordem da Shopee com segurança...');
+ordem=[...ordemShopee];
 metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
 if(metricasRotaValidas(metricasShopee)){
 metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 }
-mostrarToast('⚠️ Sem matriz viária completa; mantive o Scanner por Fronteira usando geometria', 'alerta');
+metricasMelhor=metricasShopee?{...metricasShopee}:null;
+matrizGlobal={provedor:'FALLBACK_SHOPEE_V711'};
+mostrarToast('⚠️ Sem matriz viária confiável; mantive a ordem da Shopee', 'alerta');
 }
 
-atualizarProgressoOtimizacao('Validando varredura, caminho real, tempo e quilômetros...');
+atualizarProgressoOtimizacao('Validando que a nova rota realmente supera a ordem da Shopee...');
 if(!metricasRotaValidas(metricasMelhor)){
 metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
@@ -5188,7 +5416,8 @@ atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...
 metaRota = {
 modo,
 provedor:(matrizGlobal && matrizGlobal.provedor) ? matrizGlobal.provedor : 'OSRM',
-criterio:'v7_9_scanner_principal_tempo_depois_distancia',
+criterio:'v7_11_baseline_shopee_tempo_primeiro_km_depois',
+resultadoOtimizacao:(ordem.length===ordemShopee.length && ordem.every((g,i)=>g.id===ordemShopee[i].id)) ? 'shopee_mantida' : 'melhorada',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -5202,7 +5431,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Scanner concluído: sem passar e voltar, depois tempo e quilômetros', 'sucesso');
+mostrarToast(metaRota.resultadoOtimizacao==='shopee_mantida' ? '✅ A Shopee já era a melhor referência encontrada; ordem mantida' : '⚡ Rota melhorada: menor tempo primeiro, km depois', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
@@ -5284,12 +5513,12 @@ return `
 <strong>${tempoShopee || '—'}${distShopee ? ` · ${distShopee}` : ''}</strong>
 </div>
 <div class="comparacao-item otimizada">
-⚡ Otimizada
+${metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : '⚡ Otimizada'}
 <strong>${tempoOtimizado || '—'}${distOtimizada ? ` · ${distOtimizada}` : ''}</strong>
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota prioriza o menor tempo pelas vias; quando os tempos são próximos, prefere a menor quilometragem. O Scanner organiza faixas/ruas sem se sobrepor ao custo real de deslocamento.</div>
+<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço. A ordem Shopee é a baseline: o Copiloto só troca a sequência quando encontra uma alternativa que não aumenta o tempo. Entre tempos equivalentes, vence a menor quilometragem. Scanner e agrupamentos apenas sugerem alternativas; nunca podem piorar o resultado viário.</div>
 </div>`;
 }
 
