@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.7</title>
+<title>Copiloto Entregas V7.8</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.7</div>
+<div class="versao-copiloto">Copiloto V7.8</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -3943,6 +3943,428 @@ melhor={...a,score:scoreDist};
 return {melhor,avaliadas,referencia};
 }
 
+
+
+// ----------------------------------------------------------------------
+// V7.8 - CLUSTERING POR CORREDORES VIÁRIOS
+// ----------------------------------------------------------------------
+/*
+PRINCÍPIO V7.8
+
+A rota deixa de enxergar apenas "pontos próximos" e passa a trabalhar em
+CORREDORES de entrega. Um corredor pode conter ruas diferentes/paralelas
+quando elas:
+- estão geograficamente próximas;
+- têm orientação local semelhante;
+- possuem ligação viária barata entre si;
+- permitem limpar aquela faixa da cidade sem abandonar a região e voltar.
+
+Hierarquia da otimização:
+1) ponto inicial / janelas HARD (quando existirem dados reais);
+2) formar corredores viários coerentes;
+3) escolher a melhor ordem dos corredores;
+4) escolher o melhor sentido de entrada/saída de cada corredor;
+5) dentro do corredor, tempo pelas vias é prioridade e km é secundário;
+6) só depois avançar para o próximo corredor.
+
+O Scanner V7.6/V7.7 continua disponível como ferramenta LOCAL para organizar
+um corredor, mas não decide mais a divisão da rota inteira.
+*/
+
+const RAIO_MAX_LIGACAO_CORREDOR_METROS = 560;
+const RAIO_LIGACAO_FORTE_CORREDOR_METROS = 170;
+const TEMPO_MAX_LIGACAO_CORREDOR_SEG = 240;
+const DISTANCIA_MAX_LIGACAO_CORREDOR_METROS = 1800;
+const ANGULO_MAX_DIF_CORREDOR_RAD = 42 * Math.PI / 180;
+const LARGURA_MAX_CORREDOR_METROS = 430;
+const GAP_LONGITUDINAL_CORREDOR_METROS = 620;
+const GAP_TRANSVERSAL_CORREDOR_METROS = 260;
+const RAIO_ORIENTACAO_LOCAL_METROS = 520;
+const BEAM_CORREDORES_LARGURA = 28;
+const BEAM_CORREDORES_RAMIFICACAO = 6;
+
+function membrosMesmaRuaV78(indice, validos){
+const g=grupoPorIndiceMatriz(indice,validos);
+if(!g) return [];
+const chave=chaveRuaGrupo(g);
+const saida=[];
+validos.forEach((x,k)=>{ if(chaveRuaGrupo(x)===chave) saida.push(k+1); });
+return saida;
+}
+
+function orientacaoLocalCorredorV78(indice, validos){
+// Se temos mais de uma entrega na mesma rua, essa é a pista mais confiável
+// para a orientação daquele ponto.
+const mesmaRua=membrosMesmaRuaV78(indice,validos);
+if(mesmaRua.length>=2) return anguloPcaScanner(mesmaRua,validos);
+
+// Caso contrário, estima a direção local olhando as entregas próximas.
+const vizinhos=[];
+for(let j=1;j<=validos.length;j++){
+if(j===indice) continue;
+const d=distanciaGeograficaIndices(indice,j,validos);
+if(Number.isFinite(d)&&d<=RAIO_ORIENTACAO_LOCAL_METROS) vizinhos.push({i:j,d});
+}
+vizinhos.sort((a,b)=>a.d-b.d);
+const amostra=[indice,...vizinhos.slice(0,5).map(x=>x.i)];
+return amostra.length>=2 ? anguloDominanteVizinhancaScanner(amostra,validos) : null;
+}
+
+function menorValorDirecionalMatriz(matriz,a,b){
+return Math.min(valorMatriz(matriz,a,b),valorMatriz(matriz,b,a));
+}
+
+function afinidadeCorredorV78(a,b,validos,resultado,orientacoes){
+const geo=distanciaGeograficaIndices(a,b,validos);
+if(!Number.isFinite(geo)||geo>RAIO_MAX_LIGACAO_CORREDOR_METROS) return null;
+
+const tempo=menorValorDirecionalMatriz(resultado.duracoes,a,b);
+const distVia=menorValorDirecionalMatriz(resultado.distancias,a,b);
+const ruaA=chaveRuaGrupo(grupoPorIndiceMatriz(a,validos));
+const ruaB=chaveRuaGrupo(grupoPorIndiceMatriz(b,validos));
+const mesmaRua=ruaA===ruaB;
+
+// Pontos muito próximos podem formar um corredor mesmo quando não há dados
+// suficientes para estimar a orientação local com segurança.
+const ligacaoForte=geo<=RAIO_LIGACAO_FORTE_CORREDOR_METROS;
+
+if(!ligacaoForte){
+if(Number.isFinite(tempo)&&tempo>TEMPO_MAX_LIGACAO_CORREDOR_SEG) return null;
+if(Number.isFinite(distVia)&&distVia>DISTANCIA_MAX_LIGACAO_CORREDOR_METROS) return null;
+}
+
+const angA=orientacoes.get(a);
+const angB=orientacoes.get(b);
+const dif=(Number.isFinite(angA)&&Number.isFinite(angB))?diferencaAngularScanner(angA,angB):null;
+const orientacaoCompat=mesmaRua || ligacaoForte || dif===null || dif<=ANGULO_MAX_DIF_CORREDOR_RAD;
+if(!orientacaoCompat) return null;
+
+// Score menor = ligação mais natural. Tempo domina; distância e orientação
+// servem para separar pontos que só parecem próximos no mapa.
+const tempoScore=Number.isFinite(tempo)?tempo/120:geo/250;
+const distScore=Number.isFinite(distVia)?distVia/700:geo/350;
+const angScore=dif===null?0.25:dif/ANGULO_MAX_DIF_CORREDOR_RAD;
+const score=0.62*tempoScore+0.23*distScore+0.15*angScore-(mesmaRua?0.22:0)-(ligacaoForte?0.12:0);
+return {score,geo,tempo,distVia,mesmaRua,dif};
+}
+
+function projecoesEixoCorredorV78(indices,validos,angulo){
+const {map}=coordsLocaisScanner(indices,validos);
+const ux=Math.cos(angulo),uy=Math.sin(angulo);
+const vx=-uy,vy=ux;
+const itens=indices.map(i=>{
+const p=map.get(i);
+return {i,s:p.x*ux+p.y*uy,t:p.x*vx+p.y*vy};
+});
+return itens;
+}
+
+function dividirComponenteCorredorV78(indices,validos){
+if(indices.length<=3) return [indices];
+const ang=anguloPcaScanner(indices,validos);
+const proj=projecoesEixoCorredorV78(indices,validos,ang);
+const ss=proj.map(x=>x.s),ts=proj.map(x=>x.t);
+const largura=Math.max(...ts)-Math.min(...ts);
+
+function maiorGap(campo){
+const ord=[...proj].sort((a,b)=>a[campo]-b[campo]);
+let melhor={gap:-Infinity,pos:-1,ord};
+for(let k=1;k<ord.length;k++){
+const gap=ord[k][campo]-ord[k-1][campo];
+if(gap>melhor.gap) melhor={gap,pos:k,ord};
+}
+return melhor;
+}
+
+const gapT=maiorGap('t');
+const gapS=maiorGap('s');
+let corte=null;
+
+// Primeiro evita que um componente "vaze" transversalmente para outra
+// região. Ainda permitimos várias ruas paralelas no mesmo corredor.
+if(largura>LARGURA_MAX_CORREDOR_METROS){
+if(gapT.gap>=GAP_TRANSVERSAL_CORREDOR_METROS) corte=gapT;
+else{
+const ord=[...proj].sort((a,b)=>a.t-b.t);
+const meio=Math.ceil(ord.length/2);
+corte={ord,pos:meio,gap:0};
+}
+}else if(gapS.gap>=GAP_LONGITUDINAL_CORREDOR_METROS){
+corte=gapS;
+}
+
+if(!corte||corte.pos<=0||corte.pos>=corte.ord.length) return [indices];
+const A=corte.ord.slice(0,corte.pos).map(x=>x.i);
+const B=corte.ord.slice(corte.pos).map(x=>x.i);
+if(!A.length||!B.length) return [indices];
+return [A,B].flatMap(x=>dividirComponenteCorredorV78(x,validos));
+}
+
+function clusterizarCorredoresV78(validos,resultado){
+const indices=validos.map((_,k)=>k+1);
+const orientacoes=new Map(indices.map(i=>[i,orientacaoLocalCorredorV78(i,validos)]));
+
+// Grafo de afinidade viária/geográfica.
+const adj=new Map(indices.map(i=>[i,[]]));
+for(let a=0;a<indices.length;a++){
+for(let b=a+1;b<indices.length;b++){
+const i=indices[a],j=indices[b];
+const af=afinidadeCorredorV78(i,j,validos,resultado,orientacoes);
+if(!af) continue;
+adj.get(i).push({i:j,score:af.score});
+adj.get(j).push({i:i,score:af.score});
+}
+}
+
+// Componentes conectados. Depois dividimos componentes excessivamente largos
+// para evitar o efeito corrente que juntaria um bairro inteiro.
+const nao=new Set(indices),componentes=[];
+while(nao.size){
+const inicio=nao.values().next().value;
+nao.delete(inicio);
+const fila=[inicio],comp=[];
+while(fila.length){
+const atual=fila.shift();
+comp.push(atual);
+const viz=[...(adj.get(atual)||[])].sort((a,b)=>a.score-b.score);
+for(const v of viz){
+if(nao.has(v.i)){
+nao.delete(v.i);
+fila.push(v.i);
+}
+}
+}
+componentes.push(...dividirComponenteCorredorV78(comp,validos));
+}
+
+return componentes.map((membros,id)=>{
+const angulo=anguloPcaScanner(membros,validos);
+const ruas=[...new Set(membros.map(i=>chaveRuaGrupo(validos[i-1])))];
+return {id,membros:[...membros],angulo,ruas};
+});
+}
+
+function custoAproximadoEntreCorredoresV78(origem,destino,resultado,norm){
+const origens=Array.isArray(origem)?origem:origem.membros;
+const destinos=Array.isArray(destino)?destino:destino.membros;
+return custoEntreConjuntosMatriz(origens,destinos,resultado,norm);
+}
+
+function gerarOrdensCorredoresBeamV78(corredores,resultado,norm,indiceDestinoFinal){
+if(corredores.length<=1) return [{nome:'corredor-unico',ordem:[...corredores]}];
+const porId=new Map(corredores.map(c=>[c.id,c]));
+let estados=[{ordem:[],restantes:corredores.map(c=>c.id),atual:[0],custo:0}];
+
+for(let passo=0;passo<corredores.length;passo++){
+const proximos=[];
+for(const estado of estados){
+const escolhas=estado.restantes.map(id=>{
+const c=porId.get(id);
+return {id,custo:custoAproximadoEntreCorredoresV78(estado.atual,c,resultado,norm)};
+}).sort((a,b)=>a.custo-b.custo)
+.slice(0,Math.min(BEAM_CORREDORES_RAMIFICACAO,estado.restantes.length));
+
+for(const escolha of escolhas){
+const c=porId.get(escolha.id);
+const restantes=estado.restantes.filter(id=>id!==escolha.id);
+let custo=estado.custo+(Number.isFinite(escolha.custo)?escolha.custo:9999);
+
+// Quando este for o último corredor, já considera o custo aproximado até o
+// destino final escolhido pelo usuário.
+if(restantes.length===0&&Number.isInteger(indiceDestinoFinal)){
+const saida=custoAproximadoEntreCorredoresV78(c.membros,[indiceDestinoFinal],resultado,norm);
+if(Number.isFinite(saida)) custo+=saida;
+}
+
+proximos.push({ordem:[...estado.ordem,escolha.id],restantes,atual:c.membros,custo});
+}
+}
+proximos.sort((a,b)=>a.custo-b.custo);
+estados=proximos.slice(0,BEAM_CORREDORES_LARGURA);
+}
+
+const saida=[],vistas=new Set();
+for(const estado of estados.slice(0,12)){
+const ordem=estado.ordem.map(id=>porId.get(id));
+const sig=estado.ordem.join('>');
+if(!vistas.has(sig)){
+vistas.add(sig);
+saida.push({nome:'beam-corredores',ordem});
+}
+}
+
+// Segurança: inclui também um greedy simples a partir do GPS.
+const greedy=ordemZonasScannerVizinho(corredores,resultado,norm,null);
+const sigG=greedy.map(c=>c.id).join('>');
+if(sigG&&!vistas.has(sigG)) saida.push({nome:'greedy-corredores',ordem:greedy});
+return saida;
+}
+
+function metricasSequenciaLocalV78(indices,atual,alvosSaida,resultado){
+let tempo=0,dist=0,ant=atual;
+for(const idx of indices){
+const t=valorMatriz(resultado.duracoes,ant,idx);
+const d=valorMatriz(resultado.distancias,ant,idx);
+if(!Number.isFinite(t)||!Number.isFinite(d)) return {tempo:Infinity,dist:Infinity};
+tempo+=t;dist+=d;ant=idx;
+}
+if(alvosSaida&&alvosSaida.length){
+let melhorT=Infinity,melhorD=Infinity;
+for(const alvo of alvosSaida){
+const t=valorMatriz(resultado.duracoes,ant,alvo);
+const d=valorMatriz(resultado.distancias,ant,alvo);
+if(Number.isFinite(t)&&t<melhorT){melhorT=t;melhorD=Number.isFinite(d)?d:melhorD;}
+}
+if(Number.isFinite(melhorT)){tempo+=melhorT;if(Number.isFinite(melhorD))dist+=melhorD;}
+}
+return {tempo,dist};
+}
+
+function gerarSequenciasCorredorV78(corredor,atual,alvosSaida,resultado,norm,validos){
+const membros=[...corredor.membros];
+if(membros.length<=1) return [membros];
+const candidatas=[],vistas=new Set();
+function add(seq){
+if(!seq||seq.length!==membros.length) return;
+const sig=seq.join('>');
+if(!vistas.has(sig)){vistas.add(sig);candidatas.push(seq);}
+}
+
+// 1) Ao longo do eixo principal do corredor (ida e volta).
+const proj=projecoesEixoCorredorV78(membros,validos,corredor.angulo);
+const eixo=[...proj].sort((a,b)=>a.s-b.s).map(x=>x.i);
+add(eixo);add([...eixo].reverse());
+
+// 2) Vizinho por tempo direcional, partindo da entrada real no corredor.
+let rest=[...membros],cur=atual,greedy=[];
+while(rest.length){
+let p=0,melhor=Infinity;
+rest.forEach((idx,k)=>{
+const t=valorMatriz(resultado.duracoes,cur,idx);
+const d=valorMatriz(resultado.distancias,cur,idx);
+const score=(Number.isFinite(t)?t:1e9)+(Number.isFinite(d)?d/25:1e9);
+if(score<melhor){melhor=score;p=k;}
+});
+const x=rest.splice(p,1)[0];greedy.push(x);cur=x;
+}
+add(greedy);add([...greedy].reverse());
+
+// 3) Continuidade por rua dentro do corredor.
+const ruasMap=new Map();
+membros.forEach(idx=>{
+const k=chaveRuaGrupo(validos[idx-1]);
+if(!ruasMap.has(k)) ruasMap.set(k,[]);
+ruasMap.get(k).push(idx);
+});
+if(ruasMap.size>1){
+let ruas=[...ruasMap.values()],seq=[],cur2=atual;
+while(ruas.length){
+let p=0,c=Infinity;
+ruas.forEach((r,k)=>{const cc=custoEntreConjuntosMatriz([cur2],r,resultado,norm);if(cc<c){c=cc;p=k;}});
+const rua=ruas.splice(p,1)[0];
+const saida=ruas.flat().length?ruas.flat():alvosSaida;
+const ord=candidatosOrdemRuaV75(rua,cur2,saida,resultado,norm,validos);
+seq.push(...ord);cur2=ord[ord.length-1]??cur2;
+}
+add(seq);
+}
+
+// 4) Scanner local: útil em conjuntos de ruas paralelas, mas somente dentro
+// deste corredor, para não voltar a impor uma serpentina ao bairro inteiro.
+const scanner=melhorScannerDaZona(corredor,atual,alvosSaida,resultado,norm,validos);
+add(scanner);
+
+return candidatas;
+}
+
+function escolherSequenciaCorredorV78(corredor,atual,alvosSaida,resultado,norm,validos){
+const candidatas=gerarSequenciasCorredorV78(corredor,atual,alvosSaida,resultado,norm,validos);
+const avaliadas=candidatas.map(seq=>({seq,...metricasSequenciaLocalV78(seq,atual,alvosSaida,resultado)}))
+.filter(x=>Number.isFinite(x.tempo)&&Number.isFinite(x.dist));
+if(!avaliadas.length) return [...corredor.membros];
+const menorTempo=Math.min(...avaliadas.map(x=>x.tempo));
+const faixa=avaliadas.filter(x=>x.tempo<=menorTempo*1.03);
+faixa.sort((a,b)=>a.dist-b.dist||a.tempo-b.tempo);
+return [...faixa[0].seq];
+}
+
+function expandirCorredoresV78(ordemCorredores,validos,resultado,norm,indiceDestinoFinal){
+const rota=[];
+let atual=0;
+for(let ci=0;ci<ordemCorredores.length;ci++){
+const corredor=ordemCorredores[ci];
+const saida=[];
+if(ci<ordemCorredores.length-1) saida.push(...ordemCorredores[ci+1].membros);
+else if(Number.isInteger(indiceDestinoFinal)) saida.push(indiceDestinoFinal);
+const seq=escolherSequenciaCorredorV78(corredor,atual,saida,resultado,norm,validos);
+rota.push(...seq);
+atual=seq[seq.length-1]??atual;
+}
+return rota;
+}
+
+function penalidadeReentradaCorredorV78(ordem,corredores){
+const mapa=new Map();
+corredores.forEach(c=>c.membros.forEach(i=>mapa.set(i,c.id)));
+let blocos=0,ultimo=null;
+const vistos=new Set();
+for(const idx of ordem){
+const c=mapa.get(idx);
+if(c!==ultimo){
+if(vistos.has(c)) blocos++;
+vistos.add(c);ultimo=c;
+}
+}
+return blocos;
+}
+
+function gerarCandidatasCorredoresV78(validos,resultado,indiceDestinoFinal){
+const norm=normalizadoresMatriz(resultado);
+const corredores=clusterizarCorredoresV78(validos,resultado);
+const ordens=gerarOrdensCorredoresBeamV78(corredores,resultado,norm,indiceDestinoFinal);
+const candidatas=[],vistas=new Set();
+for(const oc of ordens){
+let ordemIndices=expandirCorredoresV78(oc.ordem,validos,resultado,norm,indiceDestinoFinal);
+ordemIndices=repararJanelasHardV75(ordemIndices,resultado,validos);
+const sig=ordemIndices.join('>');
+if(sig&&!vistas.has(sig)){
+vistas.add(sig);
+candidatas.push({nome:'corredores-'+oc.nome,ordemIndices});
+}
+}
+return {candidatas,corredores};
+}
+
+function escolherMelhorCorredoresV78(candidatas,resultado,indiceDestinoFinal,validos,corredores){
+const avaliadas=candidatas.map(c=>{
+const janelas=avaliarJanelasRotaV75(c.ordemIndices,resultado,validos);
+const metricas=metricasOperacionaisMatrizV75(c.ordemIndices,resultado,indiceDestinoFinal,validos);
+const reentradas=penalidadeReentradaCorredorV78(c.ordemIndices,corredores);
+return {...c,janelas,metricas,reentradas};
+});
+const factiveis=avaliadas.filter(a=>a.janelas.violacoesHard.length===0&&metricasRotaValidas(a.metricas));
+const base=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
+if(!base.length) return {melhor:null,avaliadas,referencia:null};
+const referencia=referenciaEquilibrio(base);
+
+// Mantém a filosofia da V7.7: tempo primeiro. Entre rotas até 3% do melhor
+// tempo, escolhe a menor quilometragem. Reentrar num corredor já concluído
+// é apenas desempate e nunca vence uma diferença relevante de tempo.
+const menorTempo=Math.min(...base.map(a=>a.metricas.duracao));
+const faixaTempo=base.filter(a=>a.metricas.duracao<=menorTempo*1.03);
+let melhor=null;
+for(const a of faixaTempo){
+let score=a.metricas.distancia/Math.max(1,referencia.menorDistancia);
+if(a.janelas.violacoesHard.length) score+=1000+a.janelas.atrasoHardMin*10;
+score+=PESO_SOFT_SECUNDARIO*(a.janelas.penalidadeSoftMin/Math.max(1,a.metricas.duracao/60));
+score+=a.reentradas*0.025;
+if(!melhor||score<melhor.score-0.0001||(Math.abs(score-melhor.score)<=0.0001&&a.metricas.duracao<melhor.metricas.duracao)){
+melhor={...a,score};
+}
+}
+return {melhor,avaliadas,referencia};
+}
+
 async function consultarTrechoDirectionsOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
@@ -4068,9 +4490,9 @@ let avaliacoes = [];
 try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
-atualizarProgressoOtimizacao('Lendo o formato das ruas e montando a varredura scanner...');
-const geradasScanner = gerarCandidatasScannerV76(validos, matrizGlobal, indiceDestinoFinal);
-const escolhaGlobal = escolherMelhorScannerV76(geradasScanner.candidatas, matrizGlobal, indiceDestinoFinal, validos);
+atualizarProgressoOtimizacao('Identificando corredores viários e agrupando ruas compatíveis...');
+const geradasCorredores = gerarCandidatasCorredoresV78(validos, matrizGlobal, indiceDestinoFinal);
+const escolhaGlobal = escolherMelhorCorredoresV78(geradasCorredores.candidatas, matrizGlobal, indiceDestinoFinal, validos, geradasCorredores.corredores);
 avaliacoes = escolhaGlobal.avaliadas || [];
 
 if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
@@ -4089,17 +4511,17 @@ metricasShopee = metricasOperacionaisMatrizV75(ordemShopeeIndices, matrizGlobal,
 }catch(erroGlobal){
 console.warn('Matriz global indisponível; usando fallback viário completo:', erroGlobal);
 
-// Fallback: preserva o perfil experimental (micro-região + rua) usando uma
-// matriz geográfica estimada. Só perdemos a inteligência de mão única se o
-// roteador global estiver indisponível; nunca voltamos ao salto livre da V7.4.
-atualizarProgressoOtimizacao('Roteador indisponível; mantendo o padrão scanner por geometria...');
+// Fallback: mantém a ideia de CORREDORES usando geometria quando a matriz
+// viária completa estiver indisponível. A qualidade de mão única/retornos cai,
+// mas o app não volta a tratar a rota como uma nuvem de pontos soltos.
+atualizarProgressoOtimizacao('Roteador indisponível; mantendo corredores por geometria...');
 const pontosFallback=[inicio,...validos.map(pontoGrupo)];
 if(destino) pontosFallback.push(destino);
 const distFallback=matrizDistanciaGeografica(pontosFallback);
 const durFallback=distFallback.map(l=>l.map(m=>Number.isFinite(m)?m/(30000/3600):Infinity));
-matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_SCANNER_V76'};
-const geradasFallback=gerarCandidatasScannerV76(validos,matrizGlobal,indiceDestinoFinal);
-const escolhaFallback=escolherMelhorScannerV76(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos);
+matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_CORREDORES_V78'};
+const geradasFallback=gerarCandidatasCorredoresV78(validos,matrizGlobal,indiceDestinoFinal);
+const escolhaFallback=escolherMelhorCorredoresV78(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos,geradasFallback.corredores);
 if(!escolhaFallback.melhor) throw erroGlobal;
 ordem=escolhaFallback.melhor.ordemIndices.map(i=>validos[i-1]);
 avaliacoes=escolhaFallback.avaliadas || [];
@@ -4111,7 +4533,7 @@ metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
 if(metricasRotaValidas(metricasShopee)){
 metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 }
-mostrarToast('⚠️ Sem matriz viária completa; mantive a varredura scanner no fallback', 'alerta');
+mostrarToast('⚠️ Sem matriz viária completa; usei corredores por geometria no fallback', 'alerta');
 }
 
 atualizarProgressoOtimizacao('Validando a rota mais rápida e, depois, a menor quilometragem...');
@@ -4132,7 +4554,7 @@ atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...
 metaRota = {
 modo,
 provedor:(matrizGlobal && matrizGlobal.provedor) ? matrizGlobal.provedor : 'OSRM',
-criterio:'v7_7_scanner_prioridade_tempo_depois_distancia',
+criterio:'v7_8_corredores_viarios_tempo_depois_distancia',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -4146,7 +4568,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Rota otimizada: tempo primeiro, quilômetros depois', 'sucesso');
+mostrarToast('⚡ Rota otimizada por corredores: tempo primeiro, quilômetros depois', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
