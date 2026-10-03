@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.2</title>
+<title>Copiloto Entregas V8.3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1372,11 +1372,22 @@ font-size:15px;
 }
 
 
-/* V8.2 - editor manual fiel + organização física dos pacotes */
+/* V8.3 - editor manual fiel + organização física dos pacotes */
 .desenho-modos{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;}
 .desenho-modos button{margin:0;padding:9px 7px;border-radius:10px;background:#eef2f7;color:#536174;font-size:12px;}
 .desenho-modos button.ativo{background:#dff7fb;color:#007f96;box-shadow:inset 0 0 0 2px rgba(0,167,199,.25);}
-.organizar-pacotes-btn{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;box-shadow:0 4px 12px rgba(37,99,235,.22);}
+.organizar-pacotes-btn{
+width:auto;
+margin:0 0 10px 0;
+padding:9px 12px;
+border-radius:10px;
+background:#eef4ff;
+color:#2457b8;
+border:1px solid #dbe7ff;
+box-shadow:none;
+font-size:12.5px;
+font-weight:700;
+}
 .painel-organizacao-pacotes{margin:0 0 16px 0;}
 .organizar-header{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;background:white;padding:14px;border-radius:16px;box-shadow:0 3px 12px rgba(20,20,20,.06);}
 .organizar-titulo{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#1f2937;}
@@ -1397,7 +1408,7 @@ font-size:15px;
 .rota-gps-linha{filter:drop-shadow(0 1px 2px rgba(0,0,0,.18));}
 
 
-/* V8.2 - paradas obrigatórias no desenho */
+/* V8.3 - paradas obrigatórias no desenho */
 .pin-mapa.nao-selecionado-desenho .pin-corpo{
 animation:pulsoParadaNaoSelecionada 1s ease-in-out infinite;
 box-shadow:0 0 0 3px #00a7c7,0 0 0 8px rgba(0,167,199,.18),0 3px 8px rgba(0,0,0,.35);
@@ -1453,7 +1464,7 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.2</div>
+<div class="versao-copiloto">Copiloto V8.3</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1491,9 +1502,7 @@ Importar Rota
 
 </div>
 
-<div id="lista"></div>
-
-<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;">📦 Organizar pacotes no carro</button>
+<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;">📦 Organizar pacotes</button>
 
 <div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
 <div class="organizar-header">
@@ -1508,7 +1517,7 @@ Importar Rota
 <div id="listaOrganizacaoPacotes"></div>
 </div>
 
-
+<div id="lista"></div>
 
 </div>
 
@@ -2220,6 +2229,70 @@ function paradasFaltantesDesenhoV82(){
 return paradasValidasDesenhoV82().filter(g=>!capturasDesenhoRota.has(g.id));
 }
 
+// V8.3 - Revalida todas as capturas depois de cada traço usando o centro
+// VISUAL do pin. Isso evita falso \"faltam 1\" quando o ponteiro se move
+// rápido e o navegador não emite um pointermove exatamente sobre o marcador.
+function recomputarCapturasDesenhoV83(){
+if(!mapa || !tracosDesenhoRota.length) return;
+
+const mapaEl=mapa.getContainer();
+if(!mapaEl) return;
+const mapaRect=mapaEl.getBoundingClientRect();
+const novas=new Map();
+
+const bases=[];
+let acumuladoGlobal=0;
+for(let ti=0;ti<tracosDesenhoRota.length;ti++){
+const traco=tracosDesenhoRota[ti]||[];
+const segs=[];
+for(let i=1;i<traco.length;i++){
+const a=mapa.latLngToContainerPoint([traco[i-1].lat,traco[i-1].lng]);
+const b=mapa.latLngToContainerPoint([traco[i].lat,traco[i].lng]);
+const segM=distanciaMetros(Number(traco[i-1].lat),Number(traco[i-1].lng),Number(traco[i].lat),Number(traco[i].lng));
+segs.push({a,b,segM,base:acumuladoGlobal});
+acumuladoGlobal+=segM;
+}
+bases.push(segs);
+if(ti<tracosDesenhoRota.length-1) acumuladoGlobal+=25;
+}
+
+for(const g of paradasValidasDesenhoV82()){
+const m=marcadores[g.id];
+let gp=null,limiar=30;
+const el=m&&m.getElement?m.getElement():null;
+if(el){
+const r=el.getBoundingClientRect();
+// Centro real do ícone na tela, e não a âncora inferior do Leaflet.
+gp=L.point((r.left+r.right)/2-mapaRect.left,(r.top+r.bottom)/2-mapaRect.top);
+limiar=Math.max(24,Math.min(36,Math.max(r.width,r.height)*0.58+8));
+}else{
+gp=mapa.latLngToContainerPoint([Number(g.lat),Number(g.lng)]);
+limiar=36;
+}
+
+let melhor=null;
+for(const segs of bases){
+for(const seg of segs){
+const rr=distanciaPontoSegmentoPixel(gp,seg.a,seg.b);
+if(!melhor || rr.dist<melhor.dist){
+melhor={dist:rr.dist,progresso:seg.base+rr.t*seg.segM};
+}
+}
+}
+if(melhor && melhor.dist<=limiar){
+novas.set(g.id,{progresso:melhor.progresso,distPx:melhor.dist});
+}
+}
+
+capturasDesenhoRota=novas;
+
+Object.entries(marcadores).forEach(([id,m])=>{
+const el=m&&m.getElement?m.getElement():null;
+const pin=el?el.querySelector('.pin-mapa'):null;
+if(pin) pin.classList.toggle('capturado-desenho',capturasDesenhoRota.has(id));
+});
+}
+
 function atualizarDestaqueFaltantesDesenhoV82(){
 const faltantes=modoDesenhoRota?paradasFaltantesDesenhoV82():[];
 const ids=new Set(faltantes.map(g=>g.id));
@@ -2233,7 +2306,11 @@ const btn=document.getElementById('btnAplicarDesenhoRota');
 if(btn){
 const total=paradasValidasDesenhoV82().length;
 const faltam=faltantes.length;
+const totalM=tracosDesenhoRota.reduce((a,t)=>a+comprimentoTracoMetros(t),0);
+const desenhoValido=tracosDesenhoRota.length>0 && totalM>=20;
 btn.textContent=faltam?`Aplicar desenho · faltam ${faltam}`:'Aplicar desenho';
+// Agora é uma trava real: com qualquer parada faltando o botão não clica.
+btn.disabled=!desenhoValido || faltam>0 || total===0;
 }
 return faltantes;
 }
@@ -2391,7 +2468,9 @@ tracoAtualDesenho=null;linhaTracoAtual=null;
 pontosDesenhoRota=tracosDesenhoRota.flat();
 const totalM=tracosDesenhoRota.reduce((a,t)=>a+comprimentoTracoMetros(t),0);
 const valido=tracosDesenhoRota.length>0 && totalM>=20;
-const btn=document.getElementById('btnAplicarDesenhoRota');if(btn) btn.disabled=!valido;
+// Repassa o traço inteiro sobre todos os pins para não depender da frequência
+// dos eventos pointermove durante o gesto.
+recomputarCapturasDesenhoV83();
 const faltantes=atualizarDestaqueFaltantesDesenhoV82();
 const totalValidos=paradasValidasDesenhoV82().length;
 atualizarInstrucaoDesenho(valido
@@ -2593,6 +2672,8 @@ return simplificarPontosV81(pts,1200);
 
 async function aplicarDesenhoOtimizacao(){
 if(!tracosDesenhoRota.length){mostrarToast('⚠️ Desenhe pelo menos um trecho da rota','alerta');return;}
+// V8.3: valida novamente o desenho completo no instante do clique.
+recomputarCapturasDesenhoV83();
 const validos=paradasValidasDesenhoV82();
 const invalidos=grupos.filter(g=>!validos.includes(g));
 if(invalidos.length){
@@ -2694,7 +2775,7 @@ marcadorFimDesenho=L.marker([Number(ultima.lat),Number(ultima.lng)],{icon:icFim,
 }
 
 // ----------------------------------------------------------------------
-// V8.2 - ORGANIZAÇÃO DOS PACOTES NO CARRO (ORDEM INVERSA)
+// V8.3 - ORGANIZAÇÃO DOS PACOTES NO CARRO (ORDEM INVERSA)
 // ----------------------------------------------------------------------
 function organizacaoPacotesDisponivel(){
 return !!(grupos.length && metaRota && metaRota.modo==='desenho' && !metaRota.organizacaoPacotesConcluida);
@@ -2706,6 +2787,15 @@ modoOrganizacaoPacotes=true;
 irParaAba(0);
 renderizarOrganizacaoPacotes();
 atualizarVisibilidadeOrganizacaoPacotes();
+// O botão fica acima da Parada 1; ao abrir, sempre começamos pelo topo
+// da organização (última entrega / primeiro pacote a entrar no carro).
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+try{window.scrollTo({top:0,left:0,behavior:'auto'});}catch(e){window.scrollTo(0,0);}
+document.documentElement.scrollTop=0;
+document.body.scrollTop=0;
+const painel=document.getElementById('painelOrganizacaoPacotes');
+if(painel){try{painel.scrollIntoView({block:'start',behavior:'auto'});}catch(e){}}
+}));
 }
 
 function fecharOrganizacaoPacotes(){
