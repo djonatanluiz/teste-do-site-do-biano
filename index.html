@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.0</title>
+<title>Copiloto Entregas V8.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1372,6 +1372,31 @@ font-size:15px;
 .otimizacao-caixa{ border-radius:22px; }
 }
 
+
+/* V8.1 - editor manual de rota + organização física dos pacotes */
+.desenho-modos{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;}
+.desenho-modos button{margin:0;padding:9px 7px;border-radius:10px;background:#eef2f7;color:#536174;font-size:12px;}
+.desenho-modos button.ativo{background:#dff7fb;color:#007f96;box-shadow:inset 0 0 0 2px rgba(0,167,199,.25);}
+.organizar-pacotes-btn{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;box-shadow:0 4px 12px rgba(37,99,235,.22);}
+.painel-organizacao-pacotes{margin:0 0 16px 0;}
+.organizar-header{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;background:white;padding:14px;border-radius:16px;box-shadow:0 3px 12px rgba(20,20,20,.06);}
+.organizar-titulo{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#1f2937;}
+.organizar-subtitulo{font-size:12.5px;line-height:1.4;color:#64748b;margin-top:4px;}
+.organizar-fechar{width:auto;margin:0;padding:8px 10px;font-size:12px;background:#eef2f7;color:#475569;}
+.organizar-progresso{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:12px 2px 4px;}
+#barraOrganizarPacotes{height:100%;width:0;background:linear-gradient(90deg,#2563eb,#22c55e);transition:width .25s ease;}
+.organizar-progresso-texto{font-size:12px;color:#64748b;margin:0 2px 10px;font-weight:600;}
+.organizar-parada{background:white;border-radius:15px;margin-bottom:10px;box-shadow:0 3px 12px rgba(20,20,20,.06);overflow:hidden;border-left:5px solid #2563eb;}
+.organizar-parada-cab{padding:11px 12px 8px;font-weight:800;font-size:14px;color:#1f2937;background:#f8fafc;}
+.organizar-parada-cab small{display:block;color:#64748b;font-weight:500;margin-top:3px;}
+.organizar-pacote{display:flex;align-items:center;gap:10px;padding:12px;border-top:1px solid #eef2f7;}
+.organizar-pacote.info-ok{opacity:.55;background:#f0fdf4;}
+.organizar-pacote-info{flex:1;min-width:0;}
+.organizar-pacote-codigo{font-weight:800;font-size:14px;word-break:break-word;color:#111827;}
+.organizar-pacote-endereco{font-size:12px;color:#64748b;margin-top:3px;}
+.organizar-check{width:34px;height:34px;flex:0 0 34px;accent-color:#22c55e;cursor:pointer;}
+.rota-gps-linha{filter:drop-shadow(0 1px 2px rgba(0,0,0,.18));}
+
 </style>
 
 </head>
@@ -1416,7 +1441,8 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Desenhar otimização no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.0</div>
+<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;">📦 Organizar pacotes no carro</button>
+<div class="versao-copiloto">Copiloto V8.1</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1452,6 +1478,19 @@ Importar Rota
 <div class="barra-progresso-fill" id="barraProgresso">0%</div>
 </div>
 
+</div>
+
+<div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
+<div class="organizar-header">
+<div>
+<div class="organizar-titulo">📦 Organizar pacotes no carro</div>
+<div class="organizar-subtitulo">Carregue na ordem inversa: a última entrega entra primeiro e a primeira fica mais acessível.</div>
+</div>
+<button class="organizar-fechar" onclick="fecharOrganizacaoPacotes()">Fechar</button>
+</div>
+<div class="organizar-progresso"><div id="barraOrganizarPacotes"></div></div>
+<div id="textoProgressoOrganizar" class="organizar-progresso-texto"></div>
+<div id="listaOrganizacaoPacotes"></div>
 </div>
 
 <div id="lista"></div>
@@ -1494,8 +1533,12 @@ Importar Rota
 <button id="botaoDesenharRotaMapa" class="botao-flutuante-mapa" style="top:314px;" onclick="iniciarDesenhoOtimizacao()" title="Desenhar ordem manual da rota">✏️</button>
 
 <div id="painelDesenhoRota">
-<div class="desenho-rota-titulo">✏️ Desenhe sua rota</div>
-<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">Arraste o dedo do ponto onde quer começar até onde quer terminar. A ordem das paradas seguirá o seu traço.</div>
+<div class="desenho-rota-titulo">✏️ Desenhe a intenção da rota</div>
+<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Desenhe os corredores na ordem desejada; você pode mover o mapa e continuar desenhando sem perder os traços.</div>
+<div class="desenho-modos">
+<button id="btnModoDesenharRota" class="ativo" onclick="definirModoInteracaoDesenho('desenhar')">✏️ Desenhar</button>
+<button id="btnModoMoverRota" onclick="definirModoInteracaoDesenho('mover')">✋ Mover mapa</button>
+</div>
 <div class="desenho-rota-acoes">
 <button class="desenho-limpar" onclick="limparDesenhoOtimizacao()">Limpar</button>
 <button class="desenho-cancelar" onclick="cancelarDesenhoOtimizacao()">Cancelar</button>
@@ -1586,6 +1629,7 @@ duracaoSegundos:null,
 distanciaShopeeMetros:null,
 duracaoShopeeSegundos:null,
 destinoFinal:null,
+organizacaoPacotesConcluida:false,
 atualizadoEm:null
 };
 let modalOtimizacaoEmModoConfiguracao = false;
@@ -1594,7 +1638,7 @@ let mapaDestinoFinal = null;
 let marcadorDestinoSelecionado = null;
 let destinoSelecionadoAtual = null;
 
-// V8.0 - otimização manual por desenho sobre o mapa.
+// V8.1 - editor manual por desenho + rota encaixada nas ruas.
 let modoDesenhoRota = false;
 let desenhandoRota = false;
 let pontosDesenhoRota = [];
@@ -1606,6 +1650,13 @@ let capturasDesenhoRota = new Map();
 let comprimentoDesenhoPx = 0;
 let ultimoPontoDesenhoPx = null;
 let eventosDesenhoInstalados = false;
+let tracosDesenhoRota = [];
+let linhasTracosDesenho = [];
+let tracoAtualDesenho = null;
+let linhaTracoAtual = null;
+let modoInteracaoDesenho = 'desenhar';
+let linhaRotaGps = null;
+let modoOrganizacaoPacotes = false;
 
 // ----------------------------------------------------------------------
 // IMPORTAÇÃO DA PLANILHA
@@ -1892,7 +1943,8 @@ endereco:endereco,
 stop:stopTexto,
 destinatario:destinatario,
 status:'pendente',
-motivo:null
+motivo:null,
+organizadoCarro:false
 
 });
 
@@ -1923,7 +1975,7 @@ atualizadoEm:null
 
 salvarStorage();
 
-// V8.0: importar uma rota NÃO dispara mais qualquer otimização automática.
+// V8.1: importar uma rota NÃO dispara qualquer otimização automática.
 // Apenas corrigimos coordenadas ausentes e mostramos a ordem original da Shopee.
 abrirOverlayOtimizacao('Preparando os endereços da rota...');
 await corrigirCoordenadasAusentes({renderizar:false, silencioso:true});
@@ -1939,6 +1991,7 @@ duracaoSegundos:null,
 distanciaShopeeMetros:null,
 duracaoShopeeSegundos:null,
 destinoFinal:null,
+organizacaoPacotesConcluida:false,
 atualizadoEm:Date.now()
 };
 salvarStorage();
@@ -2073,16 +2126,19 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 
 // ======================================================================
-// V8.0 - OTIMIZAÇÃO MANUAL POR DESENHO
+// V8.1 - EDITOR MANUAL DE ROTA POR DESENHO + ENCAIXE NAS RUAS
 // ======================================================================
 /*
-A otimização automática foi desativada. A rota entra na ordem da Shopee.
-Quando o usuário escolhe "Desenhar otimização", o traço feito no mapa vira
-um eixo orientado: o ponto onde o dedo encosta primeiro é o início e o ponto
-onde ele solta é o fim. Cada parada recebe uma posição ao longo desse traço.
-Se o traço realmente passa perto de um pin, a passagem capturada pelo dedo
-tem prioridade; os demais pins são projetados no ponto mais próximo da linha.
-A sequência final segue exatamente o progresso do desenho do início ao fim.
+O desenho representa a INTENÇÃO do motorista, não uma ordem cega.
+- O início real da rota é sempre a localização atual do usuário.
+- O usuário pode desenhar vários traços, mover/zoomar o mapa e continuar.
+- Paradas atravessadas pelo dedo viram âncoras da intenção.
+- Paradas não atravessadas entram por proximidade/custo entre as âncoras.
+- Blocos consecutivos da mesma rua podem ser reordenados no sentido viário
+  mais rápido (ex.: intenção 1→2→3→4 pode virar 1→4→3→2).
+- Após aplicar, o rabisco desaparece e o mapa mostra a rota REAL encaixada
+  nas ruas pelo OSRM, partindo da localização atual e terminando na última
+  entrega da nova ordem.
 */
 
 function iniciarDesenhoOtimizacao(){
@@ -2105,12 +2161,23 @@ const painel = document.getElementById('painelDesenhoRota');
 if(painel) painel.classList.add('aberto');
 const botao = document.getElementById('botaoDesenharRotaMapa');
 if(botao) botao.classList.add('ativo');
-const mapaEl = document.getElementById('mapa');
-if(mapaEl) mapaEl.classList.add('modo-desenho-rota');
-configurarInteracoesMapaDuranteDesenho(false);
-if(linhaDesenhoSalva && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
-removerMarcadoresInicioFimDesenho();
-atualizarInstrucaoDesenho('Arraste o dedo do ponto onde quer começar até onde quer terminar. Você pode atravessar as ruas exatamente na ordem que faria na prática.');
+definirModoInteracaoDesenho('desenhar');
+removerLinhaRotaGpsV81();
+atualizarInstrucaoDesenho('O início real é sua localização. Desenhe um ou mais corredores; use “Mover mapa” quando precisar reposicionar e depois continue desenhando.');
+}
+
+function definirModoInteracaoDesenho(modo){
+modoInteracaoDesenho = modo === 'mover' ? 'mover' : 'desenhar';
+if(desenhandoRota) desenhandoRota=false;
+const bD=document.getElementById('btnModoDesenharRota');
+const bM=document.getElementById('btnModoMoverRota');
+if(bD) bD.classList.toggle('ativo', modoInteracaoDesenho==='desenhar');
+if(bM) bM.classList.toggle('ativo', modoInteracaoDesenho==='mover');
+const mapaEl=document.getElementById('mapa');
+if(mapaEl) mapaEl.classList.toggle('modo-desenho-rota', modoInteracaoDesenho==='desenhar');
+configurarInteracoesMapaDuranteDesenho(modoInteracaoDesenho==='mover');
+if(modoInteracaoDesenho==='mover') atualizarInstrucaoDesenho('✋ Mova ou dê zoom no mapa. Quando estiver pronto, toque em “✏️ Desenhar” e continue; os traços anteriores permanecem.');
+else atualizarInstrucaoDesenho(tracosDesenhoRota.length ? '✏️ Continue desenhando. Os traços anteriores continuam valendo na mesma sequência.' : '✏️ Desenhe os corredores na ordem em que você pretende percorrê-los.');
 }
 
 function configurarInteracoesMapaDuranteDesenho(habilitar){
@@ -2137,30 +2204,42 @@ if(pin) pin.classList.remove('capturado-desenho');
 });
 }
 
+function removerLinhasTracosDesenho(){
+if(!mapa) return;
+linhasTracosDesenho.forEach(l=>{ if(l && mapa.hasLayer(l)) mapa.removeLayer(l); });
+linhasTracosDesenho=[];
+if(linhaTracoAtual && mapa.hasLayer(linhaTracoAtual)) mapa.removeLayer(linhaTracoAtual);
+linhaTracoAtual=null;
+}
+
 function limparDesenhoOtimizacao(manterInstrucao){
+tracosDesenhoRota=[];
 pontosDesenhoRota=[];
 capturasDesenhoRota=new Map();
 comprimentoDesenhoPx=0;
 ultimoPontoDesenhoPx=null;
 desenhandoRota=false;
+tracoAtualDesenho=null;
+removerLinhasTracosDesenho();
 if(linhaDesenhoRota && mapa && mapa.hasLayer(linhaDesenhoRota)) mapa.removeLayer(linhaDesenhoRota);
 linhaDesenhoRota=null;
 limparDestaquesCapturaDesenho();
 const btn=document.getElementById('btnAplicarDesenhoRota');
 if(btn) btn.disabled=true;
-if(!manterInstrucao) atualizarInstrucaoDesenho('Desenho limpo. Arraste novamente do início ao fim da rota.');
+if(!manterInstrucao) atualizarInstrucaoDesenho('Desenho limpo. Comece novamente; sua localização continuará sendo o início real da rota.');
 }
 
 function cancelarDesenhoOtimizacao(){
 limparDesenhoOtimizacao(true);
 encerrarModoDesenhoRota();
 atualizarMapa();
-mostrarToast('✏️ Desenho cancelado. A ordem atual foi mantida.', 'neutro');
+mostrarToast('✏️ Edição cancelada. A ordem atual foi mantida.', 'neutro');
 }
 
 function encerrarModoDesenhoRota(){
 modoDesenhoRota=false;
 desenhandoRota=false;
+tracoAtualDesenho=null;
 const painel=document.getElementById('painelDesenhoRota');
 if(painel) painel.classList.remove('aberto');
 const botao=document.getElementById('botaoDesenharRotaMapa');
@@ -2181,14 +2260,26 @@ return L.point(ev.clientX-rect.left, ev.clientY-rect.top);
 function distanciaPontoSegmentoPixel(p,a,b){
 const dx=b.x-a.x, dy=b.y-a.y;
 const len2=dx*dx+dy*dy;
-if(len2<=0.0001) return {dist:p.distanceTo(a), t:0};
+if(len2<=0.0001) return {dist:p.distanceTo(a), t:0, q:a};
 let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/len2;
 t=Math.max(0,Math.min(1,t));
 const q=L.point(a.x+t*dx,a.y+t*dy);
 return {dist:p.distanceTo(q),t,q};
 }
 
-function tentarCapturarPinsNoSegmento(a,b,progressoAntes,comprimentoSegmento){
+function comprimentoTracoMetros(traco){
+let total=0;
+for(let i=1;i<(traco||[]).length;i++) total+=distanciaMetros(Number(traco[i-1].lat),Number(traco[i-1].lng),Number(traco[i].lat),Number(traco[i].lng));
+return total;
+}
+
+function progressoBaseNovoTraco(){
+let total=0;
+tracosDesenhoRota.forEach((t,i)=>{ total+=comprimentoTracoMetros(t); if(i<tracosDesenhoRota.length-1) total+=25; });
+return total + (tracosDesenhoRota.length ? 25 : 0);
+}
+
+function tentarCapturarPinsNoSegmentoV81(aPx,bPx,aLL,bLL,progressoAntes,comprimentoSegmentoM){
 if(!mapa) return;
 const LIMIAR_PX=30;
 grupos.forEach(g=>{
@@ -2196,9 +2287,9 @@ if(capturasDesenhoRota.has(g.id)) return;
 const lat=Number(g.lat),lng=Number(g.lng);
 if(!Number.isFinite(lat)||!Number.isFinite(lng)) return;
 const gp=mapa.latLngToContainerPoint([lat,lng]);
-const r=distanciaPontoSegmentoPixel(gp,a,b);
+const r=distanciaPontoSegmentoPixel(gp,aPx,bPx);
 if(r.dist<=LIMIAR_PX){
-capturasDesenhoRota.set(g.id,{progresso:progressoAntes+r.t*comprimentoSegmento,distPx:r.dist});
+capturasDesenhoRota.set(g.id,{progresso:progressoAntes+r.t*comprimentoSegmentoM,distPx:r.dist});
 const m=marcadores[g.id];
 const el=m && m.getElement ? m.getElement() : null;
 const pin=el ? el.querySelector('.pin-mapa') : null;
@@ -2214,144 +2305,269 @@ if(!container) return;
 eventosDesenhoInstalados=true;
 
 container.addEventListener('pointerdown', ev=>{
-if(!modoDesenhoRota) return;
+if(!modoDesenhoRota || modoInteracaoDesenho!=='desenhar') return;
 if(ev.button!==undefined && ev.button!==0 && ev.pointerType!=='touch') return;
 ev.preventDefault();ev.stopPropagation();
-if(pontosDesenhoRota.length) limparDesenhoOtimizacao(true);
 desenhandoRota=true;
 try{container.setPointerCapture(ev.pointerId);}catch(erro){}
-const px=pontoEventoNoMapa(ev);
-if(!px) return;
+const px=pontoEventoNoMapa(ev);if(!px) return;
 const ll=mapa.containerPointToLatLng(px);
-pontosDesenhoRota.push({lat:ll.lat,lng:ll.lng});
+tracoAtualDesenho=[{lat:ll.lat,lng:ll.lng}];
 ultimoPontoDesenhoPx=px;
-comprimentoDesenhoPx=0;
-linhaDesenhoRota=L.polyline([[ll.lat,ll.lng]],{color:'#00a7c7',weight:5,opacity:.9,interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
-tentarCapturarPinsNoSegmento(px,px,0,0);
-atualizarInstrucaoDesenho('Desenhando… passe pelas regiões na ordem em que deseja entregar.');
+comprimentoDesenhoPx=progressoBaseNovoTraco();
+linhaTracoAtual=L.polyline([[ll.lat,ll.lng]],{color:'#00a7c7',weight:5,opacity:.9,interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
+linhasTracosDesenho.push(linhaTracoAtual);
+atualizarInstrucaoDesenho('Desenhando… solte o dedo quando quiser. Depois você pode mover o mapa e continuar com outro traço.');
 },{passive:false});
 
 container.addEventListener('pointermove', ev=>{
-if(!modoDesenhoRota || !desenhandoRota) return;
+if(!modoDesenhoRota || modoInteracaoDesenho!=='desenhar' || !desenhandoRota || !tracoAtualDesenho) return;
 ev.preventDefault();ev.stopPropagation();
-const px=pontoEventoNoMapa(ev);
-if(!px||!ultimoPontoDesenhoPx) return;
-const seg=ultimoPontoDesenhoPx.distanceTo(px);
-if(seg<3) return;
-const progressoAntes=comprimentoDesenhoPx;
-comprimentoDesenhoPx+=seg;
-tentarCapturarPinsNoSegmento(ultimoPontoDesenhoPx,px,progressoAntes,seg);
+const px=pontoEventoNoMapa(ev);if(!px||!ultimoPontoDesenhoPx) return;
 const ll=mapa.containerPointToLatLng(px);
-pontosDesenhoRota.push({lat:ll.lat,lng:ll.lng});
+const ant=tracoAtualDesenho[tracoAtualDesenho.length-1];
+const segPx=ultimoPontoDesenhoPx.distanceTo(px);
+if(segPx<3) return;
+const segM=distanciaMetros(Number(ant.lat),Number(ant.lng),ll.lat,ll.lng);
+const progressoAntes=comprimentoDesenhoPx;
+comprimentoDesenhoPx+=segM;
+tentarCapturarPinsNoSegmentoV81(ultimoPontoDesenhoPx,px,ant,ll,progressoAntes,segM);
+tracoAtualDesenho.push({lat:ll.lat,lng:ll.lng});
 ultimoPontoDesenhoPx=px;
-if(linhaDesenhoRota) linhaDesenhoRota.addLatLng([ll.lat,ll.lng]);
+if(linhaTracoAtual) linhaTracoAtual.addLatLng([ll.lat,ll.lng]);
 },{passive:false});
 
 const finalizar=ev=>{
 if(!modoDesenhoRota || !desenhandoRota) return;
-ev.preventDefault();ev.stopPropagation();
+if(modoInteracaoDesenho==='desenhar'){ ev.preventDefault();ev.stopPropagation(); }
 desenhandoRota=false;
 try{container.releasePointerCapture(ev.pointerId);}catch(erro){}
-const btn=document.getElementById('btnAplicarDesenhoRota');
-const valido=pontosDesenhoRota.length>=2 && comprimentoDesenhoPx>=20;
-if(btn) btn.disabled=!valido;
+if(tracoAtualDesenho && tracoAtualDesenho.length>=2) tracosDesenhoRota.push(tracoAtualDesenho);
+tracoAtualDesenho=null;linhaTracoAtual=null;
+pontosDesenhoRota=tracosDesenhoRota.flat();
+const totalM=tracosDesenhoRota.reduce((a,t)=>a+comprimentoTracoMetros(t),0);
+const valido=tracosDesenhoRota.length>0 && totalM>=20;
+const btn=document.getElementById('btnAplicarDesenhoRota');if(btn) btn.disabled=!valido;
 const totalValidos=grupos.filter(g=>Number.isFinite(Number(g.lat))&&Number.isFinite(Number(g.lng))).length;
 atualizarInstrucaoDesenho(valido
-? `Traço pronto. ${capturasDesenhoRota.size} de ${totalValidos} paradas foram atravessadas diretamente; as demais serão encaixadas pela posição mais próxima do desenho.`
-: 'O traço ficou muito curto. Desenhe novamente do início ao fim da rota.');
+? `${tracosDesenhoRota.length} traço(s) salvo(s). ${capturasDesenhoRota.size} de ${totalValidos} paradas foram atravessadas diretamente. Você pode mover o mapa e continuar desenhando.`
+: 'O traço ficou muito curto. Desenhe novamente.');
 };
 container.addEventListener('pointerup',finalizar,{passive:false});
 container.addEventListener('pointercancel',finalizar,{passive:false});
 }
 
-function dadosProjecaoNoDesenho(grupo){
-if(!mapa || pontosDesenhoRota.length<2) return {progresso:Infinity,distanciaMetros:Infinity};
+function dadosProjecaoNosTracosV81(grupo){
+if(!mapa || !tracosDesenhoRota.length) return {progresso:Infinity,distanciaMetros:Infinity,capturado:false};
 const captura=capturasDesenhoRota.get(grupo.id);
 const gp=mapa.latLngToContainerPoint([Number(grupo.lat),Number(grupo.lng)]);
 let acumulado=0,melhor=null;
-for(let i=1;i<pontosDesenhoRota.length;i++){
-const a=mapa.latLngToContainerPoint([pontosDesenhoRota[i-1].lat,pontosDesenhoRota[i-1].lng]);
-const b=mapa.latLngToContainerPoint([pontosDesenhoRota[i].lat,pontosDesenhoRota[i].lng]);
-const seg=a.distanceTo(b);
+for(let ti=0;ti<tracosDesenhoRota.length;ti++){
+const t=tracosDesenhoRota[ti];
+for(let i=1;i<t.length;i++){
+const a=mapa.latLngToContainerPoint([t[i-1].lat,t[i-1].lng]);
+const b=mapa.latLngToContainerPoint([t[i].lat,t[i].lng]);
+const segM=distanciaMetros(Number(t[i-1].lat),Number(t[i-1].lng),Number(t[i].lat),Number(t[i].lng));
 const r=distanciaPontoSegmentoPixel(gp,a,b);
 if(!melhor || r.dist<melhor.dist){
-const q=r.q || a;
-const ll=mapa.containerPointToLatLng(q);
-melhor={dist:r.dist,progresso:acumulado+r.t*seg,lat:ll.lat,lng:ll.lng};
+const q=r.q||a;const ll=mapa.containerPointToLatLng(q);
+melhor={dist:r.dist,progresso:acumulado+r.t*segM,lat:ll.lat,lng:ll.lng};
 }
-acumulado+=seg;
+acumulado+=segM;
 }
-if(!melhor) return {progresso:Infinity,distanciaMetros:Infinity};
+if(ti<tracosDesenhoRota.length-1) acumulado+=25;
+}
+if(!melhor) return {progresso:Infinity,distanciaMetros:Infinity,capturado:false};
 const distM=distanciaMetros(Number(grupo.lat),Number(grupo.lng),melhor.lat,melhor.lng);
-// Quando o dedo realmente passou perto do pin, usamos o instante da captura.
-return {
-progresso:captura ? captura.progresso : melhor.progresso,
-distanciaMetros:distM,
-capturado:!!captura
-};
+return {progresso:captura?captura.progresso:melhor.progresso,distanciaMetros:distM,capturado:!!captura};
 }
 
-function simplificarDesenhoParaStorage(pontos,maxPontos=320){
-if(!Array.isArray(pontos)||pontos.length<=maxPontos) return (pontos||[]).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
-const passo=(pontos.length-1)/(maxPontos-1);
-const saida=[];
-for(let i=0;i<maxPontos;i++){
-const p=pontos[Math.round(i*passo)];
-saida.push({lat:Number(p.lat),lng:Number(p.lng)});
+function chaveRuaV81(grupo){
+try{
+const info=extrairRuaENumero(normalizarTexto(grupo.endereco));
+return info && info.rua ? info.rua : '';
+}catch(e){ return ''; }
 }
+
+function valorCustoMatrizV81(resultado,indices,prev,cand,next){
+if(!resultado) return null;
+const pi=prev ? indices.get(prev.id) : 0;
+const ci=indices.get(cand.id);
+const ni=next ? indices.get(next.id) : null;
+if(!Number.isInteger(pi)||!Number.isInteger(ci)) return null;
+const t1=valorMatriz(resultado.duracoes,pi,ci),d1=valorMatriz(resultado.distancias,pi,ci);
+if(!Number.isFinite(t1)||!Number.isFinite(d1)) return null;
+let tempo=t1,dist=d1;
+if(next && Number.isInteger(ni)){
+const t2=valorMatriz(resultado.duracoes,ci,ni),d2=valorMatriz(resultado.distancias,ci,ni);
+if(!Number.isFinite(t2)||!Number.isFinite(d2)) return null;
+tempo+=t2;dist+=d2;
+}
+return {tempo,dist};
+}
+
+function ordenarBucketV81(bucket,prev,next,resultado,indices,inicio){
+const restantes=[...bucket],out=[];let atual=prev;
+while(restantes.length){
+let best=0,bestScore=Infinity,bestDist=Infinity;
+for(let i=0;i<restantes.length;i++){
+const c=restantes[i];
+let tempo,dist;
+if(resultado){
+const ai=atual?indices.get(atual.id):0,ci=indices.get(c.id),ni=next?indices.get(next.id):null;
+const t=valorMatriz(resultado.duracoes,ai,ci),d=valorMatriz(resultado.distancias,ai,ci);
+const tn=next&&Number.isInteger(ni)?valorMatriz(resultado.duracoes,ci,ni):0;
+if(Number.isFinite(t)&&Number.isFinite(d)){tempo=t+(Number.isFinite(tn)?tn*.18:0);dist=d;}
+}
+if(!Number.isFinite(tempo)){
+const pa=atual?pontoGrupo(atual):(inicio||pontoGrupo(c));const pc=pontoGrupo(c);
+tempo=distanciaPontos(pa,pc)/10;dist=distanciaPontos(pa,pc);
+}
+if(tempo<bestScore-1 || (Math.abs(tempo-bestScore)<=1 && dist<bestDist)){best=i;bestScore=tempo;bestDist=dist;}
+}
+const escolhido=restantes.splice(best,1)[0];out.push(escolhido);atual=escolhido;
+}
+return out;
+}
+
+function construirOrdemIntencaoV81(validos,resultado,indices,inicio){
+const avaliados=validos.map(g=>({g,...dadosProjecaoNosTracosV81(g)}));
+const anchors=avaliados.filter(x=>x.capturado).sort((a,b)=>a.progresso-b.progresso).map(x=>x.g);
+if(!anchors.length){
+return avaliados.sort((a,b)=>a.progresso-b.progresso||a.distanciaMetros-b.distanciaMetros).map(x=>x.g);
+}
+const progAnchor=anchors.map(g=>capturasDesenhoRota.get(g.id).progresso);
+const buckets=Array.from({length:anchors.length+1},()=>[]);
+avaliados.filter(x=>!x.capturado).forEach(x=>{
+let gap=0;while(gap<progAnchor.length && x.progresso>progAnchor[gap]) gap++;
+buckets[gap].push(x.g);
+});
+const ordem=[];let prev=null;
+for(let gap=0;gap<buckets.length;gap++){
+const next=gap<anchors.length?anchors[gap]:null;
+const ordenados=ordenarBucketV81(buckets[gap],prev,next,resultado,indices,inicio);
+ordem.push(...ordenados);if(ordenados.length) prev=ordenados[ordenados.length-1];
+if(next){ordem.push(next);prev=next;}
+}
+return ordem;
+}
+
+function custoSequenciaV81(seq,prev,next,resultado,indices,inicio){
+let tempo=0,dist=0;let anterior=prev;
+for(const g of seq){
+const ai=anterior?indices.get(anterior.id):0,gi=indices.get(g.id);
+const t=resultado?valorMatriz(resultado.duracoes,ai,gi):null;
+const d=resultado?valorMatriz(resultado.distancias,ai,gi):null;
+if(Number.isFinite(t)&&Number.isFinite(d)){tempo+=t;dist+=d;}else{const origem=anterior?pontoGrupo(anterior):(inicio||pontoGrupo(g));const dd=distanciaPontos(origem,pontoGrupo(g));tempo+=dd/10;dist+=dd;}
+anterior=g;
+}
+if(next && seq.length){
+const ai=indices.get(seq[seq.length-1].id),ni=indices.get(next.id);
+const t=resultado?valorMatriz(resultado.duracoes,ai,ni):null,d=resultado?valorMatriz(resultado.distancias,ai,ni):null;
+if(Number.isFinite(t)&&Number.isFinite(d)){tempo+=t;dist+=d;}
+}
+return {tempo,dist};
+}
+
+function permutarV81(arr){
+if(arr.length<=1) return [arr.slice()];
+const out=[];for(let i=0;i<arr.length;i++){
+const resto=arr.slice(0,i).concat(arr.slice(i+1));
+for(const p of permutarV81(resto)) out.push([arr[i],...p]);
+}
+return out;
+}
+
+function refinarOrdemPorOrientacaoRuaV81(ordem,resultado,indices,inicio){
+const out=[...ordem];let i=0;
+while(i<out.length){
+const rua=chaveRuaV81(out[i]);if(!rua){i++;continue;}
+let j=i+1;while(j<out.length && chaveRuaV81(out[j])===rua) j++;
+const tam=j-i;
+if(tam>=2){
+const bloco=out.slice(i,j),prev=i>0?out[i-1]:null,next=j<out.length?out[j]:null;
+let candidatas=[];
+if(tam<=6) candidatas=permutarV81(bloco);
+else candidatas=[bloco,[...bloco].reverse(),ordenarBucketV81(bloco,prev,next,resultado,indices,inicio)];
+let melhor=bloco,mc=custoSequenciaV81(bloco,prev,next,resultado,indices,inicio);
+for(const c of candidatas){const cc=custoSequenciaV81(c,prev,next,resultado,indices,inicio);if(cc.tempo<mc.tempo-1 || (Math.abs(cc.tempo-mc.tempo)<=1&&cc.dist<mc.dist)){melhor=c;mc=cc;}}
+out.splice(i,tam,...melhor);
+}
+i=j;
+}
+return out;
+}
+
+function simplificarPontosV81(pontos,maxPontos=1200){
+if(!Array.isArray(pontos)||pontos.length<=maxPontos) return (pontos||[]).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+const passo=(pontos.length-1)/(maxPontos-1),saida=[];
+for(let i=0;i<maxPontos;i++){const p=pontos[Math.round(i*passo)];saida.push({lat:Number(p.lat),lng:Number(p.lng)});}
 return saida;
 }
 
-function aplicarDesenhoOtimizacao(){
-if(pontosDesenhoRota.length<2){
-mostrarToast('⚠️ Desenhe uma linha do início ao fim da rota', 'alerta');
+async function geometriaRotaPelasRuasV81(ordem,inicio){
+try{
+const pernas=await consultarPernasRotaOSRMV710(ordem,inicio,null);
+const pts=[];
+for(const perna of pernas){for(const p of perna||[]){const ult=pts[pts.length-1];if(!ult||Math.abs(ult.lat-p.lat)>1e-7||Math.abs(ult.lng-p.lng)>1e-7) pts.push(p);}}
+return simplificarPontosV81(pts,1200);
+}catch(e){console.warn('Não foi possível obter a geometria da rota pelas ruas:',e);return null;}
+}
+
+async function aplicarDesenhoOtimizacao(){
+if(!tracosDesenhoRota.length){mostrarToast('⚠️ Desenhe pelo menos um trecho da rota', 'alerta');return;}
+let inicio;
+try{
+abrirOverlayOtimizacao('Obtendo sua localização para iniciar a rota...');
+inicio=await obterPontoInicialOtimizacao();
+}catch(e){
+fecharOverlayOtimizacao();
+mostrarToast('⚠️ Não consegui sua localização. Ative o GPS ou use o 📌 para definir sua posição.', 'alerta');
 return;
 }
 const validos=grupos.filter(g=>Number.isFinite(Number(g.lat))&&Number.isFinite(Number(g.lng)));
 const invalidos=grupos.filter(g=>!validos.includes(g));
-const avaliados=validos.map(g=>({g,...dadosProjecaoNoDesenho(g)}));
-avaliados.sort((a,b)=>a.progresso-b.progresso || Number(b.capturado)-Number(a.capturado) || a.distanciaMetros-b.distanciaMetros || (a.g.indiceImportacao??0)-(b.g.indiceImportacao??0));
+let matriz=null,indices=new Map(validos.map((g,i)=>[g.id,i+1]));
+try{
+atualizarProgressoOtimizacao('Lendo sentidos e tempos das ruas...');
+matriz=await consultarMatrizGlobalOSRM([inicio,...validos.map(pontoGrupo)]);
+}catch(e){console.warn('Matriz viária indisponível; usando proximidade como fallback:',e);}
+let ordem=construirOrdemIntencaoV81(validos,matriz,indices,inicio);
+ordem=refinarOrdemPorOrientacaoRuaV81(ordem,matriz,indices,inicio);
 invalidos.sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
-grupos=[...avaliados.map(x=>x.g),...invalidos];
+grupos=[...ordem,...invalidos];
 grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;});
-const longe=avaliados.filter(x=>Number.isFinite(x.distanciaMetros)&&x.distanciaMetros>250).length;
-const primeiro=grupos[0]||null,ultimo=grupos[grupos.length-1]||null;
+const ordemIndices=ordem.map(g=>indices.get(g.id));
+let metricas={duracao:null,distancia:null};
+if(matriz && ordemIndices.every(Number.isInteger)) metricas=metricasOrdemNaMatriz(ordemIndices,matriz,null);
+atualizarProgressoOtimizacao('Encaixando a nova ordem nas ruas...');
+const geometria=await geometriaRotaPelasRuasV81(ordem,inicio);
+const longe=validos.map(g=>dadosProjecaoNosTracosV81(g)).filter(x=>Number.isFinite(x.distanciaMetros)&&x.distanciaMetros>300).length;
 metaRota={
-modo:'desenho',
-provedor:null,
-criterio:'ordem_manual_pelo_traco_v8',
-distanciaMetros:null,
-duracaoSegundos:null,
-distanciaShopeeMetros:null,
-duracaoShopeeSegundos:null,
-destinoFinal:null,
-desenho:simplificarDesenhoParaStorage(pontosDesenhoRota),
-inicioDesenho:{...pontosDesenhoRota[0]},
-fimDesenho:{...pontosDesenhoRota[pontosDesenhoRota.length-1]},
-paradasCapturadas:capturasDesenhoRota.size,
-paradasLongeDoTraco:longe,
-primeiraParada:primeiro?primeiro.id:null,
-ultimaParada:ultimo?ultimo.id:null,
-atualizadoEm:Date.now()
+modo:'desenho',provedor:matriz?'OSRM_GLOBAL':'PROXIMIDADE',criterio:'intencao_manual_refinada_pelas_ruas_v8_1',
+distanciaMetros:metricas.distancia,duracaoSegundos:metricas.duracao,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,
+inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordem.length?ordem[ordem.length-1].id:null,
+geometriaRota:geometria||null,paradasCapturadas:capturasDesenhoRota.size,paradasLongeDoTraco:longe,
+organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
 };
-if(linhaDesenhoRota && mapa && mapa.hasLayer(linhaDesenhoRota)) mapa.removeLayer(linhaDesenhoRota);
-linhaDesenhoRota=null;
-salvarStorage();
+grupos.forEach(g=>g.pacotes.forEach(p=>p.organizadoCarro=false));
+limparDesenhoOtimizacao(true);
 encerrarModoDesenhoRota();
 mapaFoiEnquadrado=true;
+salvarStorage();
+fecharOverlayOtimizacao();
 renderizarTudo();
-if(longe>0) mostrarToast(`✏️ Rota aplicada. ${longe} parada(s) ficaram longe do traço — confira a numeração.`, 'alerta');
-else mostrarToast('✏️ Rota reorganizada exatamente pelo sentido do seu desenho', 'sucesso');
+if(geometria) mostrarToast('✅ Ordem aplicada e rota encaixada nas ruas', 'sucesso');
+else mostrarToast('✅ Ordem aplicada. Não consegui desenhar o caminho viário agora.', 'alerta');
 }
 
 function restaurarOrdemShopee(){
 if(!grupos.length) return;
 grupos.sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
-grupos.forEach(g=>{g.ordemOtimizada=null;});
-metaRota={modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,atualizadoEm:Date.now()};
-if(linhaDesenhoSalva && mapa && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
-linhaDesenhoSalva=null;
-removerMarcadoresInicioFimDesenho();
+grupos.forEach(g=>{g.ordemOtimizada=null;g.pacotes.forEach(p=>p.organizadoCarro=false);});
+metaRota={modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()};
+modoOrganizacaoPacotes=false;
+removerLinhaRotaGpsV81();
 salvarStorage();
 renderizarTudo();
 mostrarToast('↩️ Ordem original da Shopee restaurada', 'neutro');
@@ -2363,20 +2579,94 @@ if(marcadorFimDesenho && mapa && mapa.hasLayer(marcadorFimDesenho)) mapa.removeL
 marcadorInicioDesenho=null;marcadorFimDesenho=null;
 }
 
-function atualizarLinhaRotaManualNoMapa(){
-if(!mapa) return;
-if(linhaDesenhoSalva && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
+function removerLinhaRotaGpsV81(){
+if(linhaRotaGps && mapa && mapa.hasLayer(linhaRotaGps)) mapa.removeLayer(linhaRotaGps);
+linhaRotaGps=null;
+if(linhaDesenhoSalva && mapa && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
 linhaDesenhoSalva=null;
 removerMarcadoresInicioFimDesenho();
+}
+
+function atualizarLinhaRotaManualNoMapa(){
+if(!mapa) return;
+removerLinhaRotaGpsV81();
 if(modoDesenhoRota) return;
-if(!metaRota || metaRota.modo!=='desenho' || !Array.isArray(metaRota.desenho) || metaRota.desenho.length<2) return;
-const latlngs=metaRota.desenho.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
+if(!metaRota || metaRota.modo!=='desenho' || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
+const latlngs=metaRota.geometriaRota.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
 if(latlngs.length<2) return;
-linhaDesenhoSalva=L.polyline(latlngs,{color:'#00a7c7',weight:4,opacity:.72,dashArray:'9 7',interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
-const icIni=L.divIcon({html:'<div class="pin-inicio-desenho">▶</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+linhaRotaGps=L.polyline(latlngs,{color:'#00a7c7',weight:5,opacity:.86,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-linha'}).addTo(mapa);
+const ultima=grupos[grupos.length-1];
+if(ultima && Number.isFinite(Number(ultima.lat))&&Number.isFinite(Number(ultima.lng))){
 const icFim=L.divIcon({html:'<div class="pin-fim-desenho">🏁</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
-marcadorInicioDesenho=L.marker(latlngs[0],{icon:icIni,zIndexOffset:850,interactive:false}).addTo(mapa);
-marcadorFimDesenho=L.marker(latlngs[latlngs.length-1],{icon:icFim,zIndexOffset:850,interactive:false}).addTo(mapa);
+marcadorFimDesenho=L.marker([Number(ultima.lat),Number(ultima.lng)],{icon:icFim,zIndexOffset:850,interactive:false}).addTo(mapa);
+}
+}
+
+// ----------------------------------------------------------------------
+// V8.1 - ORGANIZAÇÃO DOS PACOTES NO CARRO (ORDEM INVERSA)
+// ----------------------------------------------------------------------
+function organizacaoPacotesDisponivel(){
+return !!(grupos.length && metaRota && metaRota.modo==='desenho' && !metaRota.organizacaoPacotesConcluida);
+}
+
+function abrirOrganizacaoPacotes(){
+if(!organizacaoPacotesDisponivel()) return;
+modoOrganizacaoPacotes=true;
+irParaAba(0);
+renderizarOrganizacaoPacotes();
+}
+
+function fecharOrganizacaoPacotes(){
+modoOrganizacaoPacotes=false;
+atualizarVisibilidadeOrganizacaoPacotes();
+}
+
+function atualizarVisibilidadeOrganizacaoPacotes(){
+const painel=document.getElementById('painelOrganizacaoPacotes');
+const lista=document.getElementById('lista');
+if(painel) painel.style.display=modoOrganizacaoPacotes?'block':'none';
+if(lista) lista.style.display=modoOrganizacaoPacotes?'none':'block';
+if(modoOrganizacaoPacotes) renderizarOrganizacaoPacotes();
+}
+
+function renderizarOrganizacaoPacotes(){
+const container=document.getElementById('listaOrganizacaoPacotes');
+if(!container) return;
+const reversa=[...grupos].reverse();
+let html='';
+for(const g of reversa){
+let linhas='';
+g.pacotes.forEach((p,idx)=>{
+const ok=!!p.organizadoCarro;
+linhas+=`<label class="organizar-pacote${ok?' info-ok':''}">
+<div class="organizar-pacote-info"><div class="organizar-pacote-codigo">${p.codigo}</div><div class="organizar-pacote-endereco">${p.endereco}</div></div>
+<input class="organizar-check" type="checkbox" ${ok?'checked':''} onchange="alternarPacoteOrganizado('${g.id}',${idx},this.checked)">
+</label>`;
+});
+html+=`<div class="organizar-parada"><div class="organizar-parada-cab">📍 Parada ${temOrdemOtimizada(g)?g.ordemOtimizada:(g.stop||'Extra')}<small>${g.endereco} · ${g.pacotes.length} pacote(s)</small></div>${linhas}</div>`;
+}
+container.innerHTML=html;
+const todos=grupos.flatMap(g=>g.pacotes),feitos=todos.filter(p=>p.organizadoCarro).length,total=todos.length;
+const pct=total?Math.round(feitos/total*100):0;
+const barra=document.getElementById('barraOrganizarPacotes');if(barra) barra.style.width=pct+'%';
+const txt=document.getElementById('textoProgressoOrganizar');if(txt) txt.textContent=`${feitos} de ${total} pacote(s) colocados no carro · ${pct}%`;
+}
+
+function alternarPacoteOrganizado(grupoId,indice,checked){
+const g=encontrarGrupo(grupoId);if(!g||!g.pacotes[indice]) return;
+g.pacotes[indice].organizadoCarro=!!checked;
+const todos=grupos.flatMap(x=>x.pacotes);
+const concluiu=todos.length>0 && todos.every(p=>p.organizadoCarro);
+if(concluiu){
+metaRota.organizacaoPacotesConcluida=true;
+modoOrganizacaoPacotes=false;
+salvarStorage();
+renderizarTudo();
+mostrarToast('✅ Carro organizado! Voltando para a ordem normal de entrega.', 'sucesso');
+return;
+}
+salvarStorage();
+renderizarOrganizacaoPacotes();
 }
 
 // ======================================================================
@@ -5849,31 +6139,35 @@ ${diferencaHtml}
 function atualizarStatusOtimizacaoRota(){
 const el = document.getElementById('statusOtimizacaoRota');
 const btnRestaurar = document.getElementById('btnRestaurarShopee');
+const btnOrganizar = document.getElementById('btnOrganizarPacotes');
 if(!el) return;
 
 if(!grupos.length){
 el.style.display='none';
 if(btnRestaurar) btnRestaurar.style.display='none';
+if(btnOrganizar) btnOrganizar.style.display='none';
 return;
 }
 
 el.style.display='block';
 const manual = metaRota && metaRota.modo === 'desenho';
 if(btnRestaurar) btnRestaurar.style.display = manual ? 'block' : 'none';
+if(btnOrganizar) btnOrganizar.style.display = (manual && !metaRota.organizacaoPacotesConcluida) ? 'block' : 'none';
 
 if(!manual){
 el.innerHTML = `
 <div class="linha-status-rota">📦 Ordem da Shopee ativa</div>
-<div>A otimização automática está desligada. Se quiser reorganizar, toque em <strong>“✏️ Desenhar otimização no mapa”</strong> e trace a rota exatamente na ordem que você faria.</div>`;
+<div>A otimização automática está desligada. Se quiser reorganizar, use <strong>“✏️ Desenhar otimização no mapa”</strong>. O desenho é opcional.</div>`;
 return;
 }
 
 const capt = Number(metaRota.paradasCapturadas || 0);
 const longe = Number(metaRota.paradasLongeDoTraco || 0);
+const temRotaViaria = Array.isArray(metaRota.geometriaRota) && metaRota.geometriaRota.length>1;
 el.innerHTML = `
-<div class="linha-status-rota">✏️ Rota organizada pelo seu desenho</div>
-<div>O primeiro ponto do traço é o início e o último é o fim. As paradas foram numeradas seguindo o progresso da linha.</div>
-<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} atravessada(s) diretamente pelo traço` : ''}${longe ? ` · ⚠️ ${longe} longe do desenho` : ''}</div>`;
+<div class="linha-status-rota">✏️ Rota manual refinada pelas ruas</div>
+<div>O início é sua localização atual. O desenho define a intenção; paradas não tocadas entram por proximidade e blocos da mesma rua podem ser invertidos para seguir o sentido mais rápido.</div>
+<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} atravessada(s) diretamente pelo desenho` : ''}${longe ? ` · ⚠️ ${longe} longe dos traços` : ''}${temRotaViaria ? ' · 🛣️ caminho encaixado nas ruas' : ''}</div>`;
 }
 
 function htmlReferenciaRota(grupo){
@@ -6275,6 +6569,7 @@ atualizarEstatisticas();
 atualizarMapa();
 renderizarOcorrencias();
 atualizarStatusOtimizacaoRota();
+atualizarVisibilidadeOrganizacaoPacotes();
 
 }
 
@@ -6761,20 +7056,22 @@ grupos.forEach((g,indice)=>{
 if(g.stopOriginal === undefined) g.stopOriginal = g.stop;
 if(g.ordemOtimizada === undefined) g.ordemOtimizada = null;
 if(!Number.isFinite(g.indiceImportacao)) g.indiceImportacao = indice;
+(g.pacotes||[]).forEach(p=>{ if(p.organizadoCarro === undefined) p.organizadoCarro = false; });
 });
 
 const metaSalva = localStorage.getItem(META_ROTA_STORAGE_KEY);
 if(metaSalva){
 try{ metaRota = JSON.parse(metaSalva); }catch(erro){}
 }
+if(metaRota && metaRota.organizacaoPacotesConcluida === undefined) metaRota.organizacaoPacotesConcluida = false;
 
-// V8.0 desativa definitivamente a otimização automática antiga. Rotas salvas
+// V8.1 desativa definitivamente a otimização automática antiga. Rotas salvas
 // pelas versões V7 voltam para a ordem da Shopee; somente um desenho manual
-// V8 é preservado ao reabrir o navegador.
+// V8.1 é preservado ao reabrir o navegador.
 if(!metaRota || metaRota.modo !== 'desenho'){
 grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
-grupos.forEach(g=>{ g.ordemOtimizada = null; });
-metaRota = {modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,atualizadoEm:Date.now()};
+grupos.forEach(g=>{ g.ordemOtimizada = null; (g.pacotes||[]).forEach(p=>p.organizadoCarro=false); });
+metaRota = {modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()};
 try{
 localStorage.setItem(CHAVE_STORAGE, JSON.stringify(grupos));
 localStorage.setItem(META_ROTA_STORAGE_KEY, JSON.stringify(metaRota));
