@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.6</title>
+<title>Copiloto Entregas V7.7</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.6</div>
+<div class="versao-copiloto">Copiloto V7.7</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1492,7 +1492,7 @@ Importar Rota
 <span class="icone-opcao">⚖️</span>
 <span>
 <div class="titulo-opcao">Rota mais otimizada</div>
-<div class="desc-opcao">Começa da sua localização atual e equilibra tempo + quilômetros, respeitando os caminhos e sentidos das vias.</div>
+<div class="desc-opcao">Começa da sua localização atual e prioriza o menor tempo pelas vias; quilômetros entram como critério secundário.</div>
 </span>
 </button>
 
@@ -2791,8 +2791,10 @@ const tempo = valorMatriz(resultado.duracoes, origem, destino);
 const distancia = valorMatriz(resultado.distancias, origem, destino);
 if(!Number.isFinite(tempo) || !Number.isFinite(distancia)) return Infinity;
 
-// Critério final da V7.5: peso IGUAL para tempo e quilômetros.
-return 0.5 * (tempo / norm.tempo) + 0.5 * (distancia / norm.distancia);
+// V7.7: tempo é o objetivo dominante. Distância continua importante, mas
+// entra como critério secundário para reduzir combustível sem sacrificar
+// significativamente a velocidade da rota.
+return 0.90 * (tempo / norm.tempo) + 0.10 * (distancia / norm.distancia);
 }
 
 // Consulta a matriz GLOBAL em blocos técnicos. Os blocos existem apenas para
@@ -3521,7 +3523,7 @@ A rota desenhada pelo usuário em verde serve como princípio geométrico:
   incluí-la não criar desvio viário relevante, atendê-la naquele momento;
 - manter ponto inicial, ponto final, mão única/retornos e custo direcional;
 - janelas HARD continuam acima do scanner quando existirem dados reais;
-- tempo + quilômetros continuam com peso igual na escolha final.
+- tempo pelas vias é prioridade; quilômetros entram em segundo lugar;
 
 A V7.5 foi preservada separadamente para rollback caso este modelo não se
 comporte melhor em rotas reais.
@@ -3870,7 +3872,7 @@ for(const c of candidatas){
 const capt=capturarParadasNoCaminhoScanner(c,resultado,norm,validos);
 const custo=custoSequenciaScanner(capt,atual,alvosSaida,resultado,norm);
 const continuidade=penalidadeContinuidadeScanner(capt,validos);
-const score=custo*(1+Math.min(.20,continuidade*.04));
+const score=custo*(1+Math.min(.06,continuidade*.015));
 if(!melhor||score<melhor.score) melhor={seq:capt,score};
 }
 return melhor?melhor.seq:[...zona.membros];
@@ -3918,15 +3920,25 @@ const factiveis=avaliadas.filter(a=>a.janelas.violacoesHard.length===0&&metricas
 const base=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
 if(!base.length) return {melhor:null,avaliadas,referencia:null};
 const referencia=referenciaEquilibrio(base);
+
+// V7.7 - seleção hierárquica:
+// 1) encontra o menor tempo estimado entre as rotas válidas;
+// 2) aceita como equivalentes apenas rotas até 3% mais lentas;
+// 3) dentro desse pequeno intervalo, escolhe a menor quilometragem;
+// 4) continuidade do Scanner funciona só como desempate leve.
+const menorTempo=Math.min(...base.map(a=>a.metricas.duracao));
+const faixaTempo=base.filter(a=>a.metricas.duracao<=menorTempo*1.03);
 let melhor=null;
-for(const a of base){
-let score=pontuacaoEquilibrada(a.metricas,referencia);
-if(a.janelas.violacoesHard.length) score+=1000+a.janelas.atrasoHardMin*10;
-score+=PESO_SOFT_SECUNDARIO*(a.janelas.penalidadeSoftMin/Math.max(1,a.metricas.duracao/60));
-// Continuidade é uma regra operacional forte, porém limitada para não anular
-// totalmente tempo + km. Scanner ruim perde para scanner contínuo.
-score+=Math.min(.28,a.continuidade*.055);
-if(!melhor||score<melhor.score) melhor={...a,score};
+for(const a of faixaTempo){
+let scoreDist=a.metricas.distancia/Math.max(1,referencia.menorDistancia);
+if(a.janelas.violacoesHard.length) scoreDist+=1000+a.janelas.atrasoHardMin*10;
+scoreDist+=PESO_SOFT_SECUNDARIO*(a.janelas.penalidadeSoftMin/Math.max(1,a.metricas.duracao/60));
+scoreDist+=Math.min(.05,a.continuidade*.012);
+if(!melhor ||
+   scoreDist<melhor.score-0.0001 ||
+   (Math.abs(scoreDist-melhor.score)<=0.0001 && a.metricas.duracao<melhor.metricas.duracao)){
+melhor={...a,score:scoreDist};
+}
 }
 return {melhor,avaliadas,referencia};
 }
@@ -3983,9 +3995,9 @@ if(!metricasRotaValidas(metricas) || !referencia) return Infinity;
 const tempoRel = metricas.duracao / Math.max(1, referencia.menorTempo);
 const distanciaRel = metricas.distancia / Math.max(1, referencia.menorDistancia);
 
-// Mesmo peso para os dois objetivos. Uma rota que economiza muito tempo mas
-// desperdiça muitos quilômetros (ou o contrário) perde para uma mais equilibrada.
-return 0.5 * tempoRel + 0.5 * distanciaRel;
+// V7.7: prioridade explícita para tempo. A distância serve para desempatar
+// e evitar quilômetros inúteis quando duas rotas têm tempos parecidos.
+return 0.90 * tempoRel + 0.10 * distanciaRel;
 }
 
 async function avaliarCandidatasPelasVias(candidatas, inicio, destino){
@@ -4102,7 +4114,7 @@ metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegun
 mostrarToast('⚠️ Sem matriz viária completa; mantive a varredura scanner no fallback', 'alerta');
 }
 
-atualizarProgressoOtimizacao('Validando o melhor equilíbrio entre tempo e quilômetros...');
+atualizarProgressoOtimizacao('Validando a rota mais rápida e, depois, a menor quilometragem...');
 if(!metricasRotaValidas(metricasMelhor)){
 metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
@@ -4120,7 +4132,7 @@ atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...
 metaRota = {
 modo,
 provedor:(matrizGlobal && matrizGlobal.provedor) ? matrizGlobal.provedor : 'OSRM',
-criterio:'v7_6_scanner_serpentina_captura_caminho_hard_tempo_distancia',
+criterio:'v7_7_scanner_prioridade_tempo_depois_distancia',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -4134,7 +4146,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Rota otimizada em varredura por tempo + quilômetros', 'sucesso');
+mostrarToast('⚡ Rota otimizada: tempo primeiro, quilômetros depois', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
@@ -4221,7 +4233,7 @@ return `
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota usa varredura tipo scanner: fecha faixas/ruas próximas antes de avançar, evitando passar perto de entregas para depois voltar.</div>
+<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota prioriza o menor tempo pelas vias; quando os tempos são próximos, prefere a menor quilometragem. O Scanner organiza faixas/ruas sem se sobrepor ao custo real de deslocamento.</div>
 </div>`;
 }
 
