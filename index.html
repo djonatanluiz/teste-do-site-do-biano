@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.9</title>
+<title>Copiloto Entregas V7.10</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.9</div>
+<div class="versao-copiloto">Copiloto V7.10</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -4584,6 +4584,408 @@ faixaTempo.sort((a,b)=>
 return {melhor:faixaTempo[0]||null,avaliadas};
 }
 
+
+
+// ----------------------------------------------------------------------
+// V7.10 - SCANNER POR FRONTEIRA + CHECAGEM DO CAMINHO REAL
+// ----------------------------------------------------------------------
+/*
+REFERÊNCIA APRENDIDA COM O TRAÇADO MANUAL DO USUÁRIO
+
+O traçado manual mostrou que uma rota operacionalmente boa tem uma "frente"
+contínua de varredura. Ela não escolhe apenas o próximo ponto barato:
+- fecha a área/corredor em que já entrou antes de abandonar a região;
+- evita cruzar a própria rota e reentrar em células já atendidas;
+- evita saltar por cima de entregas que estão literalmente no caminho;
+- aceita um pequeno custo local quando isso elimina uma volta grande depois;
+- usa início e destino final como âncoras do movimento global;
+- janelas HARD continuam acima de qualquer regra geométrica;
+- depois da estrutura, TEMPO é prioridade e KM é desempate.
+
+A implementação abaixo NÃO copia uma sequência específica. Ela transforma
+esse comportamento em regras gerais para qualquer rota.
+*/
+
+const V710_BEAM_LARGURA = 30;
+const V710_BEAM_RAMIFICACAO = 8;
+const V710_RAIO_LOCAL = 240;
+const V710_RAIO_PASSAGEM_RETA = 95;
+const V710_SALTO_SAIDA_AREA = 420;
+const V710_CELULA = 300;
+const V710_RAIO_PASSAGEM_VIA_REAL = 55;
+
+function contextoGeometricoV710(validos,inicio,destino,indiceDestinoFinal){
+const refs=[];
+if(inicio&&pontoValido(inicio)) refs.push({i:0,lat:Number(inicio.lat),lng:Number(inicio.lng)});
+validos.forEach((g,k)=>refs.push({i:k+1,lat:Number(g.lat),lng:Number(g.lng)}));
+if(Number.isInteger(indiceDestinoFinal)&&destino&&pontoValido(destino)) refs.push({i:indiceDestinoFinal,lat:Number(destino.lat),lng:Number(destino.lng)});
+let refLat=0,refLng=0;
+refs.forEach(p=>{refLat+=p.lat;refLng+=p.lng;});
+refLat/=Math.max(1,refs.length);refLng/=Math.max(1,refs.length);
+const cos=Math.cos(refLat*Math.PI/180);
+const map=new Map();
+refs.forEach(p=>map.set(p.i,{x:(p.lng-refLng)*111320*cos,y:(p.lat-refLat)*111320,lat:p.lat,lng:p.lng}));
+
+// Eixo principal apenas para organizar células. A decisão da rota não fica
+// presa a esse eixo; ele serve para detectar reentrada em áreas já varridas.
+const membros=validos.map((_,i)=>i+1);
+let angulo=anguloPcaScanner(membros,validos);
+if(destino&&pontoValido(destino)&&inicio&&pontoValido(inicio)){
+const a=map.get(0),b=map.get(indiceDestinoFinal);
+if(a&&b&&Math.hypot(b.x-a.x,b.y-a.y)>300) angulo=normalizarAnguloScanner(Math.atan2(b.y-a.y,b.x-a.x));
+}
+return {map,angulo};
+}
+
+function chaveCelulaV710(indice,ctx){
+const p=ctx.map.get(indice);if(!p) return 'x';
+const ca=Math.cos(ctx.angulo),sa=Math.sin(ctx.angulo);
+const s=p.x*ca+p.y*sa,t=-p.x*sa+p.y*ca;
+return Math.floor(s/V710_CELULA)+':'+Math.floor(t/V710_CELULA);
+}
+
+function orientacaoTriplaV710(a,b,c,ctx){
+const A=ctx.map.get(a),B=ctx.map.get(b),C=ctx.map.get(c);
+if(!A||!B||!C) return 0;
+const ux=B.x-A.x,uy=B.y-A.y,vx=C.x-B.x,vy=C.y-B.y;
+const nu=Math.hypot(ux,uy),nv=Math.hypot(vx,vy);
+if(nu<1||nv<1) return 0;
+const dot=Math.max(-1,Math.min(1,(ux*vx+uy*vy)/(nu*nv)));
+return Math.acos(dot); // 0 = reto; PI = retorno
+}
+
+function segmentosCruzamV710(a,b,c,d){
+function ori(p,q,r){return (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);}
+const o1=ori(a,b,c),o2=ori(a,b,d),o3=ori(c,d,a),o4=ori(c,d,b);
+return ((o1>0&&o2<0)||(o1<0&&o2>0))&&((o3>0&&o4<0)||(o3<0&&o4>0));
+}
+
+function cruzamentosNovoTrechoV710(rota,candidato,ctx){
+const caminho=[0,...rota];
+if(caminho.length<3) return 0;
+const atual=caminho[caminho.length-1];
+const A=ctx.map.get(atual),B=ctx.map.get(candidato);
+if(!A||!B) return 0;
+let n=0;
+// Não compara com o último segmento, pois compartilha o vértice atual.
+for(let i=1;i<caminho.length-1;i++){
+const C=ctx.map.get(caminho[i-1]),D=ctx.map.get(caminho[i]);
+if(C&&D&&segmentosCruzamV710(A,B,C,D)) n++;
+}
+return n;
+}
+
+function distanciaGeoContextoV710(a,b,ctx){
+const A=ctx.map.get(a),B=ctx.map.get(b);
+return A&&B?Math.hypot(A.x-B.x,A.y-B.y):Infinity;
+}
+
+function distanciaPontoSegmentoCtxV710(p,a,b){
+const vx=b.x-a.x,vy=b.y-a.y,wx=p.x-a.x,wy=p.y-a.y;
+const vv=vx*vx+vy*vy;
+const t=vv>0?Math.max(0,Math.min(1,(wx*vx+wy*vy)/vv)):0;
+const qx=a.x+t*vx,qy=a.y+t*vy;
+return {dist:Math.hypot(p.x-qx,p.y-qy),t};
+}
+
+function incrementoEstruturalV710(estado,cand,resultado,norm,ctx,indiceDestinoFinal){
+const atual=estado.atual;
+const A=ctx.map.get(atual),B=ctx.map.get(cand);
+if(!A||!B) return 0;
+let penal=0;
+const distCand=Math.hypot(B.x-A.x,B.y-A.y);
+
+// 1) Não abandonar a frente local quando ainda existem entregas acessíveis.
+let melhorLocal=Infinity;
+let locais=0;
+for(const r of estado.restantes){
+if(r===cand) continue;
+const geo=distanciaGeoContextoV710(atual,r,ctx);
+const t=valorMatriz(resultado.duracoes,atual,r);
+if(geo<=V710_RAIO_LOCAL && Number.isFinite(t) && t<=300){
+locais++; if(geo<melhorLocal) melhorLocal=geo;
+}
+}
+if(locais>0 && distCand>V710_SALTO_SAIDA_AREA){
+penal += 5 + Math.min(5,distCand/350);
+}
+
+// 2) Se o novo trecho passa praticamente por cima de outra entrega futura,
+// deixar essa entrega para depois recebe uma penalidade forte.
+for(const r of estado.restantes){
+if(r===cand) continue;
+const P=ctx.map.get(r);if(!P) continue;
+const seg=distanciaPontoSegmentoCtxV710(P,A,B);
+if(seg.dist<=V710_RAIO_PASSAGEM_RETA && seg.t>=.05 && seg.t<=.96){
+penal += 3.4*(1-seg.dist/V710_RAIO_PASSAGEM_RETA);
+}
+}
+
+// 3) Cruzar a própria rota é um forte sinal de reentrada/zigue-zague.
+penal += cruzamentosNovoTrechoV710(estado.rota,cand,ctx)*7.5;
+
+// 4) Retornos bruscos são permitidos em cul-de-sac, mas custam caro.
+if(estado.rota.length>=1){
+const anterior=estado.rota.length>=2?estado.rota[estado.rota.length-2]:0;
+const ang=orientacaoTriplaV710(anterior,atual,cand,ctx);
+if(ang>2.45) penal += (ang-2.45)*1.6; // ~140 graus
+}
+
+// 5) Reentrar numa célula já abandonada indica que a varredura não fechou.
+const cel=chaveCelulaV710(cand,ctx);
+const celAtual=chaveCelulaV710(atual,ctx);
+if(cel!==celAtual && estado.celulas.has(cel)) penal += 2.7;
+
+// 6) Com destino final fixo, evita chegar muito perto dele cedo e sair de novo.
+if(Number.isInteger(indiceDestinoFinal) && estado.restantes.length>Math.max(4,Math.floor((estado.total||1)*.30))){
+const td=valorMatriz(resultado.duracoes,cand,indiceDestinoFinal);
+const tempos=estado.restantes.filter(x=>x!==cand).map(x=>valorMatriz(resultado.duracoes,x,indiceDestinoFinal)).filter(Number.isFinite).sort((a,b)=>a-b);
+if(Number.isFinite(td)&&tempos.length){
+const q=Math.max(0,Math.floor(tempos.length*.20)-1);
+if(td<=tempos[q]) penal+=1.4;
+}
+}
+return penal;
+}
+
+function poolCandidatosV710(estado,resultado,norm,ctx){
+const infos=estado.restantes.map(i=>{
+const t=valorMatriz(resultado.duracoes,estado.atual,i);
+const d=valorMatriz(resultado.distancias,estado.atual,i);
+const geo=distanciaGeoContextoV710(estado.atual,i,ctx);
+const score=(Number.isFinite(t)?t/norm.tempo:999)+(Number.isFinite(d)?.10*d/norm.distancia:99)+Math.min(2,geo/2500);
+return {i,t,d,geo,score};
+}).filter(x=>Number.isFinite(x.t)&&Number.isFinite(x.d));
+infos.sort((a,b)=>a.score-b.score);
+const ids=new Set(infos.slice(0,V710_BEAM_RAMIFICACAO).map(x=>x.i));
+// Entregas locais sempre entram no conjunto de decisão, mesmo que o tempo
+// instantâneo pareça um pouco pior por causa de mão única/retorno.
+infos.filter(x=>x.geo<=V710_RAIO_LOCAL).slice(0,6).forEach(x=>ids.add(x.i));
+return [...ids].slice(0,V710_BEAM_RAMIFICACAO+4);
+}
+
+function construirFronteiraV710(validos,resultado,indiceDestinoFinal,inicio,destino,config){
+const norm=normalizadoresMatriz(resultado);
+const ctx=contextoGeometricoV710(validos,inicio,destino,indiceDestinoFinal);
+const todos=validos.map((_,i)=>i+1);
+let estados=[{rota:[],restantes:[...todos],atual:0,estrutural:0,tempo:0,dist:0,celulas:new Set(),total:todos.length,rank:0}];
+
+for(let profundidade=0;profundidade<todos.length;profundidade++){
+const exp=[];
+for(const estado of estados){
+const pool=poolCandidatosV710(estado,resultado,norm,ctx);
+for(const cand of pool){
+const t=valorMatriz(resultado.duracoes,estado.atual,cand);
+const d=valorMatriz(resultado.distancias,estado.atual,cand);
+if(!Number.isFinite(t)||!Number.isFinite(d)) continue;
+const inc=incrementoEstruturalV710(estado,cand,resultado,norm,ctx,indiceDestinoFinal)*(config?.rigor??1);
+const restantes=estado.restantes.filter(x=>x!==cand);
+const rota=[...estado.rota,cand];
+const celulas=new Set(estado.celulas);celulas.add(chaveCelulaV710(cand,ctx));
+const estrutural=estado.estrutural+inc;
+const tempo=estado.tempo+t,dist=estado.dist+d;
+let look=0;
+if(restantes.length){
+let melhor=Infinity;
+for(const r of restantes){const x=valorMatriz(resultado.duracoes,cand,r);if(x<melhor) melhor=x;}
+if(Number.isFinite(melhor)) look=melhor/norm.tempo;
+}else if(Number.isInteger(indiceDestinoFinal)){
+const x=valorMatriz(resultado.duracoes,cand,indiceDestinoFinal);if(Number.isFinite(x)) look=x/norm.tempo;
+}
+const rank=estrutural*100 + tempo/norm.tempo + .10*dist/norm.distancia + .22*look;
+exp.push({rota,restantes,atual:cand,estrutural,tempo,dist,celulas,total:estado.total,rank});
+}
+}
+if(!exp.length) break;
+exp.sort((a,b)=>a.rank-b.rank || a.tempo-b.tempo || a.dist-b.dist);
+// Remove estados equivalentes grosseiros (mesmo último ponto + mesmo conjunto
+// restante) para gastar o beam com caminhos realmente diferentes.
+const unicos=[],vistas=new Set();
+for(const e of exp){
+const sig=e.atual+'|'+e.restantes.join(',');
+if(vistas.has(sig)) continue;
+vistas.add(sig);unicos.push(e);
+if(unicos.length>=V710_BEAM_LARGURA) break;
+}
+estados=unicos;
+}
+
+const completos=estados.filter(e=>e.rota.length===todos.length);
+if(!completos.length) return null;
+completos.forEach(e=>{
+if(Number.isInteger(indiceDestinoFinal)){
+const t=valorMatriz(resultado.duracoes,e.atual,indiceDestinoFinal);
+const d=valorMatriz(resultado.distancias,e.atual,indiceDestinoFinal);
+if(Number.isFinite(t)) e.tempo+=t;if(Number.isFinite(d)) e.dist+=d;
+}
+e.rank=e.estrutural*100+e.tempo/norm.tempo+.10*e.dist/norm.distancia;
+});
+completos.sort((a,b)=>a.rank-b.rank||a.tempo-b.tempo||a.dist-b.dist);
+return completos[0].rota;
+}
+
+function penalidadeCruzamentosV710(ordem,validos,inicio,destino,indiceDestinoFinal){
+const ctx=contextoGeometricoV710(validos,inicio,destino,indiceDestinoFinal);
+const caminho=[0,...ordem];
+let n=0;
+for(let i=1;i<caminho.length;i++){
+const A=ctx.map.get(caminho[i-1]),B=ctx.map.get(caminho[i]);if(!A||!B) continue;
+for(let j=1;j<i-1;j++){
+const C=ctx.map.get(caminho[j-1]),D=ctx.map.get(caminho[j]);
+if(C&&D&&segmentosCruzamV710(A,B,C,D)) n++;
+}
+}
+return n;
+}
+
+function penalidadeReentradaCelulasV710(ordem,validos,inicio,destino,indiceDestinoFinal){
+const ctx=contextoGeometricoV710(validos,inicio,destino,indiceDestinoFinal);
+const vistas=new Set();let atual=chaveCelulaV710(0,ctx),penal=0;
+if(atual!=='x') vistas.add(atual);
+for(const idx of ordem){
+const c=chaveCelulaV710(idx,ctx);
+if(c!==atual){if(vistas.has(c)) penal+=1;vistas.add(c);atual=c;}
+}
+return penal;
+}
+
+function penalidadeRetornosV710(ordem,validos,inicio,destino,indiceDestinoFinal){
+const ctx=contextoGeometricoV710(validos,inicio,destino,indiceDestinoFinal);
+const caminho=[0,...ordem];let p=0;
+for(let i=2;i<caminho.length;i++){
+const a=orientacaoTriplaV710(caminho[i-2],caminho[i-1],caminho[i],ctx);
+if(a>2.55) p+=(a-2.55);
+}
+return p;
+}
+
+function penalidadeEstruturalScannerV710(ordem,validos,inicio,destino,indiceDestinoFinal){
+return penalidadeEstruturalScannerV79(ordem,validos)
++ penalidadeCruzamentosV710(ordem,validos,inicio,destino,indiceDestinoFinal)*5.5
++ penalidadeReentradaCelulasV710(ordem,validos,inicio,destino,indiceDestinoFinal)*2.8
++ penalidadeRetornosV710(ordem,validos,inicio,destino,indiceDestinoFinal)*1.2;
+}
+
+function gerarCandidatasScannerAprendidoV710(validos,resultado,indiceDestinoFinal,inicio,destino){
+const candidatas=[],vistas=new Set();
+function add(nome,seq){
+if(!seq||seq.length!==validos.length) return;
+let s=capturarParadasNoCaminhoScannerV79(seq,resultado,validos);
+s=repararJanelasHardV75(s,resultado,validos);
+const sig=s.join('>');if(!sig||vistas.has(sig)) return;
+vistas.add(sig);candidatas.push({nome,ordemIndices:s});
+}
+
+// Mantém os scanners geométricos da V7.9 como alternativas válidas.
+const antigas=gerarCandidatasScannerPrincipalV79(validos,resultado,indiceDestinoFinal);
+(antigas.candidatas||[]).forEach(c=>add('scanner-v79-'+c.nome,c.ordemIndices));
+
+// Duas variações de "fronteira" aprendidas com o traçado manual. A rígida
+// fecha mais a área; a flexível permite que a matriz viária quebre a frente
+// quando há ganho real de tempo.
+const estrita=construirFronteiraV710(validos,resultado,indiceDestinoFinal,inicio,destino,{rigor:1.20});
+const flexivel=construirFronteiraV710(validos,resultado,indiceDestinoFinal,inicio,destino,{rigor:.88});
+add('fronteira-estrita',estrita);
+add('fronteira-flexivel',flexivel);
+return {candidatas};
+}
+
+function escolherMelhorScannerAprendidoV710(candidatas,resultado,indiceDestinoFinal,validos,inicio,destino){
+const avaliadas=candidatas.map(c=>{
+const janelas=avaliarJanelasRotaV75(c.ordemIndices,resultado,validos);
+const metricas=metricasOperacionaisMatrizV75(c.ordemIndices,resultado,indiceDestinoFinal,validos);
+const estrutural=penalidadeEstruturalScannerV710(c.ordemIndices,validos,inicio,destino,indiceDestinoFinal);
+return {...c,janelas,metricas,estrutural};
+});
+const factiveis=avaliadas.filter(a=>a.janelas.violacoesHard.length===0&&metricasRotaValidas(a.metricas));
+const base=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
+if(!base.length) return {melhor:null,avaliadas};
+
+// A estrutura aprendida vem primeiro. Entre rotas estruturalmente parecidas,
+// tempo decide. Quilometragem decide o empate final.
+const minEstr=Math.min(...base.map(a=>a.estrutural));
+const tol=Math.max(.22,minEstr*.07);
+const boas=base.filter(a=>a.estrutural<=minEstr+tol);
+const minTempo=Math.min(...boas.map(a=>a.metricas.duracao));
+const rapidas=boas.filter(a=>a.metricas.duracao<=minTempo*1.03);
+rapidas.sort((a,b)=>a.metricas.distancia-b.metricas.distancia || a.metricas.duracao-b.metricas.duracao || a.estrutural-b.estrutural);
+return {melhor:rapidas[0]||null,avaliadas};
+}
+
+async function consultarPernasRotaOSRMV710(ordem,inicio,destino){
+const pontos=[inicio,...ordem.map(pontoGrupo)];if(destino) pontos.push(destino);
+const pernas=[];const MAX=28;
+for(let base=0;base<pontos.length-1;base+=MAX-1){
+const parte=pontos.slice(base,Math.min(pontos.length,base+MAX));
+if(parte.length<2) break;
+const url=`https://router.project-osrm.org/route/v1/driving/${stringCoordenadas(parte)}?overview=false&steps=true&geometries=geojson`;
+const r=await fetch(url);if(!r.ok) throw new Error('OSRM_GEOM_'+r.status);
+const d=await r.json();const rota=d.routes&&d.routes[0];if(!rota||!Array.isArray(rota.legs)) throw new Error('OSRM_GEOM_INVALIDA');
+for(const leg of rota.legs){
+const coords=[];
+for(const st of (leg.steps||[])){
+const arr=st.geometry&&st.geometry.coordinates;
+if(Array.isArray(arr)) arr.forEach(c=>{if(Array.isArray(c)&&c.length>=2) coords.push({lat:Number(c[1]),lng:Number(c[0])});});
+}
+pernas.push(coords);
+}
+if(base+MAX-1<pontos.length-1) await esperar(120);
+}
+return pernas;
+}
+
+function distanciaPontoPolilinhaV710(ponto,linha){
+if(!ponto||!Array.isArray(linha)||linha.length<2) return Infinity;
+const lat=Number(ponto.lat),lng=Number(ponto.lng),cos=Math.cos(lat*Math.PI/180);
+let melhor=Infinity;
+for(let i=1;i<linha.length;i++){
+const a=linha[i-1],b=linha[i];
+const A={x:(a.lng-lng)*111320*cos,y:(a.lat-lat)*111320};
+const B={x:(b.lng-lng)*111320*cos,y:(b.lat-lat)*111320};
+const P={x:0,y:0};
+const x=distanciaPontoSegmentoCtxV710(P,A,B).dist;if(x<melhor) melhor=x;
+}
+return melhor;
+}
+
+async function repararPassagensReaisV710(ordemInicial,inicio,destino,resultado,validos,indiceDestinoFinal){
+let ordem=[...ordemInicial];
+const idIndice=new Map(validos.map((g,i)=>[g.id,i+1]));
+for(let passada=0;passada<3;passada++){
+let pernas;
+try{pernas=await consultarPernasRotaOSRMV710(ordem,inicio,destino);}catch(e){console.warn('Checagem de caminho real indisponível:',e);break;}
+let melhorMov=null;
+// Perna 0 = início -> ordem[0]; perna k = ordem[k-1] -> ordem[k].
+for(let k=0;k<Math.min(pernas.length,ordem.length);k++){
+const origemIdx=k===0?0:idIndice.get(ordem[k-1].id);
+const destinoIdx=idIndice.get(ordem[k].id);
+if(!Number.isInteger(destinoIdx)) continue;
+const tAB=valorMatriz(resultado.duracoes,origemIdx,destinoIdx);
+const dAB=valorMatriz(resultado.distancias,origemIdx,destinoIdx);
+if(!Number.isFinite(tAB)||!Number.isFinite(dAB)) continue;
+for(let j=k+1;j<ordem.length;j++){
+const cand=ordem[j];const perto=distanciaPontoPolilinhaV710(cand,pernas[k]);
+if(perto>V710_RAIO_PASSAGEM_VIA_REAL) continue;
+const ci=idIndice.get(cand.id);if(!Number.isInteger(ci)) continue;
+const t1=valorMatriz(resultado.duracoes,origemIdx,ci),t2=valorMatriz(resultado.duracoes,ci,destinoIdx);
+const d1=valorMatriz(resultado.distancias,origemIdx,ci),d2=valorMatriz(resultado.distancias,ci,destinoIdx);
+if(![t1,t2,d1,d2].every(Number.isFinite)) continue;
+const extraT=t1+t2-tAB,extraD=d1+d2-dAB;
+if(extraT>Math.max(85,tAB*.38)||extraD>Math.max(500,dAB*.40)) continue;
+const score=perto+Math.max(0,extraT)*.55+Math.max(0,extraD)/22;
+if(!melhorMov||score<melhorMov.score) melhorMov={de:j,para:k,score};
+}
+}
+if(!melhorMov) break;
+const [g]=ordem.splice(melhorMov.de,1);ordem.splice(melhorMov.para,0,g);
+}
+// A checagem real só move entregas para MAIS CEDO. Mesmo assim, reaplica
+// eventual janela hard antes de devolver a ordem.
+let indices=ordem.map(g=>idIndice.get(g.id)).filter(Number.isInteger);
+indices=repararJanelasHardV75(indices,resultado,validos);
+return indices.map(i=>validos[i-1]);
+}
+
 async function consultarTrechoDirectionsOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
@@ -4710,14 +5112,27 @@ try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
 atualizarProgressoOtimizacao('Varrendo a rota em formato Scanner e eliminando retornos...');
-const geradasScanner = gerarCandidatasScannerPrincipalV79(validos, matrizGlobal, indiceDestinoFinal);
-const escolhaGlobal = escolherMelhorScannerPrincipalV79(geradasScanner.candidatas, matrizGlobal, indiceDestinoFinal, validos);
+const geradasScanner = gerarCandidatasScannerAprendidoV710(validos, matrizGlobal, indiceDestinoFinal, inicio, destino);
+const escolhaGlobal = escolherMelhorScannerAprendidoV710(geradasScanner.candidatas, matrizGlobal, indiceDestinoFinal, validos, inicio, destino);
 avaliacoes = escolhaGlobal.avaliadas || [];
 
 if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
 
 ordem = escolhaGlobal.melhor.ordemIndices.map(i=>validos[i-1]);
 metricasMelhor = escolhaGlobal.melhor.metricas;
+
+// Segunda passagem: olha o CAMINHO REAL das ruas. Se a rota literalmente
+// passa ao lado de uma entrega que ficou para depois, tenta atendê-la agora.
+atualizarProgressoOtimizacao('Conferindo se a rota passa por entregas que ficaram para trás...');
+try{
+const reparada = await repararPassagensReaisV710(ordem, inicio, destino, matrizGlobal, validos, indiceDestinoFinal);
+if(reparada && reparada.length===ordem.length){
+ordem = reparada;
+const idParaIndiceReparo = new Map(validos.map((g,i)=>[g.id,i+1]));
+const idxReparo = ordem.map(g=>idParaIndiceReparo.get(g.id)).filter(Number.isInteger);
+metricasMelhor = metricasOperacionaisMatrizV75(idxReparo, matrizGlobal, indiceDestinoFinal, validos);
+}
+}catch(erroReparo){ console.warn('Checagem final do caminho real não pôde ser aplicada:', erroReparo); }
 
 if(escolhaGlobal.melhor.janelas && escolhaGlobal.melhor.janelas.violacoesHard.length){
 mostrarToast('⚠️ Nenhuma sequência conseguiu cumprir todos os horários limite', 'alerta');
@@ -4738,9 +5153,9 @@ const pontosFallback=[inicio,...validos.map(pontoGrupo)];
 if(destino) pontosFallback.push(destino);
 const distFallback=matrizDistanciaGeografica(pontosFallback);
 const durFallback=distFallback.map(l=>l.map(m=>Number.isFinite(m)?m/(30000/3600):Infinity));
-matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_SCANNER_V79'};
-const geradasFallback=gerarCandidatasScannerPrincipalV79(validos,matrizGlobal,indiceDestinoFinal);
-const escolhaFallback=escolherMelhorScannerPrincipalV79(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos);
+matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_SCANNER_V710'};
+const geradasFallback=gerarCandidatasScannerAprendidoV710(validos,matrizGlobal,indiceDestinoFinal,inicio,destino);
+const escolhaFallback=escolherMelhorScannerAprendidoV710(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos,inicio,destino);
 if(!escolhaFallback.melhor) throw erroGlobal;
 ordem=escolhaFallback.melhor.ordemIndices.map(i=>validos[i-1]);
 avaliacoes=escolhaFallback.avaliadas || [];
@@ -4752,10 +5167,10 @@ metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
 if(metricasRotaValidas(metricasShopee)){
 metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 }
-mostrarToast('⚠️ Sem matriz viária completa; mantive o Scanner usando geometria', 'alerta');
+mostrarToast('⚠️ Sem matriz viária completa; mantive o Scanner por Fronteira usando geometria', 'alerta');
 }
 
-atualizarProgressoOtimizacao('Validando primeiro a varredura, depois tempo e quilômetros...');
+atualizarProgressoOtimizacao('Validando varredura, caminho real, tempo e quilômetros...');
 if(!metricasRotaValidas(metricasMelhor)){
 metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
