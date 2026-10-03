@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.5</title>
+<title>Copiloto Entregas V7.6</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -892,7 +892,7 @@ margin-top:14px;
 
 
 /* ====================================================================== */
-/* V7.5 - OTIMIZAÇÃO OPERACIONAL POR MICRO-REGIÃO + RUAS                 */
+/* V7.6 - OTIMIZAÇÃO EM VARREDURA (SCANNER / SERPENTINA)                */
 /* ====================================================================== */
 
 .config-otimizacao-btn{
@@ -1374,7 +1374,7 @@ Importar Rota
 </button>
 
 <button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.5</div>
+<div class="versao-copiloto">Copiloto V7.6</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -3505,6 +3505,432 @@ if(!melhor || score<melhor.score) melhor={...a,score};
 return {melhor,avaliadas,referencia};
 }
 
+
+// ----------------------------------------------------------------------
+// V7.6 - MODELO SCANNER / SERPENTINA
+// ----------------------------------------------------------------------
+/*
+REFERÊNCIA DE COMPORTAMENTO V7.6
+
+A rota desenhada pelo usuário em verde serve como princípio geométrico:
+- evitar saltos entre pontos que fazem o motorista cruzar a mesma área várias vezes;
+- "varrer" uma região como a cabeça de uma impressora;
+- fechar uma faixa/rua antes de passar para a próxima faixa paralela;
+- alternar o sentido das faixas (serpentina) quando isso reduz retornos;
+- se uma parada futura estiver praticamente no caminho entre duas paradas e
+  incluí-la não criar desvio viário relevante, atendê-la naquele momento;
+- manter ponto inicial, ponto final, mão única/retornos e custo direcional;
+- janelas HARD continuam acima do scanner quando existirem dados reais;
+- tempo + quilômetros continuam com peso igual na escolha final.
+
+A V7.5 foi preservada separadamente para rollback caso este modelo não se
+comporte melhor em rotas reais.
+*/
+
+const RAIO_ZONA_SCANNER_METROS = 760;
+const DIAMETRO_MAX_ZONA_SCANNER_METROS = 1900;
+const LARGURAS_FAIXA_SCANNER = [55, 80, 115, 155];
+const RAIO_CAPTURA_CAMINHO_METROS = 70;
+const FATOR_MAX_DESVIO_CAPTURA = 1.28;
+
+function normalizarAnguloScanner(a){
+let x=a % Math.PI;
+if(x<0) x+=Math.PI;
+return x;
+}
+
+function diferencaAngularScanner(a,b){
+const x=Math.abs(normalizarAnguloScanner(a)-normalizarAnguloScanner(b));
+return Math.min(x,Math.PI-x);
+}
+
+function coordsLocaisScanner(indices,validos){
+if(!indices.length) return {map:new Map(),refLat:0,refLng:0};
+let refLat=0,refLng=0;
+indices.forEach(i=>{
+const g=grupoPorIndiceMatriz(i,validos);
+refLat+=Number(g.lat); refLng+=Number(g.lng);
+});
+refLat/=indices.length; refLng/=indices.length;
+const cos=Math.cos(refLat*Math.PI/180);
+const map=new Map();
+indices.forEach(i=>{
+const g=grupoPorIndiceMatriz(i,validos);
+const x=(Number(g.lng)-refLng)*111320*cos;
+const y=(Number(g.lat)-refLat)*111320;
+map.set(i,{x,y});
+});
+return {map,refLat,refLng};
+}
+
+function anguloPcaScanner(indices,validos){
+if(indices.length<2) return 0;
+const {map}=coordsLocaisScanner(indices,validos);
+let mx=0,my=0;
+indices.forEach(i=>{const p=map.get(i);mx+=p.x;my+=p.y;});
+mx/=indices.length;my/=indices.length;
+let xx=0,yy=0,xy=0;
+indices.forEach(i=>{
+const p=map.get(i); const dx=p.x-mx,dy=p.y-my;
+xx+=dx*dx;yy+=dy*dy;xy+=dx*dy;
+});
+return normalizarAnguloScanner(0.5*Math.atan2(2*xy,xx-yy));
+}
+
+function anguloDominanteVizinhancaScanner(indices,validos){
+if(indices.length<2) return anguloPcaScanner(indices,validos);
+const {map}=coordsLocaisScanner(indices,validos);
+const bins=18;
+const pesos=Array(bins).fill(0);
+for(let a=0;a<indices.length;a++){
+for(let b=a+1;b<indices.length;b++){
+const p=map.get(indices[a]),q=map.get(indices[b]);
+const dx=q.x-p.x,dy=q.y-p.y;
+const d=Math.hypot(dx,dy);
+if(d<25 || d>360) continue;
+const ang=normalizarAnguloScanner(Math.atan2(dy,dx));
+const bi=Math.min(bins-1,Math.floor(ang/Math.PI*bins));
+// Vizinhos próximos têm mais chance de compartilhar a mesma rua/faixa.
+pesos[bi]+=1/Math.max(35,d);
+}
+}
+let melhor=0;
+for(let i=1;i<bins;i++) if(pesos[i]>pesos[melhor]) melhor=i;
+if(pesos[melhor]<=0) return anguloPcaScanner(indices,validos);
+return normalizarAnguloScanner((melhor+0.5)*Math.PI/bins);
+}
+
+function angulosCandidatosScanner(indices,validos){
+const dom=anguloDominanteVizinhancaScanner(indices,validos);
+const pca=anguloPcaScanner(indices,validos);
+const brutos=[dom,dom+Math.PI/2,pca,pca+Math.PI/2];
+const saida=[];
+brutos.forEach(a=>{
+const n=normalizarAnguloScanner(a);
+if(!saida.some(x=>diferencaAngularScanner(x,n)<Math.PI/36)) saida.push(n);
+});
+return saida;
+}
+
+function dividirZonaScannerPorDiametro(indices,validos){
+if(indices.length<=2) return [indices];
+let maior=-1,sementes=[indices[0],indices[1]];
+for(let a=0;a<indices.length;a++){
+for(let b=a+1;b<indices.length;b++){
+const d=distanciaGeograficaIndices(indices[a],indices[b],validos);
+if(Number.isFinite(d)&&d>maior){maior=d;sementes=[indices[a],indices[b]];}
+}
+}
+if(maior<=DIAMETRO_MAX_ZONA_SCANNER_METROS) return [indices];
+const A=[],B=[];
+indices.forEach(i=>{
+const da=distanciaGeograficaIndices(i,sementes[0],validos);
+const db=distanciaGeograficaIndices(i,sementes[1],validos);
+(da<=db?A:B).push(i);
+});
+if(!A.length||!B.length){
+const ord=[...indices].sort((i,j)=>{
+const a=grupoPorIndiceMatriz(i,validos),b=grupoPorIndiceMatriz(j,validos);
+return Number(a.lat)-Number(b.lat)||Number(a.lng)-Number(b.lng);
+});
+const meio=Math.ceil(ord.length/2);
+return [ord.slice(0,meio),ord.slice(meio)].flatMap(x=>dividirZonaScannerPorDiametro(x,validos));
+}
+return [A,B].flatMap(x=>dividirZonaScannerPorDiametro(x,validos));
+}
+
+function clusterizarZonasScannerV76(validos){
+const indices=validos.map((_,i)=>i+1);
+const nao=new Set(indices);
+const comps=[];
+while(nao.size){
+const primeiro=nao.values().next().value;
+nao.delete(primeiro);
+const fila=[primeiro],comp=[];
+while(fila.length){
+const atual=fila.shift();comp.push(atual);
+for(const cand of [...nao]){
+const d=distanciaGeograficaIndices(atual,cand,validos);
+if(Number.isFinite(d)&&d<=RAIO_ZONA_SCANNER_METROS){
+nao.delete(cand);fila.push(cand);
+}
+}
+}
+comps.push(...dividirZonaScannerPorDiametro(comp,validos));
+}
+return comps.map((membros,id)=>({id,membros:[...membros]}));
+}
+
+function ordemZonasScannerVizinho(zonas,resultado,norm,primeiroId){
+const restantes=[...zonas],ordem=[];
+let atual=[0];
+if(Number.isInteger(primeiroId)){
+const pos=restantes.findIndex(z=>z.id===primeiroId);
+if(pos>=0){const z=restantes.splice(pos,1)[0];ordem.push(z);atual=z.membros;}
+}
+while(restantes.length){
+let p=0,c=Infinity;
+restantes.forEach((z,k)=>{
+const cc=custoEntreConjuntosMatriz(atual,z.membros,resultado,norm);
+if(cc<c){c=cc;p=k;}
+});
+const z=restantes.splice(p,1)[0];ordem.push(z);atual=z.membros;
+}
+return ordem;
+}
+
+function gerarOrdensZonasScanner(zonas,validos,resultado,norm){
+const saida=[],vistas=new Set();
+function add(nome,ordem){
+const sig=ordem.map(z=>z.id).join('>');
+if(!sig||vistas.has(sig)) return;
+vistas.add(sig);saida.push({nome,ordem});
+}
+const viz=ordemZonasScannerVizinho(zonas,resultado,norm,null);
+add('zonas-vizinho',viz);
+add('zonas-vizinho-invertida',[...viz].reverse());
+const original=[...zonas].sort((a,b)=>{
+const ia=Math.min(...a.membros.map(i=>validos[i-1].indiceImportacao??Infinity));
+const ib=Math.min(...b.membros.map(i=>validos[i-1].indiceImportacao??Infinity));
+return ia-ib;
+});
+add('zonas-orientacao-shopee',original);
+const primeiros=[...zonas].map(z=>({id:z.id,c:custoEntreConjuntosMatriz([0],z.membros,resultado,norm)}))
+.filter(x=>Number.isFinite(x.c)).sort((a,b)=>a.c-b.c).slice(0,Math.min(4,zonas.length));
+primeiros.forEach((x,k)=>add('zonas-inicio-'+(k+1),ordemZonasScannerVizinho(zonas,resultado,norm,x.id)));
+return saida;
+}
+
+function criarFaixasScannerZona(indices,validos,angulo,largura){
+const {map}=coordsLocaisScanner(indices,validos);
+const ca=Math.cos(angulo),sa=Math.sin(angulo);
+const pontos=indices.map(i=>{
+const p=map.get(i);
+return {i,s:p.x*ca+p.y*sa,t:-p.x*sa+p.y*ca};
+}).sort((a,b)=>a.t-b.t);
+
+const faixas=[];
+for(const p of pontos){
+let alvo=null,melhor=Infinity;
+for(const f of faixas){
+const d=Math.abs(p.t-f.mediaT);
+if(d<=largura&&d<melhor){alvo=f;melhor=d;}
+}
+if(!alvo){
+alvo={itens:[],mediaT:p.t};faixas.push(alvo);
+}
+alvo.itens.push(p);
+alvo.mediaT=alvo.itens.reduce((acc,x)=>acc+x.t,0)/alvo.itens.length;
+}
+faixas.sort((a,b)=>a.mediaT-b.mediaT);
+faixas.forEach(f=>f.itens.sort((a,b)=>a.s-b.s));
+return faixas;
+}
+
+function custoSequenciaScanner(indices,atual,alvosSaida,resultado,norm){
+let total=0,ant=atual;
+for(const idx of indices){
+const c=custoMatrizEquilibrado(resultado,ant,idx,norm);
+if(!Number.isFinite(c)) return Infinity;
+total+=c;ant=idx;
+}
+if(alvosSaida&&alvosSaida.length){
+const c=custoEntreConjuntosMatriz([ant],alvosSaida,resultado,norm);
+if(Number.isFinite(c)) total+=c;
+}
+return total;
+}
+
+function ordensSerpentinaFaixas(faixas,atual,alvosSaida,resultado,norm){
+if(!faixas.length) return [];
+const candidatas=[];
+for(const ordemFaixas of [faixas,[...faixas].reverse()]){
+for(const primeiroSentido of [1,-1]){
+const seq=[];
+ordemFaixas.forEach((f,k)=>{
+const base=f.itens.map(x=>x.i);
+const sentido=(k%2===0?primeiroSentido:-primeiroSentido);
+seq.push(...(sentido===1?base:[...base].reverse()));
+});
+candidatas.push(seq);
+}
+}
+candidatas.sort((a,b)=>custoSequenciaScanner(a,atual,alvosSaida,resultado,norm)-custoSequenciaScanner(b,atual,alvosSaida,resultado,norm));
+return candidatas;
+}
+
+function distanciaPontoSegmentoMetrosScanner(p,a,b){
+const vx=b.x-a.x,vy=b.y-a.y;
+const wx=p.x-a.x,wy=p.y-a.y;
+const den=vx*vx+vy*vy;
+if(den<=1e-9) return {dist:Math.hypot(wx,wy),t:0};
+const t=Math.max(0,Math.min(1,(wx*vx+wy*vy)/den));
+const qx=a.x+t*vx,qy=a.y+t*vy;
+return {dist:Math.hypot(p.x-qx,p.y-qy),t};
+}
+
+function capturarParadasNoCaminhoScanner(ordemInicial,resultado,norm,validos){
+let ordem=[...ordemInicial];
+if(ordem.length<3) return ordem;
+const todos=ordem;
+const {map}=coordsLocaisScanner(todos,validos);
+
+for(let passada=0;passada<2;passada++){
+let mudou=false;
+for(let k=1;k<ordem.length;k++){
+const aIdx=ordem[k-1],bIdx=ordem[k];
+const a=map.get(aIdx),b=map.get(bIdx);
+if(!a||!b) continue;
+const custoAB=custoMatrizEquilibrado(resultado,aIdx,bIdx,norm);
+if(!Number.isFinite(custoAB)||custoAB<=0) continue;
+let melhor=null;
+for(let j=k+1;j<ordem.length;j++){
+const pIdx=ordem[j],p=map.get(pIdx);
+if(!p) continue;
+const geo=distanciaPontoSegmentoMetrosScanner(p,a,b);
+if(geo.dist>RAIO_CAPTURA_CAMINHO_METROS||geo.t<0.08||geo.t>0.94) continue;
+const c1=custoMatrizEquilibrado(resultado,aIdx,pIdx,norm);
+const c2=custoMatrizEquilibrado(resultado,pIdx,bIdx,norm);
+if(!Number.isFinite(c1)||!Number.isFinite(c2)) continue;
+const fator=(c1+c2)/Math.max(1,custoAB);
+if(fator>FATOR_MAX_DESVIO_CAPTURA) continue;
+const chave=geo.dist+fator*25;
+if(!melhor||chave<melhor.chave) melhor={j,pIdx,chave};
+}
+if(melhor){
+ordem.splice(melhor.j,1);
+ordem.splice(k,0,melhor.pIdx);
+mudou=true;k++;
+}
+}
+if(!mudou) break;
+}
+return ordem;
+}
+
+function penalidadeContinuidadeScanner(ordem,validos){
+if(ordem.length<3) return 0;
+let penal=0;
+const restantes=new Set(ordem);
+for(let pos=0;pos<ordem.length-1;pos++){
+const atual=ordem[pos],prox=ordem[pos+1];
+restantes.delete(atual);
+const dProx=distanciaGeograficaIndices(atual,prox,validos);
+let perto=Infinity;
+for(const cand of restantes){
+if(cand===prox) continue;
+const d=distanciaGeograficaIndices(atual,cand,validos);
+if(d<perto) perto=d;
+}
+// Se existe entrega ainda não feita muito perto, mas a sequência salta bem
+// mais longe, adicionamos custo operacional para evitar abandonar a região.
+if(Number.isFinite(perto)&&perto<180&&Number.isFinite(dProx)&&dProx>Math.max(330,perto*3.2)){
+penal+=(dProx-perto)/1000;
+}
+}
+return penal;
+}
+
+function melhorScannerDaZona(zona,atual,alvosSaida,resultado,norm,validos){
+if(zona.membros.length<=1) return [...zona.membros];
+const candidatas=[],vistas=new Set();
+const angulos=angulosCandidatosScanner(zona.membros,validos);
+for(const angulo of angulos){
+for(const largura of LARGURAS_FAIXA_SCANNER){
+const faixas=criarFaixasScannerZona(zona.membros,validos,angulo,largura);
+for(const seq of ordensSerpentinaFaixas(faixas,atual,alvosSaida,resultado,norm)){
+const sig=seq.join('>');
+if(!vistas.has(sig)){vistas.add(sig);candidatas.push(seq);}
+}
+}
+}
+// Segurança: rua contínua da V7.5 também entra como variante local, mas nunca
+// substitui o scanner global. Ela ajuda quando o nome da rua está muito claro.
+const ruasMap=new Map();
+zona.membros.forEach(idx=>{
+const k=chaveRuaGrupo(validos[idx-1]);
+if(!ruasMap.has(k)) ruasMap.set(k,[]);
+ruasMap.get(k).push(idx);
+});
+if(ruasMap.size>1){
+let ruas=[...ruasMap.values()],seq=[],cur=atual;
+while(ruas.length){
+let p=0,c=Infinity;
+ruas.forEach((r,k)=>{const cc=custoEntreConjuntosMatriz([cur],r,resultado,norm);if(cc<c){c=cc;p=k;}});
+const r=ruas.splice(p,1)[0];
+const saida=ruas.flat();
+const ord=candidatosOrdemRuaV75(r,cur,saida,resultado,norm,validos);
+seq.push(...ord);cur=ord[ord.length-1]??cur;
+}
+const sig=seq.join('>');if(!vistas.has(sig)){vistas.add(sig);candidatas.push(seq);}
+}
+
+let melhor=null;
+for(const c of candidatas){
+const capt=capturarParadasNoCaminhoScanner(c,resultado,norm,validos);
+const custo=custoSequenciaScanner(capt,atual,alvosSaida,resultado,norm);
+const continuidade=penalidadeContinuidadeScanner(capt,validos);
+const score=custo*(1+Math.min(.20,continuidade*.04));
+if(!melhor||score<melhor.score) melhor={seq:capt,score};
+}
+return melhor?melhor.seq:[...zona.membros];
+}
+
+function expandirZonasScannerV76(ordemZonas,validos,resultado,norm,indiceDestinoFinal){
+const rota=[];
+let atual=0;
+for(let zi=0;zi<ordemZonas.length;zi++){
+const zona=ordemZonas[zi];
+const saida=[];
+if(zi<ordemZonas.length-1) saida.push(...ordemZonas[zi+1].membros);
+else if(Number.isInteger(indiceDestinoFinal)) saida.push(indiceDestinoFinal);
+const seq=melhorScannerDaZona(zona,atual,saida,resultado,norm,validos);
+rota.push(...seq);
+atual=seq[seq.length-1]??atual;
+}
+return capturarParadasNoCaminhoScanner(rota,resultado,norm,validos);
+}
+
+function gerarCandidatasScannerV76(validos,resultado,indiceDestinoFinal){
+const norm=normalizadoresMatriz(resultado);
+const zonas=clusterizarZonasScannerV76(validos);
+const ordensZonas=gerarOrdensZonasScanner(zonas,validos,resultado,norm);
+const candidatas=[],vistas=new Set();
+for(const zc of ordensZonas){
+let ordemIndices=expandirZonasScannerV76(zc.ordem,validos,resultado,norm,indiceDestinoFinal);
+ordemIndices=repararJanelasHardV75(ordemIndices,resultado,validos);
+const sig=ordemIndices.join('>');
+if(sig&&!vistas.has(sig)){
+vistas.add(sig);candidatas.push({nome:'scanner-'+zc.nome,ordemIndices});
+}
+}
+return {candidatas,zonas};
+}
+
+function escolherMelhorScannerV76(candidatas,resultado,indiceDestinoFinal,validos){
+const avaliadas=candidatas.map(c=>{
+const janelas=avaliarJanelasRotaV75(c.ordemIndices,resultado,validos);
+const metricas=metricasOperacionaisMatrizV75(c.ordemIndices,resultado,indiceDestinoFinal,validos);
+const continuidade=penalidadeContinuidadeScanner(c.ordemIndices,validos);
+return {...c,janelas,metricas,continuidade};
+});
+const factiveis=avaliadas.filter(a=>a.janelas.violacoesHard.length===0&&metricasRotaValidas(a.metricas));
+const base=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
+if(!base.length) return {melhor:null,avaliadas,referencia:null};
+const referencia=referenciaEquilibrio(base);
+let melhor=null;
+for(const a of base){
+let score=pontuacaoEquilibrada(a.metricas,referencia);
+if(a.janelas.violacoesHard.length) score+=1000+a.janelas.atrasoHardMin*10;
+score+=PESO_SOFT_SECUNDARIO*(a.janelas.penalidadeSoftMin/Math.max(1,a.metricas.duracao/60));
+// Continuidade é uma regra operacional forte, porém limitada para não anular
+// totalmente tempo + km. Scanner ruim perde para scanner contínuo.
+score+=Math.min(.28,a.continuidade*.055);
+if(!melhor||score<melhor.score) melhor={...a,score};
+}
+return {melhor,avaliadas,referencia};
+}
+
 async function consultarTrechoDirectionsOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
@@ -3630,9 +4056,9 @@ let avaliacoes = [];
 try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
-atualizarProgressoOtimizacao('Agrupando micro-regiões e organizando as ruas...');
-const geradasV75 = gerarCandidatasV75(validos, ordemShopee, matrizGlobal, indiceDestinoFinal);
-const escolhaGlobal = escolherMelhorV75(geradasV75.candidatas, matrizGlobal, indiceDestinoFinal, validos);
+atualizarProgressoOtimizacao('Lendo o formato das ruas e montando a varredura scanner...');
+const geradasScanner = gerarCandidatasScannerV76(validos, matrizGlobal, indiceDestinoFinal);
+const escolhaGlobal = escolherMelhorScannerV76(geradasScanner.candidatas, matrizGlobal, indiceDestinoFinal, validos);
 avaliacoes = escolhaGlobal.avaliadas || [];
 
 if(!escolhaGlobal.melhor) throw new Error('SEM_ROTA_GLOBAL');
@@ -3654,14 +4080,14 @@ console.warn('Matriz global indisponível; usando fallback viário completo:', e
 // Fallback: preserva o perfil experimental (micro-região + rua) usando uma
 // matriz geográfica estimada. Só perdemos a inteligência de mão única se o
 // roteador global estiver indisponível; nunca voltamos ao salto livre da V7.4.
-atualizarProgressoOtimizacao('Roteador indisponível; preservando micro-regiões e ruas...');
+atualizarProgressoOtimizacao('Roteador indisponível; mantendo o padrão scanner por geometria...');
 const pontosFallback=[inicio,...validos.map(pontoGrupo)];
 if(destino) pontosFallback.push(destino);
 const distFallback=matrizDistanciaGeografica(pontosFallback);
 const durFallback=distFallback.map(l=>l.map(m=>Number.isFinite(m)?m/(30000/3600):Infinity));
-matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_V75'};
-const geradasFallback=gerarCandidatasV75(validos,ordemShopee,matrizGlobal,indiceDestinoFinal);
-const escolhaFallback=escolherMelhorV75(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos);
+matrizGlobal={duracoes:durFallback,distancias:distFallback,provedor:'GEOGRAFICO_SCANNER_V76'};
+const geradasFallback=gerarCandidatasScannerV76(validos,matrizGlobal,indiceDestinoFinal);
+const escolhaFallback=escolherMelhorScannerV76(geradasFallback.candidatas,matrizGlobal,indiceDestinoFinal,validos);
 if(!escolhaFallback.melhor) throw erroGlobal;
 ordem=escolhaFallback.melhor.ordemIndices.map(i=>validos[i-1]);
 avaliacoes=escolhaFallback.avaliadas || [];
@@ -3673,7 +4099,7 @@ metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
 if(metricasRotaValidas(metricasShopee)){
 metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 }
-mostrarToast('⚠️ Sem matriz viária completa; mantive micro-regiões e ruas no fallback', 'alerta');
+mostrarToast('⚠️ Sem matriz viária completa; mantive a varredura scanner no fallback', 'alerta');
 }
 
 atualizarProgressoOtimizacao('Validando o melhor equilíbrio entre tempo e quilômetros...');
@@ -3694,7 +4120,7 @@ atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...
 metaRota = {
 modo,
 provedor:(matrizGlobal && matrizGlobal.provedor) ? matrizGlobal.provedor : 'OSRM',
-criterio:'v7_5_hard_cluster_rua_soft_servico_tempo_distancia',
+criterio:'v7_6_scanner_serpentina_captura_caminho_hard_tempo_distancia',
 distanciaMetros:Number.isFinite(metricasMelhor.distancia) ? metricasMelhor.distancia : null,
 duracaoSegundos:Number.isFinite(metricasMelhor.duracao) ? metricasMelhor.duracao : null,
 distanciaShopeeMetros:Number.isFinite(metricasShopee && metricasShopee.distancia) ? metricasShopee.distancia : null,
@@ -3708,7 +4134,7 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast('⚡ Rota completa otimizada por tempo + quilômetros', 'sucesso');
+mostrarToast('⚡ Rota otimizada em varredura por tempo + quilômetros', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
@@ -3795,7 +4221,7 @@ return `
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota prioriza micro-regiões e continuidade de rua antes do refinamento por tempo + quilômetros.</div>
+<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço em cada parada. A rota usa varredura tipo scanner: fecha faixas/ruas próximas antes de avançar, evitando passar perto de entregas para depois voltar.</div>
 </div>`;
 }
 
