@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V7.11</title>
+<title>Copiloto Entregas V8.0</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -904,6 +904,47 @@ font-size:13.5px;
 padding:11px 12px;
 }
 
+.restaurar-shopee-btn{
+background:#f1f5f9;
+color:#475569;
+border:1px solid #dbe3ec;
+box-shadow:none;
+font-size:13px;
+padding:10px 12px;
+}
+
+#painelDesenhoRota{
+display:none;
+position:absolute;
+left:12px;
+right:12px;
+bottom:68px;
+z-index:750;
+background:rgba(255,255,255,.97);
+border:1px solid #dce4ec;
+border-radius:16px;
+padding:12px;
+box-shadow:0 6px 22px rgba(15,23,42,.22);
+backdrop-filter:blur(5px);
+}
+#painelDesenhoRota.aberto{ display:block; }
+.desenho-rota-titulo{font-weight:800;font-size:14px;color:#1f2937;}
+.desenho-rota-instrucao{margin-top:4px;font-size:12px;line-height:1.4;color:#64748b;}
+.desenho-rota-acoes{display:grid;grid-template-columns:.8fr .8fr 1.4fr;gap:7px;margin-top:10px;}
+.desenho-rota-acoes button{margin:0;padding:10px 7px;font-size:12px;border-radius:10px;}
+.desenho-limpar{background:#f1f5f9;color:#475569;}
+.desenho-cancelar{background:#f3f4f6;color:#4b5563;}
+.desenho-aplicar{background:#ff6a00;color:white;}
+.desenho-aplicar:disabled{opacity:.45;cursor:not-allowed;}
+#mapa.modo-desenho-rota{cursor:crosshair;touch-action:none !important;}
+#botaoDesenharRotaMapa.ativo{background:#ffe4cc;box-shadow:0 0 0 3px rgba(255,106,0,.25),0 2px 8px rgba(0,0,0,.2);}
+.pin-mapa.capturado-desenho .pin-corpo{box-shadow:0 0 0 5px rgba(0,167,199,.28),0 3px 9px rgba(0,0,0,.45);}
+.pin-inicio-desenho,.pin-fim-desenho{
+width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+background:white;border:2px solid #0ea5b7;box-shadow:0 2px 8px rgba(0,0,0,.3);font-size:16px;
+}
+.pin-fim-desenho{border-color:#ff6a00;}
+
 .versao-copiloto{
 margin-top:7px;
 text-align:center;
@@ -1373,8 +1414,9 @@ onclick="importarExcel()">
 Importar Rota
 </button>
 
-<button class="config-otimizacao-btn" onclick="abrirConfiguracaoOtimizacao()">⚙️ Otimização da rota</button>
-<div class="versao-copiloto">Copiloto V7.11</div>
+<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Desenhar otimização no mapa</button>
+<button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
+<div class="versao-copiloto">Copiloto V8.0</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1449,6 +1491,17 @@ Importar Rota
 
 <button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar">🎯</button>
 <button id="botaoAjustarPosicao" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa">📌</button>
+<button id="botaoDesenharRotaMapa" class="botao-flutuante-mapa" style="top:314px;" onclick="iniciarDesenhoOtimizacao()" title="Desenhar ordem manual da rota">✏️</button>
+
+<div id="painelDesenhoRota">
+<div class="desenho-rota-titulo">✏️ Desenhe sua rota</div>
+<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">Arraste o dedo do ponto onde quer começar até onde quer terminar. A ordem das paradas seguirá o seu traço.</div>
+<div class="desenho-rota-acoes">
+<button class="desenho-limpar" onclick="limparDesenhoOtimizacao()">Limpar</button>
+<button class="desenho-cancelar" onclick="cancelarDesenhoOtimizacao()">Cancelar</button>
+<button class="desenho-aplicar" id="btnAplicarDesenhoRota" onclick="aplicarDesenhoOtimizacao()" disabled>Aplicar desenho</button>
+</div>
+</div>
 
 <div id="fundoInfoMapa" onclick="fecharInfoMapa()"></div>
 <div id="painelInfoMapa">
@@ -1481,70 +1534,11 @@ Importar Rota
 </div>
 </div>
 
-<!-- V7.5: escolha/configuração do modo de otimização -->
-<div class="otimizacao-fundo" id="modalOtimizacao">
-<div class="otimizacao-caixa">
-<div class="alca-painel"></div>
-<h2>⚡ Como deseja organizar sua rota?</h2>
-<div class="otimizacao-subtitulo">Antes da primeira rota você escolhe como o Copiloto deve otimizar. Se marcar “Lembrar minha escolha”, as próximas rotas usam a mesma configuração automaticamente. A numeração original da Shopee continua preservada nos detalhes.</div>
-
-<button class="otimizacao-opcao" onclick="selecionarModoOtimizacao('rapida')">
-<span class="icone-opcao">⚖️</span>
-<span>
-<div class="titulo-opcao">Rota mais otimizada</div>
-<div class="desc-opcao">Começa da sua localização atual e prioriza o menor tempo pelas vias; quilômetros entram como critério secundário.</div>
-</span>
-</button>
-
-<button class="otimizacao-opcao" onclick="abrirSeletorDestinoFinal()">
-<span class="icone-opcao">🏁</span>
-<span>
-<div class="titulo-opcao">Terminar perto de...</div>
-<div class="desc-opcao">Você pinga o ponto final no mapa e o Copiloto organiza a reta final para terminar perto dele.</div>
-</span>
-</button>
-
-<label class="otimizacao-lembrar">
-<input type="checkbox" id="lembrarEscolhaOtimizacao">
-<span><strong>Lembrar minha escolha</strong><br>Nas próximas rotas o Copiloto aplica esta configuração automaticamente. Você pode mudar depois em “⚙️ Otimização da rota”.</span>
-</label>
-
-<button id="fecharModalOtimizacaoBtn" class="fechar-otimizacao-btn" onclick="fecharModalOtimizacao()">Fechar configurações</button>
-</div>
-</div>
-
-<!-- V7.5: escolha do ponto final diretamente no mapa -->
-<div class="otimizacao-fundo" id="modalDestinoFinal">
-<div class="otimizacao-caixa destino-picker-caixa">
-<div class="alca-painel"></div>
-<h2>🏁 Onde você quer terminar?</h2>
-<div class="otimizacao-subtitulo">Toque no mapa para pingar o ponto final. Você também pode reutilizar um local que já salvou.</div>
-
-<div id="areaDestinosSalvos" style="display:none;">
-<div class="destinos-salvos-titulo">Locais salvos</div>
-<div id="listaDestinosSalvos"></div>
-</div>
-
-<div id="mapaDestinoFinal"></div>
-<div class="destino-instrucao">📌 Toque no mapa exatamente no ponto onde você quer terminar depois da última entrega.</div>
-<div id="destinoSelecionadoInfo">Nenhum ponto selecionado ainda.</div>
-
-<input class="destino-nome-input" id="nomeDestinoSalvo" type="text" maxlength="40" placeholder="Nome opcional para salvar, ex.: Casa, Base...">
-
-<div class="destino-acoes">
-<button class="destino-usar-btn" onclick="confirmarDestinoSelecionado()">Usar este ponto</button>
-<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()">💾 Salvar ponto</button>
-</div>
-
-<button class="cancelar-modal" onclick="fecharSeletorDestinoFinal()">Voltar</button>
-</div>
-</div>
-
 <!-- V7.5: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
 <div class="otimizando-spinner"></div>
-<h3>Otimizando sua rota</h3>
+<h3>Preparando sua rota</h3>
 <div id="textoProgressoOtimizacao">Preparando as paradas...</div>
 </div>
 </div>
@@ -1599,6 +1593,19 @@ let marcadorDestinoRota = null;
 let mapaDestinoFinal = null;
 let marcadorDestinoSelecionado = null;
 let destinoSelecionadoAtual = null;
+
+// V8.0 - otimização manual por desenho sobre o mapa.
+let modoDesenhoRota = false;
+let desenhandoRota = false;
+let pontosDesenhoRota = [];
+let linhaDesenhoRota = null;
+let linhaDesenhoSalva = null;
+let marcadorInicioDesenho = null;
+let marcadorFimDesenho = null;
+let capturasDesenhoRota = new Map();
+let comprimentoDesenhoPx = 0;
+let ultimoPontoDesenhoPx = null;
+let eventosDesenhoInstalados = false;
 
 // ----------------------------------------------------------------------
 // IMPORTAÇÃO DA PLANILHA
@@ -1916,17 +1923,27 @@ atualizadoEm:null
 
 salvarStorage();
 
-// Antes da V7 apresentar a rota, garante que as coordenadas problemáticas
-// tenham a melhor chance possível de serem corrigidas. Isso evita otimizar
-// uma parada para um ponto inválido e só depois movê-la no mapa.
+// V8.0: importar uma rota NÃO dispara mais qualquer otimização automática.
+// Apenas corrigimos coordenadas ausentes e mostramos a ordem original da Shopee.
 abrirOverlayOtimizacao('Preparando os endereços da rota...');
 await corrigirCoordenadasAusentes({renderizar:false, silencioso:true});
 fecharOverlayOtimizacao();
 
-// A rota crua pode aparecer por baixo do modal, mas a numeração final só
-// é definida depois da escolha/aplicação da otimização.
+grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
+grupos.forEach(g=>{ g.ordemOtimizada = null; });
+metaRota = {
+modo:'shopee',
+provedor:null,
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+atualizadoEm:Date.now()
+};
+salvarStorage();
 renderizarTudo();
-prepararOtimizacaoAposImportacao();
+mostrarToast('📦 Rota carregada na ordem da Shopee. O desenho manual é opcional.', 'sucesso');
 
 }
 
@@ -2054,6 +2071,313 @@ mostrarToast('✅ Pin corrigido - mapa levado até a nova posição', 'sucesso')
 
 }
 
+
+// ======================================================================
+// V8.0 - OTIMIZAÇÃO MANUAL POR DESENHO
+// ======================================================================
+/*
+A otimização automática foi desativada. A rota entra na ordem da Shopee.
+Quando o usuário escolhe "Desenhar otimização", o traço feito no mapa vira
+um eixo orientado: o ponto onde o dedo encosta primeiro é o início e o ponto
+onde ele solta é o fim. Cada parada recebe uma posição ao longo desse traço.
+Se o traço realmente passa perto de um pin, a passagem capturada pelo dedo
+tem prioridade; os demais pins são projetados no ponto mais próximo da linha.
+A sequência final segue exatamente o progresso do desenho do início ao fim.
+*/
+
+function iniciarDesenhoOtimizacao(){
+if(!grupos.length){
+mostrarToast('⚠️ Importe uma rota antes de desenhar a ordem', 'alerta');
+return;
+}
+irParaAba(1);
+setTimeout(()=>ativarModoDesenhoRota(), 180);
+}
+
+function ativarModoDesenhoRota(){
+inicializarMapaSeNecessario();
+if(!mapa) return;
+fecharInfoMapa();
+modoDesenhoRota = true;
+desenhandoRota = false;
+limparDesenhoOtimizacao(true);
+const painel = document.getElementById('painelDesenhoRota');
+if(painel) painel.classList.add('aberto');
+const botao = document.getElementById('botaoDesenharRotaMapa');
+if(botao) botao.classList.add('ativo');
+const mapaEl = document.getElementById('mapa');
+if(mapaEl) mapaEl.classList.add('modo-desenho-rota');
+configurarInteracoesMapaDuranteDesenho(false);
+if(linhaDesenhoSalva && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
+removerMarcadoresInicioFimDesenho();
+atualizarInstrucaoDesenho('Arraste o dedo do ponto onde quer começar até onde quer terminar. Você pode atravessar as ruas exatamente na ordem que faria na prática.');
+}
+
+function configurarInteracoesMapaDuranteDesenho(habilitar){
+if(!mapa) return;
+const metodos=['dragging','touchZoom','doubleClickZoom','scrollWheelZoom','boxZoom','keyboard','touchRotate'];
+metodos.forEach(nome=>{
+const obj=mapa[nome];
+if(obj && typeof obj[habilitar ? 'enable' : 'disable']==='function'){
+try{ obj[habilitar ? 'enable' : 'disable'](); }catch(erro){}
+}
+});
+}
+
+function atualizarInstrucaoDesenho(texto){
+const el=document.getElementById('instrucaoDesenhoRota');
+if(el) el.textContent=texto;
+}
+
+function limparDestaquesCapturaDesenho(){
+Object.values(marcadores).forEach(m=>{
+const el=m && m.getElement ? m.getElement() : null;
+const pin=el ? el.querySelector('.pin-mapa') : null;
+if(pin) pin.classList.remove('capturado-desenho');
+});
+}
+
+function limparDesenhoOtimizacao(manterInstrucao){
+pontosDesenhoRota=[];
+capturasDesenhoRota=new Map();
+comprimentoDesenhoPx=0;
+ultimoPontoDesenhoPx=null;
+desenhandoRota=false;
+if(linhaDesenhoRota && mapa && mapa.hasLayer(linhaDesenhoRota)) mapa.removeLayer(linhaDesenhoRota);
+linhaDesenhoRota=null;
+limparDestaquesCapturaDesenho();
+const btn=document.getElementById('btnAplicarDesenhoRota');
+if(btn) btn.disabled=true;
+if(!manterInstrucao) atualizarInstrucaoDesenho('Desenho limpo. Arraste novamente do início ao fim da rota.');
+}
+
+function cancelarDesenhoOtimizacao(){
+limparDesenhoOtimizacao(true);
+encerrarModoDesenhoRota();
+atualizarMapa();
+mostrarToast('✏️ Desenho cancelado. A ordem atual foi mantida.', 'neutro');
+}
+
+function encerrarModoDesenhoRota(){
+modoDesenhoRota=false;
+desenhandoRota=false;
+const painel=document.getElementById('painelDesenhoRota');
+if(painel) painel.classList.remove('aberto');
+const botao=document.getElementById('botaoDesenharRotaMapa');
+if(botao) botao.classList.remove('ativo');
+const mapaEl=document.getElementById('mapa');
+if(mapaEl) mapaEl.classList.remove('modo-desenho-rota');
+configurarInteracoesMapaDuranteDesenho(true);
+limparDestaquesCapturaDesenho();
+}
+
+function pontoEventoNoMapa(ev){
+const container=mapa && mapa.getContainer ? mapa.getContainer() : null;
+if(!container) return null;
+const rect=container.getBoundingClientRect();
+return L.point(ev.clientX-rect.left, ev.clientY-rect.top);
+}
+
+function distanciaPontoSegmentoPixel(p,a,b){
+const dx=b.x-a.x, dy=b.y-a.y;
+const len2=dx*dx+dy*dy;
+if(len2<=0.0001) return {dist:p.distanceTo(a), t:0};
+let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/len2;
+t=Math.max(0,Math.min(1,t));
+const q=L.point(a.x+t*dx,a.y+t*dy);
+return {dist:p.distanceTo(q),t,q};
+}
+
+function tentarCapturarPinsNoSegmento(a,b,progressoAntes,comprimentoSegmento){
+if(!mapa) return;
+const LIMIAR_PX=30;
+grupos.forEach(g=>{
+if(capturasDesenhoRota.has(g.id)) return;
+const lat=Number(g.lat),lng=Number(g.lng);
+if(!Number.isFinite(lat)||!Number.isFinite(lng)) return;
+const gp=mapa.latLngToContainerPoint([lat,lng]);
+const r=distanciaPontoSegmentoPixel(gp,a,b);
+if(r.dist<=LIMIAR_PX){
+capturasDesenhoRota.set(g.id,{progresso:progressoAntes+r.t*comprimentoSegmento,distPx:r.dist});
+const m=marcadores[g.id];
+const el=m && m.getElement ? m.getElement() : null;
+const pin=el ? el.querySelector('.pin-mapa') : null;
+if(pin) pin.classList.add('capturado-desenho');
+}
+});
+}
+
+function instalarEventosDesenhoRota(){
+if(eventosDesenhoInstalados || !mapa) return;
+const container=mapa.getContainer();
+if(!container) return;
+eventosDesenhoInstalados=true;
+
+container.addEventListener('pointerdown', ev=>{
+if(!modoDesenhoRota) return;
+if(ev.button!==undefined && ev.button!==0 && ev.pointerType!=='touch') return;
+ev.preventDefault();ev.stopPropagation();
+if(pontosDesenhoRota.length) limparDesenhoOtimizacao(true);
+desenhandoRota=true;
+try{container.setPointerCapture(ev.pointerId);}catch(erro){}
+const px=pontoEventoNoMapa(ev);
+if(!px) return;
+const ll=mapa.containerPointToLatLng(px);
+pontosDesenhoRota.push({lat:ll.lat,lng:ll.lng});
+ultimoPontoDesenhoPx=px;
+comprimentoDesenhoPx=0;
+linhaDesenhoRota=L.polyline([[ll.lat,ll.lng]],{color:'#00a7c7',weight:5,opacity:.9,interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
+tentarCapturarPinsNoSegmento(px,px,0,0);
+atualizarInstrucaoDesenho('Desenhando… passe pelas regiões na ordem em que deseja entregar.');
+},{passive:false});
+
+container.addEventListener('pointermove', ev=>{
+if(!modoDesenhoRota || !desenhandoRota) return;
+ev.preventDefault();ev.stopPropagation();
+const px=pontoEventoNoMapa(ev);
+if(!px||!ultimoPontoDesenhoPx) return;
+const seg=ultimoPontoDesenhoPx.distanceTo(px);
+if(seg<3) return;
+const progressoAntes=comprimentoDesenhoPx;
+comprimentoDesenhoPx+=seg;
+tentarCapturarPinsNoSegmento(ultimoPontoDesenhoPx,px,progressoAntes,seg);
+const ll=mapa.containerPointToLatLng(px);
+pontosDesenhoRota.push({lat:ll.lat,lng:ll.lng});
+ultimoPontoDesenhoPx=px;
+if(linhaDesenhoRota) linhaDesenhoRota.addLatLng([ll.lat,ll.lng]);
+},{passive:false});
+
+const finalizar=ev=>{
+if(!modoDesenhoRota || !desenhandoRota) return;
+ev.preventDefault();ev.stopPropagation();
+desenhandoRota=false;
+try{container.releasePointerCapture(ev.pointerId);}catch(erro){}
+const btn=document.getElementById('btnAplicarDesenhoRota');
+const valido=pontosDesenhoRota.length>=2 && comprimentoDesenhoPx>=20;
+if(btn) btn.disabled=!valido;
+const totalValidos=grupos.filter(g=>Number.isFinite(Number(g.lat))&&Number.isFinite(Number(g.lng))).length;
+atualizarInstrucaoDesenho(valido
+? `Traço pronto. ${capturasDesenhoRota.size} de ${totalValidos} paradas foram atravessadas diretamente; as demais serão encaixadas pela posição mais próxima do desenho.`
+: 'O traço ficou muito curto. Desenhe novamente do início ao fim da rota.');
+};
+container.addEventListener('pointerup',finalizar,{passive:false});
+container.addEventListener('pointercancel',finalizar,{passive:false});
+}
+
+function dadosProjecaoNoDesenho(grupo){
+if(!mapa || pontosDesenhoRota.length<2) return {progresso:Infinity,distanciaMetros:Infinity};
+const captura=capturasDesenhoRota.get(grupo.id);
+const gp=mapa.latLngToContainerPoint([Number(grupo.lat),Number(grupo.lng)]);
+let acumulado=0,melhor=null;
+for(let i=1;i<pontosDesenhoRota.length;i++){
+const a=mapa.latLngToContainerPoint([pontosDesenhoRota[i-1].lat,pontosDesenhoRota[i-1].lng]);
+const b=mapa.latLngToContainerPoint([pontosDesenhoRota[i].lat,pontosDesenhoRota[i].lng]);
+const seg=a.distanceTo(b);
+const r=distanciaPontoSegmentoPixel(gp,a,b);
+if(!melhor || r.dist<melhor.dist){
+const q=r.q || a;
+const ll=mapa.containerPointToLatLng(q);
+melhor={dist:r.dist,progresso:acumulado+r.t*seg,lat:ll.lat,lng:ll.lng};
+}
+acumulado+=seg;
+}
+if(!melhor) return {progresso:Infinity,distanciaMetros:Infinity};
+const distM=distanciaMetros(Number(grupo.lat),Number(grupo.lng),melhor.lat,melhor.lng);
+// Quando o dedo realmente passou perto do pin, usamos o instante da captura.
+return {
+progresso:captura ? captura.progresso : melhor.progresso,
+distanciaMetros:distM,
+capturado:!!captura
+};
+}
+
+function simplificarDesenhoParaStorage(pontos,maxPontos=320){
+if(!Array.isArray(pontos)||pontos.length<=maxPontos) return (pontos||[]).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+const passo=(pontos.length-1)/(maxPontos-1);
+const saida=[];
+for(let i=0;i<maxPontos;i++){
+const p=pontos[Math.round(i*passo)];
+saida.push({lat:Number(p.lat),lng:Number(p.lng)});
+}
+return saida;
+}
+
+function aplicarDesenhoOtimizacao(){
+if(pontosDesenhoRota.length<2){
+mostrarToast('⚠️ Desenhe uma linha do início ao fim da rota', 'alerta');
+return;
+}
+const validos=grupos.filter(g=>Number.isFinite(Number(g.lat))&&Number.isFinite(Number(g.lng)));
+const invalidos=grupos.filter(g=>!validos.includes(g));
+const avaliados=validos.map(g=>({g,...dadosProjecaoNoDesenho(g)}));
+avaliados.sort((a,b)=>a.progresso-b.progresso || Number(b.capturado)-Number(a.capturado) || a.distanciaMetros-b.distanciaMetros || (a.g.indiceImportacao??0)-(b.g.indiceImportacao??0));
+invalidos.sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+grupos=[...avaliados.map(x=>x.g),...invalidos];
+grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;});
+const longe=avaliados.filter(x=>Number.isFinite(x.distanciaMetros)&&x.distanciaMetros>250).length;
+const primeiro=grupos[0]||null,ultimo=grupos[grupos.length-1]||null;
+metaRota={
+modo:'desenho',
+provedor:null,
+criterio:'ordem_manual_pelo_traco_v8',
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+desenho:simplificarDesenhoParaStorage(pontosDesenhoRota),
+inicioDesenho:{...pontosDesenhoRota[0]},
+fimDesenho:{...pontosDesenhoRota[pontosDesenhoRota.length-1]},
+paradasCapturadas:capturasDesenhoRota.size,
+paradasLongeDoTraco:longe,
+primeiraParada:primeiro?primeiro.id:null,
+ultimaParada:ultimo?ultimo.id:null,
+atualizadoEm:Date.now()
+};
+if(linhaDesenhoRota && mapa && mapa.hasLayer(linhaDesenhoRota)) mapa.removeLayer(linhaDesenhoRota);
+linhaDesenhoRota=null;
+salvarStorage();
+encerrarModoDesenhoRota();
+mapaFoiEnquadrado=true;
+renderizarTudo();
+if(longe>0) mostrarToast(`✏️ Rota aplicada. ${longe} parada(s) ficaram longe do traço — confira a numeração.`, 'alerta');
+else mostrarToast('✏️ Rota reorganizada exatamente pelo sentido do seu desenho', 'sucesso');
+}
+
+function restaurarOrdemShopee(){
+if(!grupos.length) return;
+grupos.sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+grupos.forEach(g=>{g.ordemOtimizada=null;});
+metaRota={modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,atualizadoEm:Date.now()};
+if(linhaDesenhoSalva && mapa && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
+linhaDesenhoSalva=null;
+removerMarcadoresInicioFimDesenho();
+salvarStorage();
+renderizarTudo();
+mostrarToast('↩️ Ordem original da Shopee restaurada', 'neutro');
+}
+
+function removerMarcadoresInicioFimDesenho(){
+if(marcadorInicioDesenho && mapa && mapa.hasLayer(marcadorInicioDesenho)) mapa.removeLayer(marcadorInicioDesenho);
+if(marcadorFimDesenho && mapa && mapa.hasLayer(marcadorFimDesenho)) mapa.removeLayer(marcadorFimDesenho);
+marcadorInicioDesenho=null;marcadorFimDesenho=null;
+}
+
+function atualizarLinhaRotaManualNoMapa(){
+if(!mapa) return;
+if(linhaDesenhoSalva && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
+linhaDesenhoSalva=null;
+removerMarcadoresInicioFimDesenho();
+if(modoDesenhoRota) return;
+if(!metaRota || metaRota.modo!=='desenho' || !Array.isArray(metaRota.desenho) || metaRota.desenho.length<2) return;
+const latlngs=metaRota.desenho.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
+if(latlngs.length<2) return;
+linhaDesenhoSalva=L.polyline(latlngs,{color:'#00a7c7',weight:4,opacity:.72,dashArray:'9 7',interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
+const icIni=L.divIcon({html:'<div class="pin-inicio-desenho">▶</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+const icFim=L.divIcon({html:'<div class="pin-fim-desenho">🏁</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+marcadorInicioDesenho=L.marker(latlngs[0],{icon:icIni,zIndexOffset:850,interactive:false}).addTo(mapa);
+marcadorFimDesenho=L.marker(latlngs[latlngs.length-1],{icon:icFim,zIndexOffset:850,interactive:false}).addTo(mapa);
+}
 
 // ======================================================================
 // V7.5 - PERFIL EXPERIMENTAL DE OTIMIZAÇÃO OPERACIONAL
@@ -5524,37 +5848,41 @@ ${diferencaHtml}
 
 function atualizarStatusOtimizacaoRota(){
 const el = document.getElementById('statusOtimizacaoRota');
+const btnRestaurar = document.getElementById('btnRestaurarShopee');
 if(!el) return;
 
 if(!grupos.length){
-el.style.display = 'none';
+el.style.display='none';
+if(btnRestaurar) btnRestaurar.style.display='none';
 return;
 }
 
-el.style.display = 'block';
+el.style.display='block';
+const manual = metaRota && metaRota.modo === 'desenho';
+if(btnRestaurar) btnRestaurar.style.display = manual ? 'block' : 'none';
 
-if(!metaRota || !['rapida','endereco'].includes(metaRota.modo)){
-el.innerHTML = `<div class="linha-status-rota">⚡ Rota aguardando otimização</div><div>A escolha de otimização será aplicada antes de iniciar a rota.</div>`;
-return;
-}
-
-const destino = metaRota.modo === 'endereco' && metaRota.destinoFinal
-? `<div style="margin-top:6px;">🏁 Termina perto de: <strong>${escaparHtmlTexto(metaRota.destinoFinal.texto || 'Ponto escolhido')}</strong></div>`
-: '';
-
+if(!manual){
 el.innerHTML = `
-<div class="linha-status-rota">⚡ Rota otimizada</div>
-${htmlComparacaoTempoRota()}
-${destino}
-`;
+<div class="linha-status-rota">📦 Ordem da Shopee ativa</div>
+<div>A otimização automática está desligada. Se quiser reorganizar, toque em <strong>“✏️ Desenhar otimização no mapa”</strong> e trace a rota exatamente na ordem que você faria.</div>`;
+return;
+}
+
+const capt = Number(metaRota.paradasCapturadas || 0);
+const longe = Number(metaRota.paradasLongeDoTraco || 0);
+el.innerHTML = `
+<div class="linha-status-rota">✏️ Rota organizada pelo seu desenho</div>
+<div>O primeiro ponto do traço é o início e o último é o fim. As paradas foram numeradas seguindo o progresso da linha.</div>
+<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} atravessada(s) diretamente pelo traço` : ''}${longe ? ` · ⚠️ ${longe} longe do desenho` : ''}</div>`;
 }
 
 function htmlReferenciaRota(grupo){
 if(!temOrdemOtimizada(grupo)) return '';
 const shopee = ehStopValido(grupo.stopOriginal ?? grupo.stop) ? String(grupo.stopOriginal ?? grupo.stop) : 'Extra';
+const rotulo = metaRota && metaRota.modo === 'desenho' ? '✏️ Manual' : '⚡ Otimizada';
 return `
 <div class="rota-referencia">
-<span class="rota-otimizada-pill">⚡ Otimizada: <strong>${grupo.ordemOtimizada}</strong></span>
+<span class="rota-otimizada-pill">${rotulo}: <strong>${grupo.ordemOtimizada}</strong></span>
 <span class="rota-shopee-pill">📦 Shopee: <strong>${shopee}</strong></span>
 </div>`;
 }
@@ -6440,6 +6768,19 @@ if(metaSalva){
 try{ metaRota = JSON.parse(metaSalva); }catch(erro){}
 }
 
+// V8.0 desativa definitivamente a otimização automática antiga. Rotas salvas
+// pelas versões V7 voltam para a ordem da Shopee; somente um desenho manual
+// V8 é preservado ao reabrir o navegador.
+if(!metaRota || metaRota.modo !== 'desenho'){
+grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
+grupos.forEach(g=>{ g.ordemOtimizada = null; });
+metaRota = {modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,atualizadoEm:Date.now()};
+try{
+localStorage.setItem(CHAVE_STORAGE, JSON.stringify(grupos));
+localStorage.setItem(META_ROTA_STORAGE_KEY, JSON.stringify(metaRota));
+}catch(erro){}
+}
+
 const totalPacotes = grupos.reduce((acc,g)=>acc + g.pacotes.length, 0);
 document.getElementById("pacotes").innerText = totalPacotes;
 
@@ -6515,9 +6856,12 @@ camadaBasePrincipal.addTo(mapa);
 // toque no mapa vira a posição do usuário. É útil principalmente no PC,
 // onde normalmente não existe GPS e a localização por rede pode ser imprecisa.
 mapa.on('click', function(e){
+if(modoDesenhoRota) return;
 if(!modoAjustePosicaoManual) return;
 definirPosicaoManual(e.latlng);
 });
+
+instalarEventosDesenhoRota();
 
 }
 
@@ -7007,7 +7351,10 @@ pontosValidos.push([lat,lng]);
 
 });
 
-// Endereço final escolhido no modo “Terminar perto de...”
+// V8.0: mostra o traço manual salvo como referência visual.
+atualizarLinhaRotaManualNoMapa();
+
+// Endereço final escolhido no modo legado “Terminar perto de...”
 if(marcadorDestinoRota){
 mapa.removeLayer(marcadorDestinoRota);
 marcadorDestinoRota = null;
