@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.7</title>
+<title>Copiloto Entregas V8.8</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1506,7 +1506,7 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.7</div>
+<div class="versao-copiloto">Copiloto V8.8</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -2429,7 +2429,7 @@ btn.textContent=faltam?`Aplicar desenho · faltam ${faltam}`:'Aplicar desenho';
 btn.disabled=!desenhoValido || faltam>0 || total===0;
 }
 if(faltantes.length){
-console.info('[Copiloto V8.7] Paradas ainda não atravessadas pelo traço:', faltantes.map(g=>({id:g.id,shopee:g.stop,endereco:g.endereco,lat:g.lat,lng:g.lng})));
+console.info('[Copiloto V8.8] Paradas ainda não atravessadas pelo traço:', faltantes.map(g=>({id:g.id,shopee:g.stop,endereco:g.endereco,lat:g.lat,lng:g.lng})));
 }
 const invisiveis=[...paradasAtivasSemCoordenadaV84(),...paradasAtivasSemMarcadorV87()];
 if(modoDesenhoRota && invisiveis.length && !faltantes.length){
@@ -2844,12 +2844,30 @@ grupos=[...ordem,...gruposNaoDesenhaveis,...gruposJaEntregues];
 grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;});
 const ordemIndices=ordem.map(g=>indices.get(g.id));
 let metricas={duracao:null,distancia:null};
-if(matriz&&ordemIndices.every(Number.isInteger)) metricas=metricasOrdemNaMatriz(ordemIndices,matriz,null);
+let metricasShopee={duracao:null,distancia:null};
+if(matriz&&ordemIndices.every(Number.isInteger)){
+metricas=metricasOrdemNaMatriz(ordemIndices,matriz,null);
+
+// V8.8: compara a rota manual com a ordem original da Shopee usando
+// exatamente a mesma origem, os mesmos pontos e a mesma matriz viária.
+const ordemShopeeValidos=[...validos].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+const ordemShopeeIndices=ordemShopeeValidos.map(g=>indices.get(g.id));
+if(ordemShopeeIndices.every(Number.isInteger)){
+metricasShopee=metricasOrdemNaMatriz(ordemShopeeIndices,matriz,null);
+}
+
+// O tempo de serviço é o mesmo conjunto de paradas nas duas rotas.
+// Somamos aos dois totais para a comparação exibida ficar consistente.
+const tempoServicoTotal=ordem.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
+if(Number.isFinite(metricas.duracao)) metricas.duracao+=tempoServicoTotal;
+if(Number.isFinite(metricasShopee.duracao)) metricasShopee.duracao+=tempoServicoTotal;
+}
 atualizarProgressoOtimizacao('Encaixando sua ordem nas ruas...');
 const geometria=await geometriaRotaPelasRuasV81(ordem,inicio);
 metaRota={
-modo:'desenho',provedor:matriz?'OSRM_GLOBAL':'DESENHO_DIRETO',criterio:'ordem_manual_fiel_v8_2',
-distanciaMetros:metricas.distancia,duracaoSegundos:metricas.duracao,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,
+modo:'desenho',provedor:matriz?'OSRM_GLOBAL':'DESENHO_DIRETO',criterio:'ordem_manual_fiel_v8_8',
+distanciaMetros:metricas.distancia,duracaoSegundos:metricas.duracao,
+distanciaShopeeMetros:metricasShopee.distancia,duracaoShopeeSegundos:metricasShopee.duracao,destinoFinal:null,
 inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordem.length?ordem[ordem.length-1].id:null,
 geometriaRota:geometria||null,paradasCapturadas:capturasDesenhoRota.size,paradasLongeDoTraco:0,ajustesOrientacaoRua:refinado.ajustes,
 organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
@@ -6443,7 +6461,8 @@ partes.push(deltaDist > 0
 
 if(partes.length){
 const ambosMelhores = (!temTempo || deltaTempo >= -30) && (!temDistancia || deltaDist >= -100) && (deltaTempo > 30 || deltaDist > 100);
-diferencaHtml = `<div class="economia-rota${ambosMelhores ? '' : ' pior'}">${ambosMelhores ? '⚡' : '⚖️'} ${partes.join(' · ')}</div>`;
+const prefixoEconomia = metaRota.modo === 'desenho' && deltaTempo > 30 ? '⏱️ Economia estimada: ' : (ambosMelhores ? '⚡ ' : '⚖️ ');
+diferencaHtml = `<div class="economia-rota${ambosMelhores ? '' : ' pior'}">${prefixoEconomia}${partes.join(' · ')}</div>`;
 }else{
 diferencaHtml = `<div class="economia-rota">≈ Resultado muito próximo da ordem da Shopee</div>`;
 }
@@ -6457,12 +6476,12 @@ return `
 <strong>${tempoShopee || '—'}${distShopee ? ` · ${distShopee}` : ''}</strong>
 </div>
 <div class="comparacao-item otimizada">
-${metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : '⚡ Otimizada'}
+${metaRota.modo === 'desenho' ? '✏️ Sua rota' : (metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : '⚡ Otimizada')}
 <strong>${tempoOtimizado || '—'}${distOtimizada ? ` · ${distOtimizada}` : ''}</strong>
 </div>
 </div>
 ${diferencaHtml}
-<div class="comparacao-nota">Tempo total estimado = deslocamento pelas vias + tempo de serviço. A ordem Shopee é a baseline: o Copiloto só troca a sequência quando encontra uma alternativa que não aumenta o tempo. Entre tempos equivalentes, vence a menor quilometragem. Scanner e agrupamentos apenas sugerem alternativas; nunca podem piorar o resultado viário.</div>
+<div class="comparacao-nota">${metaRota.modo === 'desenho' ? 'Estimativa calculada com a mesma origem e as mesmas paradas nas duas ordens. O tempo inclui deslocamento pelas vias + o mesmo tempo de serviço em cada parada.' : 'Tempo total estimado = deslocamento pelas vias + tempo de serviço. A ordem Shopee é a baseline: o Copiloto só troca a sequência quando encontra uma alternativa que não aumenta o tempo. Entre tempos equivalentes, vence a menor quilometragem.'}</div>
 </div>`;
 }
 
@@ -6494,10 +6513,12 @@ return;
 const capt = Number(metaRota.paradasCapturadas || 0);
 const longe = Number(metaRota.paradasLongeDoTraco || 0);
 const temRotaViaria = Array.isArray(metaRota.geometriaRota) && metaRota.geometriaRota.length>1;
+const comparacaoManual = htmlComparacaoTempoRota();
 el.innerHTML = `
 <div class="linha-status-rota">✏️ Rota manual aplicada</div>
 <div>O desenho define a ordem. Todas as paradas precisam ser selecionadas; o Copiloto só inverte um trecho da mesma rua quando houver ganho viário claramente relevante.</div>
-<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} selecionada(s) pelo desenho` : ''}${metaRota.ajustesOrientacaoRua ? ` · ${metaRota.ajustesOrientacaoRua} ajuste(s) claro(s) de orientação` : ''}${temRotaViaria ? ' · 🛣️ caminho encaixado nas ruas' : ''}</div>`;
+<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} selecionada(s) pelo desenho` : ''}${metaRota.ajustesOrientacaoRua ? ` · ${metaRota.ajustesOrientacaoRua} ajuste(s) claro(s) de orientação` : ''}${temRotaViaria ? ' · 🛣️ caminho encaixado nas ruas' : ''}</div>
+${comparacaoManual}`;
 }
 
 function htmlReferenciaRota(grupo){
