@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.3</title>
+<title>Copiloto Entregas V8.4</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1410,12 +1410,12 @@ font-weight:700;
 
 /* V8.3 - paradas obrigatórias no desenho */
 .pin-mapa.nao-selecionado-desenho .pin-corpo{
-animation:pulsoParadaNaoSelecionada 1s ease-in-out infinite;
-box-shadow:0 0 0 3px #00a7c7,0 0 0 8px rgba(0,167,199,.18),0 3px 8px rgba(0,0,0,.35);
+animation:pulsoParadaNaoSelecionada 1.9s ease-in-out infinite;
+box-shadow:0 0 0 2px rgba(0,167,199,.78),0 0 0 5px rgba(0,167,199,.09),0 3px 8px rgba(0,0,0,.32);
 }
 @keyframes pulsoParadaNaoSelecionada{
-0%,100%{transform:scale(1);box-shadow:0 0 0 3px #00a7c7,0 0 0 7px rgba(0,167,199,.12),0 3px 8px rgba(0,0,0,.35);}
-50%{transform:scale(1.13);box-shadow:0 0 0 4px #00a7c7,0 0 0 13px rgba(0,167,199,.08),0 4px 10px rgba(0,0,0,.4);}
+0%,100%{transform:scale(1);box-shadow:0 0 0 2px rgba(0,167,199,.72),0 0 0 5px rgba(0,167,199,.07),0 3px 8px rgba(0,0,0,.32);}
+50%{transform:scale(1.045);box-shadow:0 0 0 2px rgba(0,167,199,.9),0 0 0 8px rgba(0,167,199,.05),0 3px 8px rgba(0,0,0,.34);}
 }
 .organizar-pacote-acao{width:auto;min-width:136px;margin:0;padding:10px 12px;border-radius:10px;background:#22c55e;color:white;font-size:12px;font-weight:800;}
 .organizar-pacote-meta{font-size:12px;color:#475569;margin-top:3px;font-weight:700;}
@@ -1464,7 +1464,7 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.3</div>
+<div class="versao-copiloto">Copiloto V8.4</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -2221,8 +2221,26 @@ const el=document.getElementById('instrucaoDesenhoRota');
 if(el) el.textContent=texto;
 }
 
+function paradaParticipaDoDesenhoV84(grupo){
+// Paradas totalmente entregues não fazem mais parte da rota pendente e,
+// portanto, não devem impedir a aplicação de um novo desenho.
+try{ return statusEfetivoGrupo(grupo) !== 'entregue'; }
+catch(e){ return true; }
+}
+
+function paradaTemCoordenadaValidaV84(grupo){
+return Number.isFinite(Number(grupo.lat)) && Number.isFinite(Number(grupo.lng));
+}
+
 function paradasValidasDesenhoV82(){
-return grupos.filter(g=>Number.isFinite(Number(g.lat))&&Number.isFinite(Number(g.lng)));
+// Mantemos o nome da função para compatibilidade com o restante da V8,
+// mas agora ela representa apenas as paradas ATIVAS que precisam ser
+// atravessadas pelo desenho.
+return grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g));
+}
+
+function paradasAtivasSemCoordenadaV84(){
+return grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&!paradaTemCoordenadaValidaV84(g));
 }
 
 function paradasFaltantesDesenhoV82(){
@@ -2258,24 +2276,27 @@ if(ti<tracosDesenhoRota.length-1) acumuladoGlobal+=25;
 
 for(const g of paradasValidasDesenhoV82()){
 const m=marcadores[g.id];
-let gp=null,limiar=30;
+// A posição real da entrega no Leaflet é a ÂNCORA do pin (a ponta da gota).
+// Na V8.3 usávamos principalmente o centro visual do ícone; dependendo do
+// zoom isso podia gerar o falso "faltam 1" mesmo com o traço passando pela
+// localização correta. Agora testamos os dois pontos e usamos o mais próximo.
+const candidatosPonto=[mapa.latLngToContainerPoint([Number(g.lat),Number(g.lng)])];
+let limiar=38;
 const el=m&&m.getElement?m.getElement():null;
 if(el){
 const r=el.getBoundingClientRect();
-// Centro real do ícone na tela, e não a âncora inferior do Leaflet.
-gp=L.point((r.left+r.right)/2-mapaRect.left,(r.top+r.bottom)/2-mapaRect.top);
-limiar=Math.max(24,Math.min(36,Math.max(r.width,r.height)*0.58+8));
-}else{
-gp=mapa.latLngToContainerPoint([Number(g.lat),Number(g.lng)]);
-limiar=36;
+candidatosPonto.push(L.point((r.left+r.right)/2-mapaRect.left,(r.top+r.bottom)/2-mapaRect.top));
+limiar=Math.max(36,Math.min(46,Math.max(r.width,r.height)*0.72+12));
 }
 
 let melhor=null;
+for(const gp of candidatosPonto){
 for(const segs of bases){
 for(const seg of segs){
 const rr=distanciaPontoSegmentoPixel(gp,seg.a,seg.b);
 if(!melhor || rr.dist<melhor.dist){
 melhor={dist:rr.dist,progresso:seg.base+rr.t*seg.segM};
+}
 }
 }
 }
@@ -2401,7 +2422,7 @@ return total + (tracosDesenhoRota.length ? 25 : 0);
 
 function tentarCapturarPinsNoSegmentoV81(aPx,bPx,aLL,bLL,progressoAntes,comprimentoSegmentoM){
 if(!mapa) return;
-const LIMIAR_PX=30;
+const LIMIAR_PX=38;
 grupos.forEach(g=>{
 if(capturasDesenhoRota.has(g.id)) return;
 const lat=Number(g.lat),lng=Number(g.lng);
@@ -2675,7 +2696,7 @@ if(!tracosDesenhoRota.length){mostrarToast('⚠️ Desenhe pelo menos um trecho 
 // V8.3: valida novamente o desenho completo no instante do clique.
 recomputarCapturasDesenhoV83();
 const validos=paradasValidasDesenhoV82();
-const invalidos=grupos.filter(g=>!validos.includes(g));
+const invalidos=paradasAtivasSemCoordenadaV84();
 if(invalidos.length){
 mostrarToast(`⚠️ ${invalidos.length} parada(s) estão sem coordenada válida. Corrija a localização antes de aplicar o desenho.`,'alerta');
 return;
@@ -2707,7 +2728,10 @@ matriz=await consultarMatrizGlobalOSRM([inicio,...validos.map(pontoGrupo)]);
 }catch(e){console.warn('Matriz viária indisponível; mantendo exatamente a ordem desenhada:',e);}
 const refinado=refinarOrdemRuaConservadoraV82(ordem,matriz,indices,inicio);
 ordem=refinado.ordem;
-grupos=[...ordem];
+// Grupos já entregues não participam do desenho, mas continuam preservados
+// no estado da rota e permanecem no final da lista após a reorganização.
+const gruposJaEntregues=grupos.filter(g=>!paradaParticipaDoDesenhoV84(g));
+grupos=[...ordem,...gruposJaEntregues];
 grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;});
 const ordemIndices=ordem.map(g=>indices.get(g.id));
 let metricas={duracao:null,distancia:null};
