@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.8</title>
+<title>Copiloto Entregas V9.0</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -904,6 +904,23 @@ font-size:13.5px;
 padding:11px 12px;
 }
 
+.auto-v9-btn{
+background:linear-gradient(135deg,#ff7a1a,#ff5b00);
+color:white;
+border:0;
+box-shadow:0 4px 12px rgba(255,91,0,.22);
+font-size:14px;
+padding:12px 13px;
+}
+
+.auto-v9-btn small{
+display:block;
+font-size:10.5px;
+font-weight:600;
+opacity:.88;
+margin-top:2px;
+}
+
 .restaurar-shopee-btn{
 background:#f1f5f9;
 color:#475569;
@@ -1504,9 +1521,10 @@ onclick="importarExcel()">
 Importar Rota
 </button>
 
+<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="otimizarRotaAutomaticamenteV9()">⚡ Otimizar automaticamente — V9<small>Tempo primeiro · km como desempate · nunca pior que a Shopee</small></button>
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.8</div>
+<div class="versao-copiloto">Copiloto V9.0</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -2916,7 +2934,7 @@ function atualizarLinhaRotaManualNoMapa(){
 if(!mapa) return;
 removerLinhaRotaGpsV81();
 if(modoDesenhoRota) return;
-if(!metaRota || metaRota.modo!=='desenho' || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
+if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo) || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
 const latlngs=metaRota.geometriaRota.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
 if(latlngs.length<2) return;
 linhaRotaGps=L.polyline(latlngs,{color:'#00a7c7',weight:5,opacity:.86,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-linha'}).addTo(mapa);
@@ -2931,7 +2949,7 @@ marcadorFimDesenho=L.marker([Number(ultima.lat),Number(ultima.lng)],{icon:icFim,
 // V8.3 - ORGANIZAÇÃO DOS PACOTES NO CARRO (ORDEM INVERSA)
 // ----------------------------------------------------------------------
 function organizacaoPacotesDisponivel(){
-return !!(grupos.length && metaRota && metaRota.modo==='desenho' && !metaRota.organizacaoPacotesConcluida);
+return !!(grupos.length && metaRota && ['desenho','auto_v9'].includes(metaRota.modo) && !metaRota.organizacaoPacotesConcluida);
 }
 
 function abrirOrganizacaoPacotes(){
@@ -3015,6 +3033,279 @@ return;
 }
 salvarStorage();
 renderizarOrganizacaoPacotes();
+}
+
+
+// ======================================================================
+// V9.0 - MOTOR AUTOMÁTICO REALISTA (OPCIONAL)
+// ======================================================================
+/*
+Princípios da V9:
+1) A ordem Shopee é sempre a baseline e nunca pode ser substituída por uma
+   alternativa pior em tempo. Em empate técnico (até 15 s), vence menor km.
+2) O custo usa matriz DIRECIONAL de tempo + distância pelas ruas (OSRM).
+   A -> B e B -> A podem ter custos diferentes por mão única/retornos/acessos.
+3) Gera múltiplas sementes: Shopee, vizinho mais rápido, vizinho com leve
+   preferência por km, inserção de menor custo e várias primeiras paradas.
+4) Refina globalmente com realocação, troca, inversão e blocos, sem janelas
+   fixas de 10 paradas.
+5) Pós-processa situações de "passei no caminho e deixei para depois": se
+   inserir uma entrega entre A e B custa quase nada (<=20s e <=180m), ela é
+   puxada para aquele ponto e a rota é refinada novamente.
+6) Até 90 paradas usa busca mais profunda; acima disso reduz iterações para
+   manter o celular responsivo.
+*/
+
+const V9_EPS_TEMPO_SEG = 15;
+
+function metricasIndicesV9(ordem, resultado){
+let anterior=0,tempo=0,distancia=0;
+for(const idx of ordem){
+const t=valorMatriz(resultado.duracoes,anterior,idx);
+const d=valorMatriz(resultado.distancias,anterior,idx);
+if(!Number.isFinite(t)||!Number.isFinite(d)) return {tempo:Infinity,distancia:Infinity};
+tempo+=t;distancia+=d;anterior=idx;
+}
+return {tempo,distancia};
+}
+
+function avaliacaoMelhorV9(a,b){
+if(!b) return true;
+if(a.tempo < b.tempo - V9_EPS_TEMPO_SEG) return true;
+if(b.tempo < a.tempo - V9_EPS_TEMPO_SEG) return false;
+return a.distancia < b.distancia - 1;
+}
+
+function sementeVizinhoV9(indices,resultado,primeiroForcado=null,pesoKm=0){
+const restantes=new Set(indices),saida=[];
+let atual=0;
+if(Number.isInteger(primeiroForcado)&&restantes.has(primeiroForcado)){
+saida.push(primeiroForcado);restantes.delete(primeiroForcado);atual=primeiroForcado;
+}
+while(restantes.size){
+let melhor=null,melhorCusto=Infinity;
+for(const candidato of restantes){
+const t=valorMatriz(resultado.duracoes,atual,candidato);
+const d=valorMatriz(resultado.distancias,atual,candidato);
+const custo=t+pesoKm*(d/1000);
+if(custo<melhorCusto){melhorCusto=custo;melhor=candidato;}
+}
+if(melhor===null) break;
+saida.push(melhor);restantes.delete(melhor);atual=melhor;
+}
+return saida;
+}
+
+function sementeInsercaoV9(indices,resultado,primeiroForcado=null){
+const restantes=new Set(indices);
+let rota=[];
+if(Number.isInteger(primeiroForcado)&&restantes.has(primeiroForcado)){
+rota=[primeiroForcado];restantes.delete(primeiroForcado);
+}else{
+let primeiro=null,melhor=Infinity;
+for(const x of restantes){const t=valorMatriz(resultado.duracoes,0,x);if(t<melhor){melhor=t;primeiro=x;}}
+if(primeiro===null) return [];
+rota=[primeiro];restantes.delete(primeiro);
+}
+while(restantes.size){
+let melhorInsercao=null;
+for(const x of restantes){
+for(let pos=0;pos<=rota.length;pos++){
+const cand=[...rota.slice(0,pos),x,...rota.slice(pos)];
+const m=metricasIndicesV9(cand,resultado);
+if(!melhorInsercao||avaliacaoMelhorV9(m,melhorInsercao.metricas)) melhorInsercao={x,pos,metricas:m};
+}
+}
+if(!melhorInsercao) break;
+rota.splice(melhorInsercao.pos,0,melhorInsercao.x);restantes.delete(melhorInsercao.x);
+}
+return rota;
+}
+
+function melhorMovimentoV9(rota,resultado,tipo,tamanhoBloco=1){
+const atual=metricasIndicesV9(rota,resultado),n=rota.length;
+let melhor=null;
+const testar=cand=>{const m=metricasIndicesV9(cand,resultado);if(avaliacaoMelhorV9(m,atual)&&(!melhor||avaliacaoMelhorV9(m,melhor.metricas))) melhor={rota:cand,metricas:m};};
+if(tipo==='relocar'){
+for(let i=0;i<n;i++){
+const x=rota[i],base=[...rota.slice(0,i),...rota.slice(i+1)];
+for(let j=0;j<n;j++){if(j===i) continue;testar([...base.slice(0,j),x,...base.slice(j)]);}
+}
+}else if(tipo==='trocar'){
+for(let i=0;i<n-1;i++) for(let j=i+1;j<n;j++){const c=[...rota];[c[i],c[j]]=[c[j],c[i]];testar(c);}
+}else if(tipo==='inverter'){
+for(let i=0;i<n-1;i++) for(let j=i+1;j<n;j++) testar([...rota.slice(0,i),...rota.slice(i,j+1).reverse(),...rota.slice(j+1)]);
+}else if(tipo==='bloco'){
+const L=tamanhoBloco;
+for(let i=0;i<=n-L;i++){
+const bloco=rota.slice(i,i+L),base=[...rota.slice(0,i),...rota.slice(i+L)];
+for(let j=0;j<=base.length;j++){if(j===i) continue;testar([...base.slice(0,j),...bloco,...base.slice(j)]);}
+}
+}
+return melhor;
+}
+
+function melhorRealocacaoRapidaV9(rota,resultado,metricasAtuais){
+const n=rota.length;
+let melhor=null;
+function aresta(a,b){
+if(b===null||b===undefined) return {tempo:0,distancia:0};
+return {tempo:valorMatriz(resultado.duracoes,a,b),distancia:valorMatriz(resultado.distancias,a,b)};
+}
+for(let i=0;i<n;i++){
+const x=rota[i];
+const pred=i===0?0:rota[i-1];
+const prox=i<n-1?rota[i+1]:null;
+const ePredX=aresta(pred,x),eXProx=aresta(x,prox),ePredProx=aresta(pred,prox);
+if(!Number.isFinite(ePredX.tempo)||!Number.isFinite(ePredX.distancia)) continue;
+const base=[...rota.slice(0,i),...rota.slice(i+1)];
+const deltaRemT=(prox!==null?ePredProx.tempo:0)-ePredX.tempo-(prox!==null?eXProx.tempo:0);
+const deltaRemD=(prox!==null?ePredProx.distancia:0)-ePredX.distancia-(prox!==null?eXProx.distancia:0);
+for(let j=0;j<=base.length;j++){
+if(j===i) continue;
+const p=j===0?0:base[j-1];
+const q=j<base.length?base[j]:null;
+const ePX=aresta(p,x),eXQ=aresta(x,q),ePQ=aresta(p,q);
+if(!Number.isFinite(ePX.tempo)||!Number.isFinite(ePX.distancia)) continue;
+const deltaInsT=ePX.tempo+(q!==null?eXQ.tempo:0)-(q!==null?ePQ.tempo:0);
+const deltaInsD=ePX.distancia+(q!==null?eXQ.distancia:0)-(q!==null?ePQ.distancia:0);
+const m={tempo:metricasAtuais.tempo+deltaRemT+deltaInsT,distancia:metricasAtuais.distancia+deltaRemD+deltaInsD};
+if(avaliacaoMelhorV9(m,metricasAtuais)&&(!melhor||avaliacaoMelhorV9(m,melhor.metricas))){
+melhor={rota:[...base.slice(0,j),x,...base.slice(j)],metricas:m};
+}
+}
+}
+return melhor;
+}
+
+function refinarGlobalV9(rota,resultado,rodadas=3){
+let atual=[...rota],met=metricasIndicesV9(atual,resultado);
+for(let r=0;r<rodadas;r++){
+let mudou=false;
+// Realocação é o movimento mais importante para entregas e agora usa delta
+// de arestas O(n²), permitindo busca global sem congelar o celular.
+for(let k=0;k<Math.min(6,atual.length);k++){
+const mov=melhorRealocacaoRapidaV9(atual,resultado,met);
+if(!mov) break;
+atual=mov.rota;met=mov.metricas;mudou=true;
+}
+for(const tipo of ['trocar','inverter']){
+const mov=melhorMovimentoV9(atual,resultado,tipo,1);
+if(mov&&avaliacaoMelhorV9(mov.metricas,met)){atual=mov.rota;met=mov.metricas;mudou=true;}
+}
+if(!mudou) break;
+}
+return {ordem:atual,metricas:met};
+}
+
+function corrigirPassouPertoV9(rota,resultado){
+let r=[...rota],mudou=true,ciclos=0;
+while(mudou&&ciclos++<3){
+mudou=false;
+externo: for(let i=0;i<r.length-1;i++){
+const anterior=i===0?0:r[i-1],atual=r[i];
+const tDireto=valorMatriz(resultado.duracoes,anterior,atual);
+const dDireto=valorMatriz(resultado.distancias,anterior,atual);
+if(!Number.isFinite(tDireto)||!Number.isFinite(dDireto)) continue;
+for(let j=i+1;j<r.length;j++){
+const x=r[j];
+const extraT=valorMatriz(resultado.duracoes,anterior,x)+valorMatriz(resultado.duracoes,x,atual)-tDireto;
+const extraD=valorMatriz(resultado.distancias,anterior,x)+valorMatriz(resultado.distancias,x,atual)-dDireto;
+if(extraT<=20&&extraD<=180){r.splice(j,1);r.splice(i,0,x);mudou=true;break externo;}
+}
+}
+}
+return r;
+}
+
+async function motorAutomaticoV9(indices,resultado,baseline){
+const sementes=[];
+sementes.push([...baseline]);
+sementes.push(sementeVizinhoV9(indices,resultado));
+sementes.push(sementeVizinhoV9(indices,resultado,null,1.5));
+sementes.push(sementeInsercaoV9(indices,resultado));
+const proximos=[...indices].sort((a,b)=>valorMatriz(resultado.duracoes,0,a)-valorMatriz(resultado.duracoes,0,b)).slice(0,Math.min(indices.length,indices.length<=90?4:3));
+const distantes=[...indices].sort((a,b)=>valorMatriz(resultado.duracoes,0,b)-valorMatriz(resultado.duracoes,0,a)).slice(0,Math.min(indices.length,1));
+for(const primeiro of [...proximos,...distantes]){
+sementes.push(sementeVizinhoV9(indices,resultado,primeiro));
+}
+const unicas=[],vistos=new Set();
+for(const s of sementes){const k=s.join(',');if(s.length===indices.length&&!vistos.has(k)){vistos.add(k);unicas.push(s);}}
+let melhor={ordem:[...baseline],metricas:metricasIndicesV9(baseline,resultado)};
+const ranqueadas=unicas
+.map(ordem=>({ordem,metricas:metricasIndicesV9(ordem,resultado)}))
+.sort((a,b)=>{
+if(avaliacaoMelhorV9(a.metricas,b.metricas)) return -1;
+if(avaliacaoMelhorV9(b.metricas,a.metricas)) return 1;
+return 0;
+});
+const limiteRefino=indices.length<=90?4:3;
+const finalistas=ranqueadas.slice(0,limiteRefino);
+// A baseline também merece uma chance de melhoria mesmo quando não ficou
+// entre as sementes brutas mais promissoras.
+if(!finalistas.some(x=>x.ordem.join(',')===baseline.join(','))){
+finalistas.push({ordem:[...baseline],metricas:metricasIndicesV9(baseline,resultado)});
+}
+const rodadas=indices.length<=90?3:2;
+for(let i=0;i<finalistas.length;i++){
+atualizarProgressoOtimizacao(`Refinando melhores candidatas... ${i+1}/${finalistas.length}`);
+let refinada=refinarGlobalV9(finalistas[i].ordem,resultado,rodadas);
+let passou=corrigirPassouPertoV9(refinada.ordem,resultado);
+refinada=refinarGlobalV9(passou,resultado,1);
+if(avaliacaoMelhorV9(refinada.metricas,melhor.metricas)) melhor=refinada;
+if(i<finalistas.length-1) await esperar(0);
+}
+return melhor;
+}
+
+async function otimizarRotaAutomaticamenteV9(){
+if(!grupos.length){mostrarToast('⚠️ Importe uma rota primeiro','alerta');return;}
+const ativos=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g));
+const semCoordenada=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&!paradaTemCoordenadaValidaV84(g));
+const entregues=grupos.filter(g=>!paradaParticipaDoDesenhoV84(g));
+if(ativos.length<2){mostrarToast('⚠️ Não há paradas suficientes para otimizar','alerta');return;}
+let inicio;
+try{
+abrirOverlayOtimizacao('Obtendo sua localização atual...');
+inicio=await obterPontoInicialOtimizacao();
+atualizarProgressoOtimizacao('Montando matriz direcional das ruas...');
+const pontos=[inicio,...ativos.map(pontoGrupo)];
+const matriz=await consultarMatrizGlobalOSRM(pontos);
+const porId=new Map(ativos.map((g,i)=>[g.id,i+1]));
+const baselineGrupos=[...ativos].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+const baselineIndices=baselineGrupos.map(g=>porId.get(g.id));
+const indices=ativos.map(g=>porId.get(g.id));
+const resultado=await motorAutomaticoV9(indices,matriz,baselineIndices);
+const gruposPorIndice=new Map(ativos.map((g,i)=>[i+1,g]));
+const ordemGrupos=resultado.ordem.map(i=>gruposPorIndice.get(i)).filter(Boolean);
+const baselineMet=metricasIndicesV9(baselineIndices,matriz);
+const diferencaTempoV9 = resultado.metricas.tempo - baselineMet.tempo;
+const melhorou = diferencaTempoV9 < -1 || (Math.abs(diferencaTempoV9) <= 1 && resultado.metricas.distancia < baselineMet.distancia - 1);
+const ordemFinal=melhorou?ordemGrupos:baselineGrupos;
+const metFinal=melhorou?resultado.metricas:baselineMet;
+const tempoServico=ordemFinal.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
+const metricasFinal={duracao:metFinal.tempo+tempoServico,distancia:metFinal.distancia};
+const metricasShopee={duracao:baselineMet.tempo+tempoServico,distancia:baselineMet.distancia};
+const idsAtivos=new Set(ordemFinal.map(g=>g.id));
+const naoRoteaveis=[...semCoordenada].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+grupos=[...ordemFinal,...naoRoteaveis,...entregues];
+grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;(g.pacotes||[]).forEach(p=>p.organizadoCarro=false);});
+atualizarProgressoOtimizacao('Desenhando a rota vencedora pelas ruas...');
+const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio);
+metaRota={
+modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:'v9_tempo_primeiro_km_desempate',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
+distanciaMetros:metricasFinal.distancia,duracaoSegundos:metricasFinal.duracao,
+distanciaShopeeMetros:metricasShopee.distancia,duracaoShopeeSegundos:metricasShopee.duracao,
+destinoFinal:null,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
+geometriaRota:geometria||null,paradasAnalisadas:ativos.length,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
+};
+modoOrganizacaoPacotes=false;mapaFoiEnquadrado=true;salvarStorage();fecharOverlayOtimizacao();renderizarTudo();
+if(melhorou) mostrarToast('⚡ V9 encontrou uma rota melhor que a Shopee','sucesso');
+else mostrarToast('✅ A Shopee já era a melhor referência encontrada — mantida','neutro');
+if(semCoordenada.length) setTimeout(()=>mostrarToast(`⚠️ ${semCoordenada.length} parada(s) sem coordenada ficaram no final da lista`,'alerta'),500);
+}catch(erro){
+console.error('Falha na otimização V9:',erro);fecharOverlayOtimizacao();mostrarToast('⚠️ Não consegui calcular a matriz das ruas. A ordem atual foi mantida.','alerta');
+}
 }
 
 // ======================================================================
@@ -6476,7 +6767,7 @@ return `
 <strong>${tempoShopee || '—'}${distShopee ? ` · ${distShopee}` : ''}</strong>
 </div>
 <div class="comparacao-item otimizada">
-${metaRota.modo === 'desenho' ? '✏️ Sua rota' : (metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : '⚡ Otimizada')}
+${metaRota.modo === 'desenho' ? '✏️ Sua rota' : (metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : (metaRota.modo === 'auto_v9' ? '⚡ V9 automática' : '⚡ Otimizada'))}
 <strong>${tempoOtimizado || '—'}${distOtimizada ? ` · ${distOtimizada}` : ''}</strong>
 </div>
 </div>
@@ -6500,13 +6791,25 @@ return;
 
 el.style.display='block';
 const manual = metaRota && metaRota.modo === 'desenho';
-if(btnRestaurar) btnRestaurar.style.display = manual ? 'block' : 'none';
-if(btnOrganizar) btnOrganizar.style.display = (manual && !metaRota.organizacaoPacotesConcluida) ? 'block' : 'none';
+const autoV9 = metaRota && metaRota.modo === 'auto_v9';
+const rotaReorganizada = manual || autoV9;
+if(btnRestaurar) btnRestaurar.style.display = rotaReorganizada ? 'block' : 'none';
+if(btnOrganizar) btnOrganizar.style.display = (rotaReorganizada && !metaRota.organizacaoPacotesConcluida) ? 'block' : 'none';
+
+if(autoV9){
+const comparacaoAuto = htmlComparacaoTempoRota();
+const manteve = metaRota.resultadoOtimizacao === 'shopee_mantida';
+el.innerHTML = `
+<div class="linha-status-rota">${manteve ? '✅ V9 analisou a rota e manteve a Shopee' : '⚡ Rota automática V9 aplicada'}</div>
+<div>${manteve ? 'Nenhuma alternativa testada conseguiu superar a ordem original em tempo de deslocamento.' : 'A V9 usa a matriz direcional das ruas, gera múltiplas candidatas e refina a sequência. Tempo é o critério principal; em empate técnico, vence a menor quilometragem.'}</div>
+${comparacaoAuto}`;
+return;
+}
 
 if(!manual){
 el.innerHTML = `
 <div class="linha-status-rota">📦 Ordem da Shopee ativa</div>
-<div>A otimização automática está desligada. Se quiser reorganizar, use <strong>“✏️ Otimizar rota desenhando no mapa”</strong>. O desenho é opcional.</div>`;
+<div>Você pode usar <strong>“⚡ Otimizar automaticamente — V9”</strong> ou desenhar sua própria ordem. Nenhuma otimização é obrigatória.</div>`;
 return;
 }
 
@@ -6524,7 +6827,7 @@ ${comparacaoManual}`;
 function htmlReferenciaRota(grupo){
 if(!temOrdemOtimizada(grupo)) return '';
 const shopee = ehStopValido(grupo.stopOriginal ?? grupo.stop) ? String(grupo.stopOriginal ?? grupo.stop) : 'Extra';
-const rotulo = metaRota && metaRota.modo === 'desenho' ? '✏️ Manual' : '⚡ Otimizada';
+const rotulo = metaRota && metaRota.modo === 'desenho' ? '✏️ Manual' : (metaRota && metaRota.modo === 'auto_v9' ? '⚡ V9' : '⚡ Otimizada');
 return `
 <div class="rota-referencia">
 <span class="rota-otimizada-pill">${rotulo}: <strong>${grupo.ordemOtimizada}</strong></span>
@@ -7419,7 +7722,7 @@ if(metaRota && metaRota.organizacaoPacotesConcluida === undefined) metaRota.orga
 // V8.1 desativa definitivamente a otimização automática antiga. Rotas salvas
 // pelas versões V7 voltam para a ordem da Shopee; somente um desenho manual
 // V8.1 é preservado ao reabrir o navegador.
-if(!metaRota || metaRota.modo !== 'desenho'){
+if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo)){
 grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 grupos.forEach(g=>{ g.ordemOtimizada = null; (g.pacotes||[]).forEach(p=>p.organizadoCarro=false); });
 metaRota = {modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()};
