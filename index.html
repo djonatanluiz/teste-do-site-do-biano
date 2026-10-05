@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.4</title>
+<title>Copiloto Entregas V8.5</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1408,14 +1408,14 @@ font-weight:700;
 .rota-gps-linha{filter:drop-shadow(0 1px 2px rgba(0,0,0,.18));}
 
 
-/* V8.3 - paradas obrigatórias no desenho */
+/* V8.5 - paradas obrigatórias no desenho: indicação discreta */
 .pin-mapa.nao-selecionado-desenho .pin-corpo{
-animation:pulsoParadaNaoSelecionada 1.9s ease-in-out infinite;
-box-shadow:0 0 0 2px rgba(0,167,199,.78),0 0 0 5px rgba(0,167,199,.09),0 3px 8px rgba(0,0,0,.32);
+animation:pulsoParadaNaoSelecionada 2.8s ease-in-out infinite;
+box-shadow:0 0 0 2px rgba(0,167,199,.52),0 0 0 4px rgba(0,167,199,.045),0 3px 8px rgba(0,0,0,.30);
 }
 @keyframes pulsoParadaNaoSelecionada{
-0%,100%{transform:scale(1);box-shadow:0 0 0 2px rgba(0,167,199,.72),0 0 0 5px rgba(0,167,199,.07),0 3px 8px rgba(0,0,0,.32);}
-50%{transform:scale(1.045);box-shadow:0 0 0 2px rgba(0,167,199,.9),0 0 0 8px rgba(0,167,199,.05),0 3px 8px rgba(0,0,0,.34);}
+0%,100%{transform:scale(1);box-shadow:0 0 0 2px rgba(0,167,199,.48),0 0 0 4px rgba(0,167,199,.035),0 3px 8px rgba(0,0,0,.30);}
+50%{transform:scale(1.018);box-shadow:0 0 0 2px rgba(0,167,199,.64),0 0 0 6px rgba(0,167,199,.035),0 3px 8px rgba(0,0,0,.31);}
 }
 .organizar-pacote-acao{width:auto;min-width:136px;margin:0;padding:10px 12px;border-radius:10px;background:#22c55e;color:white;font-size:12px;font-weight:800;}
 .organizar-pacote-meta{font-size:12px;color:#475569;margin-top:3px;font-weight:700;}
@@ -1464,7 +1464,7 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.4</div>
+<div class="versao-copiloto">Copiloto V8.5</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -2247,71 +2247,80 @@ function paradasFaltantesDesenhoV82(){
 return paradasValidasDesenhoV82().filter(g=>!capturasDesenhoRota.has(g.id));
 }
 
-// V8.3 - Revalida todas as capturas depois de cada traço usando o centro
-// VISUAL do pin. Isso evita falso \"faltam 1\" quando o ponteiro se move
-// rápido e o navegador não emite um pointermove exatamente sobre o marcador.
+// V8.5 - Revalida TODAS as capturas em METROS REAIS, não em pixels.
+// Isso deixa a seleção independente de zoom, tamanho visual do pin e pan do mapa.
+// O desenho é uma intenção de corredor, então consideramos selecionada uma parada
+// quando o traço passa suficientemente perto da coordenada real da entrega.
+const RAIO_CAPTURA_DESENHO_METROS_V85 = 70;
+
+function distanciaParadaAoSegmentoMetrosV85(grupo, a, b){
+const lat=Number(grupo.lat), lng=Number(grupo.lng);
+const refLat=lat*Math.PI/180;
+const cos=Math.cos(refLat);
+const ax=(Number(a.lng)-lng)*111320*cos;
+const ay=(Number(a.lat)-lat)*111320;
+const bx=(Number(b.lng)-lng)*111320*cos;
+const by=(Number(b.lat)-lat)*111320;
+const vx=bx-ax, vy=by-ay;
+const den=vx*vx+vy*vy;
+let t=0;
+if(den>1e-9) t=Math.max(0,Math.min(1,(-ax*vx-ay*vy)/den));
+const qx=ax+t*vx, qy=ay+t*vy;
+return {dist:Math.hypot(qx,qy),t};
+}
+
 function recomputarCapturasDesenhoV83(){
-if(!mapa || !tracosDesenhoRota.length) return;
+if(!tracosDesenhoRota.length){
+capturasDesenhoRota=new Map();
+return;
+}
 
-const mapaEl=mapa.getContainer();
-if(!mapaEl) return;
-const mapaRect=mapaEl.getBoundingClientRect();
-const novas=new Map();
-
-const bases=[];
+const segmentos=[];
 let acumuladoGlobal=0;
 for(let ti=0;ti<tracosDesenhoRota.length;ti++){
 const traco=tracosDesenhoRota[ti]||[];
-const segs=[];
 for(let i=1;i<traco.length;i++){
-const a=mapa.latLngToContainerPoint([traco[i-1].lat,traco[i-1].lng]);
-const b=mapa.latLngToContainerPoint([traco[i].lat,traco[i].lng]);
-const segM=distanciaMetros(Number(traco[i-1].lat),Number(traco[i-1].lng),Number(traco[i].lat),Number(traco[i].lng));
-segs.push({a,b,segM,base:acumuladoGlobal});
+const a=traco[i-1], b=traco[i];
+const segM=distanciaMetros(Number(a.lat),Number(a.lng),Number(b.lat),Number(b.lng));
+segmentos.push({a,b,segM,base:acumuladoGlobal});
 acumuladoGlobal+=segM;
 }
-bases.push(segs);
 if(ti<tracosDesenhoRota.length-1) acumuladoGlobal+=25;
 }
 
+const novas=new Map();
 for(const g of paradasValidasDesenhoV82()){
-const m=marcadores[g.id];
-// A posição real da entrega no Leaflet é a ÂNCORA do pin (a ponta da gota).
-// Na V8.3 usávamos principalmente o centro visual do ícone; dependendo do
-// zoom isso podia gerar o falso "faltam 1" mesmo com o traço passando pela
-// localização correta. Agora testamos os dois pontos e usamos o mais próximo.
-const candidatosPonto=[mapa.latLngToContainerPoint([Number(g.lat),Number(g.lng)])];
-let limiar=38;
-const el=m&&m.getElement?m.getElement():null;
-if(el){
-const r=el.getBoundingClientRect();
-candidatosPonto.push(L.point((r.left+r.right)/2-mapaRect.left,(r.top+r.bottom)/2-mapaRect.top));
-limiar=Math.max(36,Math.min(46,Math.max(r.width,r.height)*0.72+12));
-}
-
 let melhor=null;
-for(const gp of candidatosPonto){
-for(const segs of bases){
-for(const seg of segs){
-const rr=distanciaPontoSegmentoPixel(gp,seg.a,seg.b);
+for(const seg of segmentos){
+const rr=distanciaParadaAoSegmentoMetrosV85(g,seg.a,seg.b);
 if(!melhor || rr.dist<melhor.dist){
 melhor={dist:rr.dist,progresso:seg.base+rr.t*seg.segM};
 }
 }
-}
-}
-if(melhor && melhor.dist<=limiar){
-novas.set(g.id,{progresso:melhor.progresso,distPx:melhor.dist});
+if(melhor && melhor.dist<=RAIO_CAPTURA_DESENHO_METROS_V85){
+novas.set(g.id,{progresso:melhor.progresso,distMetros:melhor.dist});
 }
 }
 
 capturasDesenhoRota=novas;
-
 Object.entries(marcadores).forEach(([id,m])=>{
 const el=m&&m.getElement?m.getElement():null;
 const pin=el?el.querySelector('.pin-mapa'):null;
 if(pin) pin.classList.toggle('capturado-desenho',capturasDesenhoRota.has(id));
 });
+}
+
+function descricaoParadaFaltanteV85(g){
+if(ehStopValido(g.stop)) return `Shopee ${String(g.stop).trim()}`;
+const e=String(g.endereco||'').trim();
+return e ? e.split(',').slice(0,2).join(',') : 'Extra';
+}
+
+function resumoFaltantesDesenhoV85(faltantes){
+if(!faltantes || !faltantes.length) return '';
+const nomes=faltantes.slice(0,4).map(descricaoParadaFaltanteV85);
+const extra=faltantes.length>4?` +${faltantes.length-4}`:'';
+return `${nomes.join(' · ')}${extra}`;
 }
 
 function atualizarDestaqueFaltantesDesenhoV82(){
@@ -2321,7 +2330,7 @@ Object.entries(marcadores).forEach(([id,m])=>{
 const el=m&&m.getElement?m.getElement():null;
 const pin=el?el.querySelector('.pin-mapa'):null;
 if(pin) pin.classList.toggle('nao-selecionado-desenho',ids.has(id));
-if(m&&typeof m.setZIndexOffset==='function'&&ids.has(id)) m.setZIndexOffset(600);
+if(m&&typeof m.setZIndexOffset==='function') m.setZIndexOffset(ids.has(id)?600:0);
 });
 const btn=document.getElementById('btnAplicarDesenhoRota');
 if(btn){
@@ -2330,8 +2339,10 @@ const faltam=faltantes.length;
 const totalM=tracosDesenhoRota.reduce((a,t)=>a+comprimentoTracoMetros(t),0);
 const desenhoValido=tracosDesenhoRota.length>0 && totalM>=20;
 btn.textContent=faltam?`Aplicar desenho · faltam ${faltam}`:'Aplicar desenho';
-// Agora é uma trava real: com qualquer parada faltando o botão não clica.
 btn.disabled=!desenhoValido || faltam>0 || total===0;
+}
+if(faltantes.length){
+console.info('[Copiloto V8.5] Paradas ainda fora do corredor desenhado:', faltantes.map(g=>({id:g.id,shopee:g.stop,endereco:g.endereco,lat:g.lat,lng:g.lng})));
 }
 return faltantes;
 }
@@ -2422,7 +2433,7 @@ return total + (tracosDesenhoRota.length ? 25 : 0);
 
 function tentarCapturarPinsNoSegmentoV81(aPx,bPx,aLL,bLL,progressoAntes,comprimentoSegmentoM){
 if(!mapa) return;
-const LIMIAR_PX=38;
+const LIMIAR_PX=44;
 grupos.forEach(g=>{
 if(capturasDesenhoRota.has(g.id)) return;
 const lat=Number(g.lat),lng=Number(g.lng);
@@ -2496,7 +2507,7 @@ const faltantes=atualizarDestaqueFaltantesDesenhoV82();
 const totalValidos=paradasValidasDesenhoV82().length;
 atualizarInstrucaoDesenho(valido
 ? (faltantes.length
-? `${capturasDesenhoRota.size} de ${totalValidos} paradas selecionadas. ⚠️ Faltam ${faltantes.length}; elas estão pulsando em azul no mapa.`
+? `${capturasDesenhoRota.size} de ${totalValidos} paradas selecionadas. ⚠️ Falta: ${resumoFaltantesDesenhoV85(faltantes)}.`
 : `✅ Todas as ${totalValidos} paradas foram selecionadas. Você pode aplicar a ordem desenhada.`)
 : 'O traço ficou muito curto. Desenhe novamente.');
 };
@@ -2706,8 +2717,8 @@ if(faltantes.length){
 atualizarDestaqueFaltantesDesenhoV82();
 const bounds=faltantes.map(g=>[Number(g.lat),Number(g.lng)]);
 if(mapa&&bounds.length){try{mapa.fitBounds(bounds,{padding:[70,70],maxZoom:17});}catch(e){}}
-atualizarInstrucaoDesenho(`⚠️ Faltam ${faltantes.length} parada(s). Elas estão pulsando em azul; inclua todas antes de aplicar.`);
-mostrarToast(`⚠️ Faltam ${faltantes.length} parada(s) no desenho`,'alerta');
+atualizarInstrucaoDesenho(`⚠️ Falta selecionar: ${resumoFaltantesDesenhoV85(faltantes)}. O pin está destacado no mapa.`);
+mostrarToast(`⚠️ Falta: ${resumoFaltantesDesenhoV85(faltantes)}`,'alerta');
 return;
 }
 let inicio;
