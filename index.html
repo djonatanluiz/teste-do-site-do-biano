@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V8.5</title>
+<title>Copiloto Entregas V8.6</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1408,14 +1408,56 @@ font-weight:700;
 .rota-gps-linha{filter:drop-shadow(0 1px 2px rgba(0,0,0,.18));}
 
 
-/* V8.5 - paradas obrigatórias no desenho: indicação discreta */
+/* V8.6 - seleção PRECISA pelo próprio pin visual.
+   Durante o desenho: ! azul = ainda falta | ✓ = já atravessada. */
 .pin-mapa.nao-selecionado-desenho .pin-corpo{
-animation:pulsoParadaNaoSelecionada 2.8s ease-in-out infinite;
-box-shadow:0 0 0 2px rgba(0,167,199,.52),0 0 0 4px rgba(0,167,199,.045),0 3px 8px rgba(0,0,0,.30);
+position:relative;
+animation:pulsoParadaNaoSelecionadaV86 3.4s ease-in-out infinite;
+box-shadow:0 0 0 3px rgba(0,167,199,.92),0 0 0 6px rgba(0,167,199,.12),0 3px 8px rgba(0,0,0,.32);
 }
-@keyframes pulsoParadaNaoSelecionada{
-0%,100%{transform:scale(1);box-shadow:0 0 0 2px rgba(0,167,199,.48),0 0 0 4px rgba(0,167,199,.035),0 3px 8px rgba(0,0,0,.30);}
-50%{transform:scale(1.018);box-shadow:0 0 0 2px rgba(0,167,199,.64),0 0 0 6px rgba(0,167,199,.035),0 3px 8px rgba(0,0,0,.31);}
+.pin-mapa.nao-selecionado-desenho .pin-corpo::after{
+content:"!";
+position:absolute;
+right:-8px;
+top:-9px;
+width:15px;
+height:15px;
+border-radius:50%;
+background:#00a7c7;
+color:#fff;
+font-size:10px;
+font-weight:900;
+line-height:15px;
+text-align:center;
+border:2px solid #fff;
+box-shadow:0 1px 3px rgba(0,0,0,.25);
+z-index:3;
+}
+.pin-mapa.capturado-desenho .pin-corpo{
+position:relative;
+box-shadow:0 0 0 2px rgba(34,197,94,.72),0 3px 8px rgba(0,0,0,.30);
+}
+.pin-mapa.capturado-desenho .pin-corpo::after{
+content:"✓";
+position:absolute;
+right:-8px;
+top:-9px;
+width:15px;
+height:15px;
+border-radius:50%;
+background:#22c55e;
+color:#fff;
+font-size:9px;
+font-weight:900;
+line-height:15px;
+text-align:center;
+border:2px solid #fff;
+box-shadow:0 1px 3px rgba(0,0,0,.22);
+z-index:3;
+}
+@keyframes pulsoParadaNaoSelecionadaV86{
+0%,100%{box-shadow:0 0 0 3px rgba(0,167,199,.80),0 0 0 6px rgba(0,167,199,.08),0 3px 8px rgba(0,0,0,.30);}
+50%{box-shadow:0 0 0 3px rgba(0,167,199,1),0 0 0 8px rgba(0,167,199,.13),0 3px 8px rgba(0,0,0,.32);}
 }
 .organizar-pacote-acao{width:auto;min-width:136px;margin:0;padding:10px 12px;border-radius:10px;background:#22c55e;color:white;font-size:12px;font-weight:800;}
 .organizar-pacote-meta{font-size:12px;color:#475569;margin-top:3px;font-weight:700;}
@@ -1464,7 +1506,7 @@ Importar Rota
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V8.5</div>
+<div class="versao-copiloto">Copiloto V8.6</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1557,7 +1599,7 @@ Importar Rota
 
 <div id="painelDesenhoRota">
 <div class="desenho-rota-titulo">✏️ Desenhe a intenção da rota</div>
-<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Passe o desenho por TODAS as paradas na ordem desejada; você pode mover o mapa e continuar sem perder os traços.</div>
+<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Passe a linha POR CIMA do círculo de cada pin. ! azul = falta selecionar · ✓ = selecionado. Você pode mover o mapa e continuar.</div>
 <div class="desenho-modos">
 <button id="btnModoDesenharRota" class="ativo" onclick="definirModoInteracaoDesenho('desenhar')">✏️ Desenhar</button>
 <button id="btnModoMoverRota" onclick="definirModoInteracaoDesenho('mover')">✋ Mover mapa</button>
@@ -1676,6 +1718,7 @@ let eventosDesenhoInstalados = false;
 let tracosDesenhoRota = [];
 let linhasTracosDesenho = [];
 let tracoAtualDesenho = null;
+let baseProgressoTracoAtual = 0;
 let linhaTracoAtual = null;
 let modoInteracaoDesenho = 'desenhar';
 let linhaRotaGps = null;
@@ -2247,67 +2290,84 @@ function paradasFaltantesDesenhoV82(){
 return paradasValidasDesenhoV82().filter(g=>!capturasDesenhoRota.has(g.id));
 }
 
-// V8.5 - Revalida TODAS as capturas em METROS REAIS, não em pixels.
-// Isso deixa a seleção independente de zoom, tamanho visual do pin e pan do mapa.
-// O desenho é uma intenção de corredor, então consideramos selecionada uma parada
-// quando o traço passa suficientemente perto da coordenada real da entrega.
-const RAIO_CAPTURA_DESENHO_METROS_V85 = 70;
+// V8.6 - SELEÇÃO EXATA PELO PIN VISUAL
+// Uma parada só é selecionada quando a linha desenhada realmente atravessa
+// o círculo visível do pin. "Passar perto" não conta.
+const RAIO_VISUAL_PIN_DESENHO_V86 = 12; // raio do corpo circular de 24px
+const METADE_LINHA_DESENHO_V86 = 2.5;   // linha azul tem 5px
+const LIMIAR_CAPTURA_PIN_PX_V86 = RAIO_VISUAL_PIN_DESENHO_V86 + METADE_LINHA_DESENHO_V86;
 
-function distanciaParadaAoSegmentoMetrosV85(grupo, a, b){
-const lat=Number(grupo.lat), lng=Number(grupo.lng);
-const refLat=lat*Math.PI/180;
-const cos=Math.cos(refLat);
-const ax=(Number(a.lng)-lng)*111320*cos;
-const ay=(Number(a.lat)-lat)*111320;
-const bx=(Number(b.lng)-lng)*111320*cos;
-const by=(Number(b.lat)-lat)*111320;
-const vx=bx-ax, vy=by-ay;
-const den=vx*vx+vy*vy;
-let t=0;
-if(den>1e-9) t=Math.max(0,Math.min(1,(-ax*vx-ay*vy)/den));
-const qx=ax+t*vx, qy=ay+t*vy;
-return {dist:Math.hypot(qx,qy),t};
+function centroVisualPinDesenhoV86(grupo){
+if(!mapa) return null;
+const marcador=marcadores[grupo.id];
+const container=mapa.getContainer();
+if(marcador && container && typeof marcador.getElement==='function'){
+const el=marcador.getElement();
+const corpo=el ? el.querySelector('.pin-corpo') : null;
+if(corpo){
+const r=corpo.getBoundingClientRect();
+const mr=container.getBoundingClientRect();
+if(r.width>0 && r.height>0){
+return L.point((r.left+r.right)/2-mr.left,(r.top+r.bottom)/2-mr.top);
 }
-
-function recomputarCapturasDesenhoV83(){
-if(!tracosDesenhoRota.length){
-capturasDesenhoRota=new Map();
-return;
 }
-
-const segmentos=[];
-let acumuladoGlobal=0;
-for(let ti=0;ti<tracosDesenhoRota.length;ti++){
-const traco=tracosDesenhoRota[ti]||[];
-for(let i=1;i<traco.length;i++){
-const a=traco[i-1], b=traco[i];
-const segM=distanciaMetros(Number(a.lat),Number(a.lng),Number(b.lat),Number(b.lng));
-segmentos.push({a,b,segM,base:acumuladoGlobal});
-acumuladoGlobal+=segM;
 }
-if(ti<tracosDesenhoRota.length-1) acumuladoGlobal+=25;
+// Fallback: o anchor do Leaflet fica na ponta inferior do pin; o centro do
+// círculo fica aproximadamente 22px acima dessa ponta.
+const lat=Number(grupo.lat),lng=Number(grupo.lng);
+if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+const ancora=mapa.latLngToContainerPoint([lat,lng]);
+return L.point(ancora.x,ancora.y-22);
 }
 
-const novas=new Map();
-for(const g of paradasValidasDesenhoV82()){
-let melhor=null;
-for(const seg of segmentos){
-const rr=distanciaParadaAoSegmentoMetrosV85(g,seg.a,seg.b);
-if(!melhor || rr.dist<melhor.dist){
-melhor={dist:rr.dist,progresso:seg.base+rr.t*seg.segM};
-}
-}
-if(melhor && melhor.dist<=RAIO_CAPTURA_DESENHO_METROS_V85){
-novas.set(g.id,{progresso:melhor.progresso,distMetros:melhor.dist});
-}
-}
-
-capturasDesenhoRota=novas;
-Object.entries(marcadores).forEach(([id,m])=>{
+function atualizarClasseCapturaPinV86(id){
+const m=marcadores[id];
 const el=m&&m.getElement?m.getElement():null;
 const pin=el?el.querySelector('.pin-mapa'):null;
-if(pin) pin.classList.toggle('capturado-desenho',capturasDesenhoRota.has(id));
-});
+if(!pin) return;
+const capturado=capturasDesenhoRota.has(id);
+pin.classList.toggle('capturado-desenho',capturado);
+pin.classList.toggle('nao-selecionado-desenho',modoDesenhoRota&&!capturado&&paradasValidasDesenhoV82().some(g=>g.id===id));
+}
+
+function capturarPinsNoTracoV86(traco,baseProgresso){
+if(!mapa || !Array.isArray(traco) || traco.length<2) return;
+const candidatos=paradasValidasDesenhoV82().filter(g=>!capturasDesenhoRota.has(g.id));
+if(!candidatos.length) return;
+
+let acumuladoLocal=0;
+const segmentos=[];
+for(let i=1;i<traco.length;i++){
+const aLL=traco[i-1],bLL=traco[i];
+const aPx=mapa.latLngToContainerPoint([Number(aLL.lat),Number(aLL.lng)]);
+const bPx=mapa.latLngToContainerPoint([Number(bLL.lat),Number(bLL.lng)]);
+const segM=distanciaMetros(Number(aLL.lat),Number(aLL.lng),Number(bLL.lat),Number(bLL.lng));
+segmentos.push({aPx,bPx,segM,base:acumuladoLocal});
+acumuladoLocal+=segM;
+}
+
+for(const g of candidatos){
+const gp=centroVisualPinDesenhoV86(g);
+if(!gp) continue;
+let melhor=null;
+for(const seg of segmentos){
+const rr=distanciaPontoSegmentoPixel(gp,seg.aPx,seg.bPx);
+if(!melhor || rr.dist<melhor.dist){
+melhor={dist:rr.dist,progresso:Number(baseProgresso||0)+seg.base+rr.t*seg.segM};
+}
+}
+if(melhor && melhor.dist<=LIMIAR_CAPTURA_PIN_PX_V86){
+capturasDesenhoRota.set(g.id,{progresso:melhor.progresso,distPx:melhor.dist,metodo:'pin_visual_v86'});
+atualizarClasseCapturaPinV86(g.id);
+}
+}
+}
+
+// Mantido por compatibilidade com chamadas antigas. Na V8.6 NÃO recalculamos
+// capturas antigas a partir do zoom atual: uma vez que o traço cruzou o pin,
+// a seleção permanece enquanto o usuário move/zooma o mapa para continuar.
+function recomputarCapturasDesenhoV83(){
+for(const g of paradasValidasDesenhoV82()) atualizarClasseCapturaPinV86(g.id);
 }
 
 function descricaoParadaFaltanteV85(g){
@@ -2342,7 +2402,7 @@ btn.textContent=faltam?`Aplicar desenho · faltam ${faltam}`:'Aplicar desenho';
 btn.disabled=!desenhoValido || faltam>0 || total===0;
 }
 if(faltantes.length){
-console.info('[Copiloto V8.5] Paradas ainda fora do corredor desenhado:', faltantes.map(g=>({id:g.id,shopee:g.stop,endereco:g.endereco,lat:g.lat,lng:g.lng})));
+console.info('[Copiloto V8.6] Paradas ainda não atravessadas pelo traço:', faltantes.map(g=>({id:g.id,shopee:g.stop,endereco:g.endereco,lat:g.lat,lng:g.lng})));
 }
 return faltantes;
 }
@@ -2433,22 +2493,18 @@ return total + (tracosDesenhoRota.length ? 25 : 0);
 
 function tentarCapturarPinsNoSegmentoV81(aPx,bPx,aLL,bLL,progressoAntes,comprimentoSegmentoM){
 if(!mapa) return;
-const LIMIAR_PX=44;
-grupos.forEach(g=>{
-if(capturasDesenhoRota.has(g.id)) return;
-const lat=Number(g.lat),lng=Number(g.lng);
-if(!Number.isFinite(lat)||!Number.isFinite(lng)) return;
-const gp=mapa.latLngToContainerPoint([lat,lng]);
+for(const g of paradasValidasDesenhoV82()){
+if(capturasDesenhoRota.has(g.id)) continue;
+const gp=centroVisualPinDesenhoV86(g);
+if(!gp) continue;
 const r=distanciaPontoSegmentoPixel(gp,aPx,bPx);
-if(r.dist<=LIMIAR_PX){
-capturasDesenhoRota.set(g.id,{progresso:progressoAntes+r.t*comprimentoSegmentoM,distPx:r.dist});
+if(r.dist<=LIMIAR_CAPTURA_PIN_PX_V86){
+capturasDesenhoRota.set(g.id,{progresso:progressoAntes+r.t*comprimentoSegmentoM,distPx:r.dist,metodo:'pin_visual_v86'});
+atualizarClasseCapturaPinV86(g.id);
 const m=marcadores[g.id];
-const el=m && m.getElement ? m.getElement() : null;
-const pin=el ? el.querySelector('.pin-mapa') : null;
-if(pin){ pin.classList.add('capturado-desenho'); pin.classList.remove('nao-selecionado-desenho'); }
 if(m&&typeof m.setZIndexOffset==='function') m.setZIndexOffset(0);
 }
-});
+}
 }
 
 function instalarEventosDesenhoRota(){
@@ -2467,7 +2523,8 @@ const px=pontoEventoNoMapa(ev);if(!px) return;
 const ll=mapa.containerPointToLatLng(px);
 tracoAtualDesenho=[{lat:ll.lat,lng:ll.lng}];
 ultimoPontoDesenhoPx=px;
-comprimentoDesenhoPx=progressoBaseNovoTraco();
+baseProgressoTracoAtual=progressoBaseNovoTraco();
+comprimentoDesenhoPx=baseProgressoTracoAtual;
 linhaTracoAtual=L.polyline([[ll.lat,ll.lng]],{color:'#00a7c7',weight:5,opacity:.9,interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapa);
 linhasTracosDesenho.push(linhaTracoAtual);
 atualizarInstrucaoDesenho('Desenhando… solte o dedo quando quiser. Depois você pode mover o mapa e continuar com outro traço.');
@@ -2495,13 +2552,18 @@ if(!modoDesenhoRota || !desenhandoRota) return;
 if(modoInteracaoDesenho==='desenhar'){ ev.preventDefault();ev.stopPropagation(); }
 desenhandoRota=false;
 try{container.releasePointerCapture(ev.pointerId);}catch(erro){}
-if(tracoAtualDesenho && tracoAtualDesenho.length>=2) tracosDesenhoRota.push(tracoAtualDesenho);
+if(tracoAtualDesenho && tracoAtualDesenho.length>=2){
+const tracoFinalizado=tracoAtualDesenho.slice();
+// Repassa APENAS este traço no mesmo zoom em que ele foi desenhado. Assim
+// movimentos rápidos não perdem um pin, mas também não capturamos por perto.
+capturarPinsNoTracoV86(tracoFinalizado,baseProgressoTracoAtual);
+tracosDesenhoRota.push(tracoFinalizado);
+}
 tracoAtualDesenho=null;linhaTracoAtual=null;
 pontosDesenhoRota=tracosDesenhoRota.flat();
 const totalM=tracosDesenhoRota.reduce((a,t)=>a+comprimentoTracoMetros(t),0);
 const valido=tracosDesenhoRota.length>0 && totalM>=20;
-// Repassa o traço inteiro sobre todos os pins para não depender da frequência
-// dos eventos pointermove durante o gesto.
+// As capturas foram validadas pelo círculo visual no zoom de cada traço.
 recomputarCapturasDesenhoV83();
 const faltantes=atualizarDestaqueFaltantesDesenhoV82();
 const totalValidos=paradasValidasDesenhoV82().length;
@@ -2704,7 +2766,7 @@ return simplificarPontosV81(pts,1200);
 
 async function aplicarDesenhoOtimizacao(){
 if(!tracosDesenhoRota.length){mostrarToast('⚠️ Desenhe pelo menos um trecho da rota','alerta');return;}
-// V8.3: valida novamente o desenho completo no instante do clique.
+// V8.6: confirma o conjunto já capturado pelo cruzamento visual exato dos pins.
 recomputarCapturasDesenhoV83();
 const validos=paradasValidasDesenhoV82();
 const invalidos=paradasAtivasSemCoordenadaV84();
