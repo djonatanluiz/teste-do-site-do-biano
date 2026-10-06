@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10</title>
+<title>Copiloto Entrega V10.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1638,6 +1638,45 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 </style>
 
 <style id="v10-extra-fixes">
+/* V10.1 */
+.auto-v9-btn{background:#2a57c8!important;}
+.acoes-rota-home{grid-template-columns:1fr;}
+#btnConfigOtimizacaoV9{display:none!important;}
+.home-insights{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px;}
+.home-insight{background:#f8f9fc;border:1px solid #eef1f6;border-radius:11px;padding:9px 10px;min-width:0;}
+.home-insight span{display:block;font-size:9.5px;color:#98a2b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.home-insight strong{display:block;font-size:13px;color:#344054;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sheet-route-summary{position:static!important;inset:auto!important;margin:0 0 10px!important;border:1px solid #e7eaf0;box-shadow:none!important;border-radius:14px!important;padding:11px 12px!important;background:#fff!important;z-index:auto!important;}
+#botaoListaMapaDesktop{display:none;}
+.settings-container{max-width:760px;margin:0 auto;padding-top:18px;padding-bottom:28px;}
+.settings-title{padding:4px 3px 13px;}
+.settings-title h2{font-size:22px;margin:2px 0 2px;letter-spacing:-.5px;}
+.settings-title p{font-size:12px;color:#98a2b3;margin:0;}
+.settings-card{background:#fff;border:1px solid #eaecf0;border-radius:18px;overflow:hidden;margin-bottom:12px;box-shadow:0 4px 16px rgba(16,24,40,.035);}
+.settings-row{width:100%;margin:0;padding:14px 15px;border:0;border-bottom:1px solid #f0f2f5;border-radius:0;background:#fff;color:#344054;display:grid;grid-template-columns:38px 1fr auto;gap:11px;align-items:center;text-align:left;box-shadow:none;}
+.settings-row:last-child{border-bottom:0;}
+.settings-row-button{cursor:pointer;}
+.settings-row-icon{width:38px;height:38px;border-radius:12px;background:#f2f6ff;color:var(--brand);display:flex;align-items:center;justify-content:center;}
+.settings-row-icon .ui-icon{width:20px;height:20px;}
+.settings-row-copy strong{display:block;font-size:13.5px;color:#101828;}
+.settings-row-copy span{display:block;font-size:10.5px;color:#98a2b3;line-height:1.35;margin-top:2px;}
+.settings-arrow{width:17px;height:17px;color:#98a2b3;transform:rotate(90deg);}
+.settings-switch{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:999px;background:#d0d5dd;position:relative;transition:.2s;cursor:pointer;margin:0;}
+.settings-switch::after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s;}
+.settings-switch:checked{background:var(--brand);}
+.settings-switch:checked::after{transform:translateX(18px);}
+@media(max-width:799px){
+  .sheet-lista-mapa{transform:translateY(100%)!important;height:min(88%,760px);pointer-events:none;}
+  .sheet-lista-mapa.aberto{transform:translateY(0)!important;pointer-events:auto;}
+  .sheet-lista-mapa:not(.aberto) .sheet-lista-handle,.sheet-lista-mapa:not(.aberto) .sheet-lista-conteudo{pointer-events:none;}
+  #botaoListaMapaDesktop{display:none!important;}
+}
+@media(min-width:800px){
+  #botaoListaMapaDesktop{display:flex;}
+  .sheet-lista-mapa{transform:translateY(calc(100% - 67px));}
+  .sheet-lista-mapa.aberto{transform:translateY(0);}
+}
+
 .rota-resumo-v10{display:flex;align-items:center;gap:8px;color:#344054}.rota-resumo-v10 .ui-icon{color:var(--brand)}.rota-resumo-v10 strong{display:block;font-size:12px}.rota-resumo-v10 small{display:block;font-size:10px;color:#667085;margin-top:1px}.otimizacao-caixa h2{display:flex;align-items:center;gap:7px}.destino-selecionado-info{display:flex;align-items:flex-start;gap:6px}.destino-selecionado-info .ui-icon{margin-top:1px}.icone-opcao{display:flex!important;align-items:center;justify-content:center}.icone-opcao .ui-icon{width:24px;height:24px}.organizar-parada-cab>.ui-icon,.organizar-pacote-codigo>.ui-icon{width:16px;height:16px}.badge-status{display:inline-flex!important;align-items:center;gap:4px}.badge-status .ui-icon{width:14px;height:14px}.ocorrencia-pacote-texto{display:flex;align-items:center;gap:5px}.ocorrencia-pacote-texto .ui-icon{width:15px;height:15px}
 </style>
 </head>
@@ -1647,6 +1686,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <defs>
 <symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-7h5v7"/></symbol>
 <symbol id="icon-map" viewBox="0 0 24 24"><path d="m3 6 5-2 8 2 5-2v14l-5 2-8-2-5 2Z"/><path d="M8 4v14M16 6v14"/></symbol>
+<symbol id="icon-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".8"/><circle cx="3.5" cy="12" r=".8"/><circle cx="3.5" cy="18" r=".8"/></symbol>
 <symbol id="icon-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16V9a3 3 0 0 1 3-3h7"/><path d="m14 4 2 2-2 2"/></symbol>
 <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4Z"/><path d="M12 9v4.5M12 17h.01"/></symbol>
 <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v5h14v-5"/></symbol>
@@ -1682,7 +1722,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <nav class="abas" aria-label="Navegação principal">
 <button class="aba-btn ativa" id="btnAbaLista" onclick="irParaAba(0)"><svg class="ui-icon"><use href="#icon-home"></use></svg><span>Home</span></button>
 <button class="aba-btn" id="btnAbaMapa" onclick="irParaAba(1)"><svg class="ui-icon"><use href="#icon-map"></use></svg><span>Mapa</span></button>
-<button class="aba-btn ocorrencias-aba" id="btnAbaOcorrencias" onclick="irParaAba(2)"><span class="tab-icon-wrap"><svg class="ui-icon"><use href="#icon-alert"></use></svg><b id="badgeOcorrenciasTab" class="tab-badge" style="display:none">0</b></span><span>Ocorrências</span></button>
+<button class="aba-btn" id="btnAbaOcorrencias" onclick="irParaAba(2)"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurações</span><b id="badgeOcorrenciasTab" style="display:none">0</b></button>
 </nav>
 
 <div id="areaAbas">
@@ -1696,7 +1736,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10</div>
+<div class="versao-copiloto">V10.1</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -1704,7 +1744,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 <div class="acoes-rota-home">
 <button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="executarOtimizacaoPrincipalV9()"><svg class="ui-icon"><use href="#icon-route"></use></svg><span>Otimizar rota</span><small id="resumoModoOtimizacaoV9">Mais rápida</small></button>
-<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurar</span></button>
+<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()" style="display:none"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurar</span></button>
 </div>
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;"><svg class="ui-icon"><use href="#icon-pencil"></use></svg><span>Otimização manual</span></button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;"><span>Restaurar ordem original</span></button>
@@ -1718,6 +1758,11 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="stat ocorrencia-cor"><div>Ocorrências</div><h2 id="qtdOcorrencias">0</h2></div>
 </div>
 <div class="barra-progresso"><div class="barra-progresso-fill" id="barraProgresso">0%</div></div>
+<div class="home-insights" id="homeInsights">
+<div class="home-insight"><span>Progresso</span><strong id="homeInsightProgresso">0%</strong></div>
+<div class="home-insight"><span>Paradas restantes</span><strong id="homeInsightParadas">0</strong></div>
+<div class="home-insight"><span>Próxima parada</span><strong id="homeInsightProxima">—</strong></div>
+</div>
 </div>
 
 <section class="home-urgencias">
@@ -1731,15 +1776,10 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="painel-aba" id="painelMapa">
 <div id="mapa"></div>
 
-<div id="resumoMapa">
-<div id="resumoMapaTextos"><span id="resumoMapaTexto">0 pendentes</span><span id="resumoMapaOcorrencias">0 ocorrências</span></div>
-<div class="legenda-mapa"><span><i class="ponto-legenda" style="background:#003CBD"></i> Pendente</span><span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span><span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span></div>
-<div id="statusLocalizacaoMapa"><svg class="ui-icon mini"><use href="#icon-pin"></use></svg><span>Localização: aguardando GPS...</span></div>
-</div>
-
 <div id="painelBuscaMapa"><input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()"><button onclick="buscarParadaNoMapa()" aria-label="Buscar"><svg class="ui-icon"><use href="#icon-search"></use></svg></button></div>
 <button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada"><svg class="ui-icon"><use href="#icon-search"></use></svg></button>
 <button id="botaoOcultarEntregues" class="botao-flutuante-mapa" style="top:146px;" onclick="alternarOcultarEntreguesMapa()" title="Ocultar/mostrar entregues"><svg class="ui-icon"><use href="#icon-eye"></use></svg></button>
+<button id="botaoListaMapaDesktop" class="botao-flutuante-mapa" style="top:202px;" onclick="alternarSheetListaMapa()" title="Abrir lista de paradas"><svg class="ui-icon"><use href="#icon-list"></use></svg></button>
 <button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar"><svg class="ui-icon"><use href="#icon-target"></use></svg></button>
 <button id="botaoAjustarPosicao" style="display:none;" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa"><svg class="ui-icon"><use href="#icon-crosshair-pin"></use></svg></button>
 
@@ -1759,6 +1799,11 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="sheet-handle-row"><div><strong>Paradas</strong><span id="sheetListaResumo">Arraste para cima</span></div><svg class="ui-icon sheet-chevron"><use href="#icon-chevron-up"></use></svg></div>
 </div>
 <div class="sheet-lista-conteudo">
+<div id="resumoMapa" class="sheet-route-summary">
+<div id="resumoMapaTextos"><span id="resumoMapaTexto">0 pendentes</span><span id="resumoMapaOcorrencias">0 ocorrências</span></div>
+<div class="legenda-mapa"><span><i class="ponto-legenda" style="background:#003CBD"></i> Pendente</span><span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span><span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span></div>
+<div id="statusLocalizacaoMapa"><svg class="ui-icon mini"><use href="#icon-pin"></use></svg><span>Localização: aguardando GPS...</span></div>
+</div>
 <button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes</button>
 <div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
 <div class="organizar-header"><div><div class="organizar-titulo"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes no carro</div><div class="organizar-subtitulo">Carregue na ordem inversa: a última entrega entra primeiro.</div></div><button class="organizar-fechar" onclick="fecharOrganizacaoPacotes()">Fechar</button></div>
@@ -1770,8 +1815,35 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 </div>
 
 <div class="painel-aba" id="painelOcorrencias">
-<div class="container">
-<div id="listaOcorrencias"></div>
+<div class="container settings-container">
+<div class="settings-title"><div><div class="eyebrow">PREFERÊNCIAS</div><h2>Configurações</h2><p>Ajuste o Copiloto para o seu jeito de trabalhar.</p></div></div>
+
+<section class="settings-card">
+<button class="settings-row settings-row-button" onclick="abrirConfiguracaoV9()">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
+<div class="settings-row-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Mais rápida</span></div>
+<svg class="ui-icon settings-arrow"><use href="#icon-chevron-up"></use></svg>
+</button>
+</section>
+
+<section class="settings-card">
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-eye"></use></svg></div>
+<div class="settings-row-copy"><strong>Ocultar entregues no mapa</strong><span>Deixa o mapa mais limpo conforme a rota avança.</span></div>
+<input class="settings-switch" id="configOcultarEntreguesV10" type="checkbox" onchange="alternarConfigOcultarEntreguesV10(this.checked)">
+</label>
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-list"></use></svg></div>
+<div class="settings-row-copy"><strong>Mostrar lista recolhida no computador</strong><span>No celular a lista continua escondida até você arrastar para cima.</span></div>
+<input class="settings-switch" id="configSheetDesktopV10" type="checkbox" checked onchange="alternarConfigSheetDesktopV10(this.checked)">
+</label>
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-clock"></use></svg></div>
+<div class="settings-row-copy"><strong>Manter tela ativa durante a rota</strong><span>Evita que a tela apague quando o aparelho permitir.</span></div>
+<input class="settings-switch" id="configTelaAtivaV10" type="checkbox" onchange="alternarConfigTelaAtivaV10(this.checked)">
+</label>
+</section>
+<div id="listaOcorrencias" style="display:none"></div>
 </div>
 </div>
 
@@ -1876,9 +1948,38 @@ function textoSemEmoji(texto){return String(texto||'').replace(/[\u{1F000}-\u{1F
 function selecionarArquivoRota(){const input=document.getElementById('arquivo');if(input) input.click();}
 let sheetListaMapaAberto=false;
 let sheetTouchInicioY=null;
-function definirSheetListaMapa(aberto){sheetListaMapaAberto=!!aberto;const sheet=document.getElementById('sheetListaMapa');if(sheet) sheet.classList.toggle('aberto',sheetListaMapaAberto);}
+let gestoBordaMapaInicioY=null;
+function ehLayoutMobileV10(){return window.matchMedia('(max-width: 799px)').matches;}
+function definirSheetListaMapa(aberto){
+sheetListaMapaAberto=!!aberto;
+const sheet=document.getElementById('sheetListaMapa');
+if(sheet) sheet.classList.toggle('aberto',sheetListaMapaAberto);
+}
 function alternarSheetListaMapa(){definirSheetListaMapa(!sheetListaMapaAberto);}
-function iniciarGestosSheetListaMapa(){const sheet=document.getElementById('sheetListaMapa');const alca=document.getElementById('alcaListaMapa');if(!sheet||!alca||sheet.dataset.gestos==='1')return;sheet.dataset.gestos='1';alca.addEventListener('touchstart',e=>{sheetTouchInicioY=e.touches&&e.touches[0]?e.touches[0].clientY:null;},{passive:true});alca.addEventListener('touchend',e=>{if(sheetTouchInicioY===null)return;const y=e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientY:sheetTouchInicioY;const d=y-sheetTouchInicioY;if(d<-28)definirSheetListaMapa(true);else if(d>28)definirSheetListaMapa(false);sheetTouchInicioY=null;},{passive:true});}
+function iniciarGestosSheetListaMapa(){
+const sheet=document.getElementById('sheetListaMapa');
+const alca=document.getElementById('alcaListaMapa');
+const painel=document.getElementById('painelMapa');
+if(!sheet||!alca||sheet.dataset.gestos==='1')return;
+sheet.dataset.gestos='1';
+alca.addEventListener('touchstart',e=>{sheetTouchInicioY=e.touches&&e.touches[0]?e.touches[0].clientY:null;},{passive:true});
+alca.addEventListener('touchend',e=>{if(sheetTouchInicioY===null)return;const y=e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientY:sheetTouchInicioY;const d=y-sheetTouchInicioY;if(d<-28)definirSheetListaMapa(true);else if(d>28)definirSheetListaMapa(false);sheetTouchInicioY=null;},{passive:true});
+if(painel){
+painel.addEventListener('touchstart',e=>{
+if(!ehLayoutMobileV10()||sheetListaMapaAberto)return;
+const t=e.touches&&e.touches[0];if(!t)return;
+const r=painel.getBoundingClientRect();
+gestoBordaMapaInicioY=(t.clientY>=r.bottom-105)?t.clientY:null;
+},{passive:true,capture:true});
+painel.addEventListener('touchend',e=>{
+if(gestoBordaMapaInicioY===null)return;
+const t=e.changedTouches&&e.changedTouches[0];
+const y=t?t.clientY:gestoBordaMapaInicioY;
+if(y-gestoBordaMapaInicioY<-48) definirSheetListaMapa(true);
+gestoBordaMapaInicioY=null;
+},{passive:true,capture:true});
+}
+}
 function abrirListaMapaNoGrupo(id){irParaAba(1);definirSheetListaMapa(true);setTimeout(()=>destacarElemento('grupo_'+id),260);}
 
 let abaAtual = 0; // 0 = Lista, 1 = Mapa, 2 = Ocorrências
@@ -3272,6 +3373,7 @@ atual.innerHTML=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
 }
 if(opPadrao) opPadrao.classList.toggle('selecionada',cfg.modo==='padrao');
 if(opDestino) opDestino.classList.toggle('selecionada',cfg.modo==='destino');
+atualizarResumoSettingsV10();
 }
 
 function abrirConfiguracaoV9(){
@@ -7564,7 +7666,7 @@ container.innerHTML=itens.map(({g,p,indice})=>`<article class="home-urgencia-car
 <div class="home-urgencia-actions"><button class="home-urgencia-open" onclick="irParaOcorrenciaHome('${g.id}')">${iconeLinha('alert')} Abrir ocorrência</button><button class="home-urgencia-map" onclick="focarGrupoNoMapaV10('${g.id}')">${iconeLinha('map')} Ver no mapa</button></div>
 </article>`).join('');
 }
-function irParaOcorrenciaHome(id){irParaAba(2);setTimeout(()=>destacarElemento('grupo_oc_'+id),220);}
+function irParaOcorrenciaHome(id){focarGrupoNoMapaV10(id);}
 function focarGrupoNoMapaV10(id){const g=encontrarGrupo(id);if(!g)return;irParaAba(1);setTimeout(()=>{inicializarMapaSeNecessario();const lat=Number(g.lat),lng=Number(g.lng);if(mapa&&Number.isFinite(lat)&&Number.isFinite(lng)){mapa.setView([lat,lng],17);abrirInfoMapa(id);}},220);}
 
 function alternarPacotes(id){
@@ -7873,7 +7975,7 @@ document.getElementById('qtdEntregues').innerText = pacotesEntregues;
 document.getElementById('qtdOcorrencias').innerText = pacotesOcorrencia;
 
 // Contadores das abas = mesma base (quantidade de pacotes)
-const badgeTab=document.getElementById('badgeOcorrenciasTab'); if(badgeTab){badgeTab.textContent=String(pacotesOcorrencia);badgeTab.style.display=pacotesOcorrencia?'block':'none';}
+const badgeTab=document.getElementById('badgeOcorrenciasTab'); if(badgeTab){badgeTab.textContent=String(pacotesOcorrencia);badgeTab.style.display='none';}
 const resumoSheet=document.getElementById('sheetListaResumo'); if(resumoSheet) resumoSheet.textContent=pacotesPendentes?`${pacotesPendentes} pacote(s) restante(s) · arraste para cima`:'Rota concluída';
 
 const totalPacotes = todosPacotes.length;
@@ -7901,6 +8003,7 @@ atualizarHistoricoEAvisarRecorde(pacotesEntregues);
 const barra = document.getElementById('barraProgresso');
 barra.style.width = percentual + '%';
 barra.innerText = percentual + '%';
+atualizarInformacoesHomeV101(percentual);
 
 // Uma comemoração quando a rota é 100% finalizada 🎉
 if(percentual === 100 && totalPacotes > 0){
@@ -8470,14 +8573,9 @@ if(!grupo) return;
 
 fecharInfoMapa();
 
-if(grupo.pacotes.some(p => p.status === 'ocorrencia')){
-irParaAba(2);
-setTimeout(()=> destacarElemento('grupo_oc_' + id), 200);
-}else{
 irParaAba(1);
 definirSheetListaMapa(true);
 setTimeout(()=> destacarElemento('grupo_' + id), 260);
-}
 }
 
 function destacarElemento(elementId){
@@ -8622,7 +8720,70 @@ if(modoDesenhoRota) setTimeout(()=>atualizarDestaqueFaltantesDesenhoV82(),0);
 
 
 // ----------------------------------------------------------------------
-// NAVEGAÇÃO POR ABAS (Lista / Mapa / Ocorrências) + SWIPE
+// V10.1 - PREFERÊNCIAS DO APP
+// ----------------------------------------------------------------------
+const CONFIG_V10_KEY='copiloto_entrega_config_v10_1';
+let wakeLockV10=null;
+function carregarPreferenciasV10(){
+let cfg={ocultarEntregues:false,sheetDesktop:true,telaAtiva:false};
+try{const bruto=localStorage.getItem(CONFIG_V10_KEY);if(bruto)cfg={...cfg,...JSON.parse(bruto)};}catch(e){}
+ocultarEntreguesMapa=!!cfg.ocultarEntregues;
+const btn=document.getElementById('botaoOcultarEntregues');if(btn)btn.classList.toggle('ativo',ocultarEntreguesMapa);
+const a=document.getElementById('configOcultarEntreguesV10');if(a)a.checked=!!cfg.ocultarEntregues;
+const b=document.getElementById('configSheetDesktopV10');if(b)b.checked=cfg.sheetDesktop!==false;
+const c=document.getElementById('configTelaAtivaV10');if(c)c.checked=!!cfg.telaAtiva;
+if(!ehLayoutMobileV10()&&cfg.sheetDesktop!==false) definirSheetListaMapa(false);
+if(cfg.telaAtiva) solicitarWakeLockV10();
+atualizarResumoSettingsV10();
+return cfg;
+}
+function salvarPreferenciasV10(patch){
+let atual={ocultarEntregues:false,sheetDesktop:true,telaAtiva:false};
+try{const bruto=localStorage.getItem(CONFIG_V10_KEY);if(bruto)atual={...atual,...JSON.parse(bruto)};}catch(e){}
+const novo={...atual,...patch};
+try{localStorage.setItem(CONFIG_V10_KEY,JSON.stringify(novo));}catch(e){}
+return novo;
+}
+function alternarConfigOcultarEntreguesV10(valor){
+ocultarEntreguesMapa=!!valor;salvarPreferenciasV10({ocultarEntregues:!!valor});
+const btn=document.getElementById('botaoOcultarEntregues');if(btn)btn.classList.toggle('ativo',ocultarEntreguesMapa);
+if(mapa)atualizarMapa();
+}
+function alternarConfigSheetDesktopV10(valor){
+salvarPreferenciasV10({sheetDesktop:!!valor});
+if(!ehLayoutMobileV10()&&!valor) definirSheetListaMapa(false);
+}
+async function solicitarWakeLockV10(){
+if(!('wakeLock' in navigator)||document.visibilityState!=='visible')return;
+try{wakeLockV10=await navigator.wakeLock.request('screen');}catch(e){wakeLockV10=null;}
+}
+async function liberarWakeLockV10(){try{if(wakeLockV10)await wakeLockV10.release();}catch(e){}wakeLockV10=null;}
+function alternarConfigTelaAtivaV10(valor){
+salvarPreferenciasV10({telaAtiva:!!valor});
+if(valor)solicitarWakeLockV10();else liberarWakeLockV10();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){let cfg={};try{cfg=JSON.parse(localStorage.getItem(CONFIG_V10_KEY)||'{}');}catch(e){}if(cfg.telaAtiva)solicitarWakeLockV10();}});
+function atualizarResumoSettingsV10(){
+const cfg=carregarConfiguracaoV9();
+const el=document.getElementById('settingsResumoOtimizacao');
+if(el)el.textContent=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)?`Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`:'Mais rápida';
+}
+function atualizarInformacoesHomeV101(percentual){
+const p=document.getElementById('homeInsightProgresso');if(p)p.textContent=`${Number.isFinite(percentual)?percentual:0}%`;
+const restantes=grupos.filter(g=>statusEfetivoGrupo(g)!=='entregue');
+const r=document.getElementById('homeInsightParadas');if(r)r.textContent=String(restantes.length);
+const pendentes=grupos.filter(g=>g.pacotes.some(p=>p.status==='pendente')).slice().sort((a,b)=>{
+ const oa=temOrdemOtimizada(a)?Number(a.ordemOtimizada):(ehStopValido(a.stop)?Number(a.stop):999999);
+ const ob=temOrdemOtimizada(b)?Number(b.ordemOtimizada):(ehStopValido(b.stop)?Number(b.stop):999999);
+ return oa-ob;
+});
+const prox=pendentes[0];
+const n=prox?(temOrdemOtimizada(prox)?prox.ordemOtimizada:(ehStopValido(prox.stop)?prox.stop:'Extra')):null;
+const el=document.getElementById('homeInsightProxima');if(el)el.textContent=n?`#${n}`:'—';
+}
+
+// ----------------------------------------------------------------------
+// NAVEGAÇÃO POR ABAS (Home / Mapa / Configurações)
 // ----------------------------------------------------------------------
 
 const painéis = ['painelLista','painelMapa','painelOcorrencias'];
@@ -8649,11 +8810,14 @@ if(indice === 1){
 inicializarMapaSeNecessario();
 iniciarGestosSheetListaMapa();
 iniciarRastreamentoLocalizacao();
+if(ehLayoutMobileV10()) definirSheetListaMapa(false);
+else {let cfg={sheetDesktop:true};try{cfg={...cfg,...JSON.parse(localStorage.getItem(CONFIG_V10_KEY)||'{}')};}catch(e){}if(cfg.sheetDesktop===false) definirSheetListaMapa(false);}
 setTimeout(()=>{
 mapa.invalidateSize();
 atualizarMapa();
 }, 100);
 }
+if(indice===2){carregarPreferenciasV10();atualizarResumoSettingsV10();}
 
 }
 
@@ -8776,6 +8940,7 @@ iniciarGestosSheetListaMapa();
 
 carregarStorage();
 configurarControlesPorDispositivoV82();
+carregarPreferenciasV10();
 
 // V7.1 é focada no celular: começa a pedir/acompanhar o GPS já ao abrir o
 // Copiloto, para a otimização ter um ponto inicial pronto antes da importação.
