@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V9.0</title>
+<title>Copiloto Entregas V9.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1131,6 +1131,54 @@ align-items:flex-start;
 
 .otimizacao-opcao:active{ background:#fff7f0; }
 
+.otimizacao-opcao.selecionada{
+border-color:#ff8a3d;
+background:#fff7f0;
+box-shadow:0 0 0 3px rgba(255,106,0,.10);
+}
+
+.config-v9-atual{
+margin-top:12px;
+padding:10px 11px;
+border-radius:11px;
+background:#f8fafc;
+border:1px solid #e5e7eb;
+font-size:12px;
+line-height:1.4;
+color:#475569;
+}
+
+.destino-busca-linha{
+display:grid;
+grid-template-columns:1fr auto;
+gap:7px;
+margin-top:8px;
+}
+
+.destino-busca-linha input{
+min-width:0;
+border:1px solid #d7dce2;
+border-radius:10px;
+padding:10px 11px;
+font-family:inherit;
+font-size:13px;
+outline:none;
+}
+
+.destino-busca-linha input:focus{
+border-color:#ff8a3d;
+box-shadow:0 0 0 3px rgba(255,106,0,.12);
+}
+
+.destino-busca-linha button{
+width:auto;
+margin:0;
+padding:10px 13px;
+background:#ff6a00;
+color:white;
+font-size:13px;
+}
+
 .otimizacao-opcao .icone-opcao{
 width:40px;
 height:40px;
@@ -1521,10 +1569,11 @@ onclick="importarExcel()">
 Importar Rota
 </button>
 
-<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="otimizarRotaAutomaticamenteV9()">⚡ Otimizar automaticamente — V9<small>Tempo primeiro · km como desempate · nunca pior que a Shopee</small></button>
-<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()">✏️ Otimizar rota desenhando no mapa</button>
+<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="executarOtimizacaoPrincipalV9()">⚡ Otimizar rota<small id="resumoModoOtimizacaoV9">V9 padrão · tempo primeiro · km como desempate</small></button>
+<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()">⚙️ Configuração de otimização</button>
+<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;">✏️ Otimizar rota desenhando no mapa</button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V9.0</div>
+<div class="versao-copiloto">Copiloto V9.1</div>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
@@ -1660,6 +1709,55 @@ Importar Rota
 </div>
 </div>
 
+<!-- V9.1: configuração principal da otimização -->
+<div class="otimizacao-fundo" id="modalConfigOtimizacaoV9">
+<div class="otimizacao-caixa">
+<h2>⚙️ Configuração de otimização</h2>
+<div class="otimizacao-subtitulo">Escolha como o motor V9 deve organizar suas próximas rotas. A configuração fica salva neste aparelho.</div>
+
+<button class="otimizacao-opcao" id="opcaoV9Padrao" onclick="selecionarConfiguracaoV9Padrao()">
+<div class="icone-opcao">⚡</div>
+<div><div class="titulo-opcao">V9 padrão</div><div class="desc-opcao">Busca a melhor ordem a partir da sua localização atual. Tempo pelas vias é prioridade; quilômetros desempata.</div></div>
+</button>
+
+<button class="otimizacao-opcao" id="opcaoV9Destino" onclick="selecionarConfiguracaoV9Destino()">
+<div class="icone-opcao">🏁</div>
+<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Usa o mesmo motor V9, mas favorece uma última entrega próxima ao ponto final escolhido no mapa ou por pesquisa.</div></div>
+</button>
+
+<div class="config-v9-atual" id="textoConfigAtualV9"></div>
+<button class="fechar-otimizacao-btn visivel" onclick="fecharConfiguracaoV9()">Fechar</button>
+</div>
+</div>
+
+<!-- V9.1: seletor do destino final por mapa/pesquisa -->
+<div class="otimizacao-fundo" id="modalDestinoFinal">
+<div class="otimizacao-caixa destino-picker-caixa">
+<h2>🏁 Onde deseja terminar?</h2>
+<div class="otimizacao-subtitulo">Pesquise um endereço ou toque diretamente no mapa. A V9 continuará priorizando tempo, mas levará esse ponto em conta na reta final.</div>
+
+<div class="destino-busca-linha">
+<input id="buscaEnderecoDestinoV9" type="text" placeholder="Pesquisar endereço, bairro ou local..." onkeydown="if(event.key==='Enter') buscarEnderecoDestinoV9()">
+<button onclick="buscarEnderecoDestinoV9()">🔍 Buscar</button>
+</div>
+
+<div id="areaDestinosSalvos" style="display:none;margin-top:10px;">
+<div class="destinos-salvos-titulo">Locais salvos</div>
+<div id="listaDestinosSalvos"></div>
+</div>
+
+<div id="mapaDestinoFinal"></div>
+<div class="destino-instrucao">Toque no ponto exato do mapa onde você quer terminar. Esse ponto não precisa ser uma entrega.</div>
+<div id="destinoSelecionadoInfo">Nenhum ponto selecionado.</div>
+<input id="nomeDestinoSalvo" class="destino-nome-input" type="text" placeholder="Nome opcional para salvar: Casa, Base, Galpão...">
+<div class="destino-acoes">
+<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()">💾 Salvar local</button>
+<button class="destino-usar-btn" onclick="confirmarDestinoSelecionadoV9()">Usar este destino</button>
+</div>
+<button class="fechar-otimizacao-btn visivel" onclick="fecharSeletorDestinoFinal()">Cancelar</button>
+</div>
+</div>
+
 <!-- V7.5: tela de cálculo -->
 <div class="overlay-otimizando" id="overlayOtimizando">
 <div class="otimizando-conteudo">
@@ -1703,6 +1801,7 @@ const OTIMIZACAO_PREF_KEY = "copiloto_entregas_otimizacao_pref_v7_2";
 const OTIMIZACAO_PRIMEIRA_ESCOLHA_KEY = "copiloto_entregas_otimizacao_primeira_escolha_v7_2";
 const DESTINOS_SALVOS_KEY = "copiloto_entregas_destinos_salvos";
 const DESTINOS_SALVOS_LEGADO_KEY = "copiloto_entregas_destinos_salvos_v7_1";
+const CONFIG_OTIMIZACAO_V9_KEY = "copiloto_entregas_config_otimizacao_v9_1";
 
 let metaRota = {
 modo:null,
@@ -2080,7 +2179,7 @@ atualizadoEm:Date.now()
 };
 salvarStorage();
 renderizarTudo();
-mostrarToast('📦 Rota carregada na ordem da Shopee. O desenho manual é opcional.', 'sucesso');
+mostrarToast('📦 Rota carregada. Toque em ⚡ Otimizar rota para aplicar a V9.', 'sucesso');
 
 }
 
@@ -2805,9 +2904,9 @@ for(let i=0;i<maxPontos;i++){const p=pontos[Math.round(i*passo)];saida.push({lat
 return saida;
 }
 
-async function geometriaRotaPelasRuasV81(ordem,inicio){
+async function geometriaRotaPelasRuasV81(ordem,inicio,destino=null){
 try{
-const pernas=await consultarPernasRotaOSRMV710(ordem,inicio,null);
+const pernas=await consultarPernasRotaOSRMV710(ordem,inicio,destino);
 const pts=[];
 for(const perna of pernas){for(const p of perna||[]){const ult=pts[pts.length-1];if(!ult||Math.abs(ult.lat-p.lat)>1e-7||Math.abs(ult.lng-p.lng)>1e-7) pts.push(p);}}
 return simplificarPontosV81(pts,1200);
@@ -3037,7 +3136,127 @@ renderizarOrganizacaoPacotes();
 
 
 // ======================================================================
-// V9.0 - MOTOR AUTOMÁTICO REALISTA (OPCIONAL)
+// V9.1 - CONFIGURAÇÃO PRINCIPAL DO MOTOR
+// ======================================================================
+
+function carregarConfiguracaoV9(){
+try{
+const bruto=localStorage.getItem(CONFIG_OTIMIZACAO_V9_KEY);
+const cfg=bruto?JSON.parse(bruto):null;
+if(!cfg||!['padrao','destino'].includes(cfg.modo)) return {modo:'padrao',destinoFinal:null};
+return {modo:cfg.modo,destinoFinal:pontoValido(cfg.destinoFinal)?cfg.destinoFinal:null};
+}catch(erro){
+return {modo:'padrao',destinoFinal:null};
+}
+}
+
+function salvarConfiguracaoV9(modo,destinoFinal=null){
+const cfg={modo:modo==='destino'?'destino':'padrao',destinoFinal:pontoValido(destinoFinal)?destinoFinal:null};
+try{localStorage.setItem(CONFIG_OTIMIZACAO_V9_KEY,JSON.stringify(cfg));}catch(erro){}
+atualizarResumoConfiguracaoV9();
+return cfg;
+}
+
+function textoDestinoCurtoV9(destino){
+if(!pontoValido(destino)) return 'nenhum destino selecionado';
+return destino.nome||destino.endereco||destino.texto||`${Number(destino.lat).toFixed(4)}, ${Number(destino.lng).toFixed(4)}`;
+}
+
+function atualizarResumoConfiguracaoV9(){
+const cfg=carregarConfiguracaoV9();
+const resumo=document.getElementById('resumoModoOtimizacaoV9');
+const atual=document.getElementById('textoConfigAtualV9');
+const opPadrao=document.getElementById('opcaoV9Padrao');
+const opDestino=document.getElementById('opcaoV9Destino');
+if(resumo){
+resumo.textContent=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
+? `Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`
+: 'V9 padrão · tempo primeiro · km como desempate';
+}
+if(atual){
+atual.innerHTML=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
+? `<strong>Configuração atual:</strong> 🏁 Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`
+: '<strong>Configuração atual:</strong> ⚡ V9 padrão';
+}
+if(opPadrao) opPadrao.classList.toggle('selecionada',cfg.modo==='padrao');
+if(opDestino) opDestino.classList.toggle('selecionada',cfg.modo==='destino');
+}
+
+function abrirConfiguracaoV9(){
+atualizarResumoConfiguracaoV9();
+const modal=document.getElementById('modalConfigOtimizacaoV9');
+if(modal) modal.classList.add('aberto');
+}
+
+function fecharConfiguracaoV9(){
+const modal=document.getElementById('modalConfigOtimizacaoV9');
+if(modal) modal.classList.remove('aberto');
+}
+
+function selecionarConfiguracaoV9Padrao(){
+salvarConfiguracaoV9('padrao',null);
+fecharConfiguracaoV9();
+mostrarToast('⚙️ V9 padrão selecionada','sucesso');
+}
+
+function selecionarConfiguracaoV9Destino(){
+fecharConfiguracaoV9();
+const cfg=carregarConfiguracaoV9();
+destinoSelecionadoAtual=pontoValido(cfg.destinoFinal)?{...cfg.destinoFinal}:null;
+abrirSeletorDestinoFinal();
+}
+
+async function buscarEnderecoDestinoV9(){
+const campo=document.getElementById('buscaEnderecoDestinoV9');
+const consulta=(campo&&campo.value||'').trim();
+if(!consulta){mostrarToast('⚠️ Digite um endereço para pesquisar','alerta');return;}
+try{
+mostrarToast('🔍 Procurando endereço...','neutro');
+const resultado=await geocodificarEndereco(consulta);
+if(!resultado){mostrarToast('⚠️ Endereço não encontrado','alerta');return;}
+const ponto={lat:Number(resultado.lat),lng:Number(resultado.lng),endereco:consulta,texto:consulta};
+await definirDestinoSelecionado(ponto,false);
+if(mapaDestinoFinal) mapaDestinoFinal.setView([ponto.lat,ponto.lng],17);
+}catch(erro){
+mostrarToast('⚠️ Não foi possível pesquisar este endereço','alerta');
+}
+}
+
+function confirmarDestinoSelecionadoV9(){
+if(!pontoValido(destinoSelecionadoAtual)){mostrarToast('⚠️ Escolha um ponto no mapa ou pesquise um endereço','alerta');return;}
+const nome=(document.getElementById('nomeDestinoSalvo')?.value||'').trim();
+const destino={...destinoSelecionadoAtual};
+if(nome){destino.nome=nome;destino.texto=nome;}
+else if(!destino.texto) destino.texto=destino.endereco||'Ponto escolhido no mapa';
+salvarConfiguracaoV9('destino',destino);
+fecharSeletorDestinoFinal();
+mostrarToast('🏁 Destino final salvo na configuração','sucesso');
+}
+
+function usarDestinoSalvoV9(id){
+const item=carregarDestinosSalvos().find(x=>String(x.id)===String(id));
+if(!item) return;
+destinoSelecionadoAtual={...item,texto:item.nome||item.endereco||'Local salvo'};
+salvarConfiguracaoV9('destino',destinoSelecionadoAtual);
+fecharSeletorDestinoFinal();
+mostrarToast(`🏁 ${item.nome||'Destino'} selecionado`,'sucesso');
+}
+
+async function executarOtimizacaoPrincipalV9(){
+const cfg=carregarConfiguracaoV9();
+if(cfg.modo==='destino'){
+if(!pontoValido(cfg.destinoFinal)){
+mostrarToast('🏁 Escolha primeiro onde deseja terminar','alerta');
+abrirSeletorDestinoFinal();
+return;
+}
+return otimizarRotaAutomaticamenteV9(cfg.destinoFinal);
+}
+return otimizarRotaAutomaticamenteV9(null);
+}
+
+// ======================================================================
+// V9.1 - MOTOR AUTOMÁTICO REALISTA (PRINCIPAL)
 // ======================================================================
 /*
 Princípios da V9:
@@ -3065,6 +3284,16 @@ const t=valorMatriz(resultado.duracoes,anterior,idx);
 const d=valorMatriz(resultado.distancias,anterior,idx);
 if(!Number.isFinite(t)||!Number.isFinite(d)) return {tempo:Infinity,distancia:Infinity};
 tempo+=t;distancia+=d;anterior=idx;
+}
+// V9.1: quando existe um destino final configurado, ele é um ponto fixo da
+// matriz. Assim o motor favorece uma última entrega que já deixe o motorista
+// próximo desse destino, sem transformar o destino em uma entrega.
+const fim = Number.isInteger(resultado && resultado.indiceDestinoFinalV9) ? resultado.indiceDestinoFinalV9 : null;
+if(fim !== null && ordem.length){
+const t=valorMatriz(resultado.duracoes,anterior,fim);
+const d=valorMatriz(resultado.distancias,anterior,fim);
+if(!Number.isFinite(t)||!Number.isFinite(d)) return {tempo:Infinity,distancia:Infinity};
+tempo+=t;distancia+=d;
 }
 return {tempo,distancia};
 }
@@ -3148,6 +3377,7 @@ return melhor;
 function melhorRealocacaoRapidaV9(rota,resultado,metricasAtuais){
 const n=rota.length;
 let melhor=null;
+const fim = Number.isInteger(resultado && resultado.indiceDestinoFinalV9) ? resultado.indiceDestinoFinalV9 : null;
 function aresta(a,b){
 if(b===null||b===undefined) return {tempo:0,distancia:0};
 return {tempo:valorMatriz(resultado.duracoes,a,b),distancia:valorMatriz(resultado.distancias,a,b)};
@@ -3155,18 +3385,20 @@ return {tempo:valorMatriz(resultado.duracoes,a,b),distancia:valorMatriz(resultad
 for(let i=0;i<n;i++){
 const x=rota[i];
 const pred=i===0?0:rota[i-1];
-const prox=i<n-1?rota[i+1]:null;
+const prox=i<n-1?rota[i+1]:fim;
 const ePredX=aresta(pred,x),eXProx=aresta(x,prox),ePredProx=aresta(pred,prox);
 if(!Number.isFinite(ePredX.tempo)||!Number.isFinite(ePredX.distancia)) continue;
+if(prox!==null && (!Number.isFinite(eXProx.tempo)||!Number.isFinite(ePredProx.tempo))) continue;
 const base=[...rota.slice(0,i),...rota.slice(i+1)];
 const deltaRemT=(prox!==null?ePredProx.tempo:0)-ePredX.tempo-(prox!==null?eXProx.tempo:0);
 const deltaRemD=(prox!==null?ePredProx.distancia:0)-ePredX.distancia-(prox!==null?eXProx.distancia:0);
 for(let j=0;j<=base.length;j++){
 if(j===i) continue;
 const p=j===0?0:base[j-1];
-const q=j<base.length?base[j]:null;
+const q=j<base.length?base[j]:fim;
 const ePX=aresta(p,x),eXQ=aresta(x,q),ePQ=aresta(p,q);
 if(!Number.isFinite(ePX.tempo)||!Number.isFinite(ePX.distancia)) continue;
+if(q!==null && (!Number.isFinite(eXQ.tempo)||!Number.isFinite(ePQ.tempo))) continue;
 const deltaInsT=ePX.tempo+(q!==null?eXQ.tempo:0)-(q!==null?ePQ.tempo:0);
 const deltaInsD=ePX.distancia+(q!==null?eXQ.distancia:0)-(q!==null?ePQ.distancia:0);
 const m={tempo:metricasAtuais.tempo+deltaRemT+deltaInsT,distancia:metricasAtuais.distancia+deltaRemD+deltaInsD};
@@ -3258,19 +3490,27 @@ if(i<finalistas.length-1) await esperar(0);
 return melhor;
 }
 
-async function otimizarRotaAutomaticamenteV9(){
+async function otimizarRotaAutomaticamenteV9(destinoFinal=null){
 if(!grupos.length){mostrarToast('⚠️ Importe uma rota primeiro','alerta');return;}
 const ativos=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g));
 const semCoordenada=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&!paradaTemCoordenadaValidaV84(g));
 const entregues=grupos.filter(g=>!paradaParticipaDoDesenhoV84(g));
 if(ativos.length<2){mostrarToast('⚠️ Não há paradas suficientes para otimizar','alerta');return;}
+const destino = pontoValido(destinoFinal) ? {
+lat:Number(destinoFinal.lat),
+lng:Number(destinoFinal.lng),
+nome:destinoFinal.nome||'',
+endereco:destinoFinal.endereco||'',
+texto:destinoFinal.texto||destinoFinal.nome||destinoFinal.endereco||'Destino final'
+} : null;
 let inicio;
 try{
-abrirOverlayOtimizacao('Obtendo sua localização atual...');
+abrirOverlayOtimizacao(destino?'Obtendo sua localização e preparando o destino final...':'Obtendo sua localização atual...');
 inicio=await obterPontoInicialOtimizacao();
-atualizarProgressoOtimizacao('Montando matriz direcional das ruas...');
-const pontos=[inicio,...ativos.map(pontoGrupo)];
+atualizarProgressoOtimizacao(destino?'Montando matriz das ruas com o destino final...':'Montando matriz direcional das ruas...');
+const pontos=[inicio,...ativos.map(pontoGrupo),...(destino?[destino]:[])];
 const matriz=await consultarMatrizGlobalOSRM(pontos);
+matriz.indiceDestinoFinalV9 = destino ? pontos.length-1 : null;
 const porId=new Map(ativos.map((g,i)=>[g.id,i+1]));
 const baselineGrupos=[...ativos].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
 const baselineIndices=baselineGrupos.map(g=>porId.get(g.id));
@@ -3286,22 +3526,24 @@ const metFinal=melhorou?resultado.metricas:baselineMet;
 const tempoServico=ordemFinal.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 const metricasFinal={duracao:metFinal.tempo+tempoServico,distancia:metFinal.distancia};
 const metricasShopee={duracao:baselineMet.tempo+tempoServico,distancia:baselineMet.distancia};
-const idsAtivos=new Set(ordemFinal.map(g=>g.id));
 const naoRoteaveis=[...semCoordenada].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
 grupos=[...ordemFinal,...naoRoteaveis,...entregues];
 grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;(g.pacotes||[]).forEach(p=>p.organizadoCarro=false);});
 atualizarProgressoOtimizacao('Desenhando a rota vencedora pelas ruas...');
-const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio);
+const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio,destino);
 metaRota={
-modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:'v9_tempo_primeiro_km_desempate',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
+modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:destino?'v9_tempo_primeiro_km_desempate_destino_final':'v9_tempo_primeiro_km_desempate',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
 distanciaMetros:metricasFinal.distancia,duracaoSegundos:metricasFinal.duracao,
 distanciaShopeeMetros:metricasShopee.distancia,duracaoShopeeSegundos:metricasShopee.duracao,
-destinoFinal:null,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
+destinoFinal:destino,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
 geometriaRota:geometria||null,paradasAnalisadas:ativos.length,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
 };
 modoOrganizacaoPacotes=false;mapaFoiEnquadrado=true;salvarStorage();fecharOverlayOtimizacao();renderizarTudo();
-if(melhorou) mostrarToast('⚡ V9 encontrou uma rota melhor que a Shopee','sucesso');
-else mostrarToast('✅ A Shopee já era a melhor referência encontrada — mantida','neutro');
+if(melhorou){
+mostrarToast(destino?'⚡ V9 otimizou a rota terminando próximo ao destino':'⚡ V9 encontrou uma rota melhor que a Shopee','sucesso');
+}else{
+mostrarToast(destino?'✅ Melhor referência mantida respeitando o destino final':'✅ A Shopee já era a melhor referência encontrada — mantida','neutro');
+}
 if(semCoordenada.length) setTimeout(()=>mostrarToast(`⚠️ ${semCoordenada.length} parada(s) sem coordenada ficaram no final da lista`,'alerta'),500);
 }catch(erro){
 console.error('Falha na otimização V9:',erro);fecharOverlayOtimizacao();mostrarToast('⚠️ Não consegui calcular a matriz das ruas. A ordem atual foi mantida.','alerta');
@@ -3515,7 +3757,7 @@ return `
 <div class="nome">📍 ${nome}</div>
 <div class="endereco">${endereco}</div>
 <div class="destino-salvo-acoes">
-<button class="destino-salvo-usar" onclick="usarDestinoSalvo('${item.id}')">Usar</button>
+<button class="destino-salvo-usar" onclick="usarDestinoSalvoV9('${item.id}')">Usar</button>
 <button class="destino-salvo-excluir" onclick="removerDestinoSalvo('${item.id}')">Excluir</button>
 </div>
 </div>`;
@@ -3565,7 +3807,12 @@ modal.classList.add('aberto');
 setTimeout(()=>{
 inicializarMapaDestinoFinal();
 mapaDestinoFinal.invalidateSize();
+if(pontoValido(destinoSelecionadoAtual)){
+definirDestinoSelecionado(destinoSelecionadoAtual,false);
+mapaDestinoFinal.setView([Number(destinoSelecionadoAtual.lat),Number(destinoSelecionadoAtual.lng)],16);
+}else{
 enquadrarMapaDestinoFinal();
+}
 }, 120);
 }
 
@@ -6793,15 +7040,17 @@ el.style.display='block';
 const manual = metaRota && metaRota.modo === 'desenho';
 const autoV9 = metaRota && metaRota.modo === 'auto_v9';
 const rotaReorganizada = manual || autoV9;
-if(btnRestaurar) btnRestaurar.style.display = rotaReorganizada ? 'block' : 'none';
+if(btnRestaurar) btnRestaurar.style.display = 'none'; // V9.1: função preservada no código, botão oculto
 if(btnOrganizar) btnOrganizar.style.display = (rotaReorganizada && !metaRota.organizacaoPacotesConcluida) ? 'block' : 'none';
 
 if(autoV9){
 const comparacaoAuto = htmlComparacaoTempoRota();
 const manteve = metaRota.resultadoOtimizacao === 'shopee_mantida';
+const comDestino = pontoValido(metaRota.destinoFinal);
+const destinoTxt = comDestino ? escaparHtmlTexto(textoDestinoCurtoV9(metaRota.destinoFinal)) : '';
 el.innerHTML = `
-<div class="linha-status-rota">${manteve ? '✅ V9 analisou a rota e manteve a Shopee' : '⚡ Rota automática V9 aplicada'}</div>
-<div>${manteve ? 'Nenhuma alternativa testada conseguiu superar a ordem original em tempo de deslocamento.' : 'A V9 usa a matriz direcional das ruas, gera múltiplas candidatas e refina a sequência. Tempo é o critério principal; em empate técnico, vence a menor quilometragem.'}</div>
+<div class="linha-status-rota">${manteve ? '✅ V9 analisou a rota e manteve a melhor referência' : (comDestino ? '🏁 V9 aplicada · final próximo do destino' : '⚡ Rota automática V9 aplicada')}</div>
+<div>${manteve ? 'Nenhuma alternativa testada conseguiu superar a referência em tempo de deslocamento.' : (comDestino ? `Destino configurado: <strong>${destinoTxt}</strong>. A V9 otimiza a rota inteira e inclui o custo da última entrega até esse ponto.` : 'A V9 usa a matriz direcional das ruas, gera múltiplas candidatas e refina a sequência. Tempo é o critério principal; em empate técnico, vence a menor quilometragem.')}</div>
 ${comparacaoAuto}`;
 return;
 }
@@ -8324,7 +8573,7 @@ if(marcadorDestinoRota){
 mapa.removeLayer(marcadorDestinoRota);
 marcadorDestinoRota = null;
 }
-if(metaRota && metaRota.modo === 'endereco' && metaRota.destinoFinal &&
+if(metaRota && metaRota.destinoFinal &&
 Number.isFinite(Number(metaRota.destinoFinal.lat)) && Number.isFinite(Number(metaRota.destinoFinal.lng))){
 const iconeDestino = L.divIcon({
 html:'<div class="pin-destino-final">🏁</div>',
@@ -8494,6 +8743,7 @@ frases[Math.floor(Math.random() * frases.length)];
 
 aplicarSaudacao();
 carregarPreferenciaSom();
+atualizarResumoConfiguracaoV9();
 
 // ----------------------------------------------------------------------
 // INICIALIZAÇÃO
