@@ -4,17 +4,21 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Copiloto Entrega">
 <meta name="google" content="notranslate">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entregas V9.1</title>
+<title>Copiloto Entrega V10</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -1527,163 +1531,242 @@ z-index:3;
 .organizar-pacote-acao{width:auto;min-width:136px;margin:0;padding:10px 12px;border-radius:10px;background:#22c55e;color:white;font-size:12px;font-weight:800;}
 .organizar-pacote-meta{font-size:12px;color:#475569;margin-top:3px;font-weight:700;}
 
+
+
+/* ======================================================================
+   V10 - APP MOBILE / NOVO LAYOUT
+   ====================================================================== */
+:root{--brand:#003CBD;--brand-700:#002d8f;--brand-050:#f2f6ff;--ink:#101828;--muted:#667085;--surface:#fff;--line:#e7eaf0;--nav-h:70px;--appbar-h:56px;}
+*{box-sizing:border-box;}
+html,body{min-height:100%;}
+body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));color:var(--ink);}
+.svg-sprite{pointer-events:none;}
+.ui-icon{width:22px;height:22px;display:inline-block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;flex:0 0 auto;}
+.ui-icon.mini{width:17px;height:17px;}
+.app-header{height:var(--appbar-h);padding:0 16px;background:#fff;color:var(--brand);box-shadow:0 1px 0 rgba(16,24,40,.08);display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:900;overflow:visible;}
+.app-header::after{display:none;}
+.logo-app{font-family:'Space Grotesk','Inter',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.8px;line-height:1;color:var(--brand);}
+.abas{position:fixed;left:0;right:0;bottom:0;top:auto;height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding:5px 8px env(safe-area-inset-bottom);background:rgba(255,255,255,.97);border-top:1px solid rgba(16,24,40,.08);box-shadow:0 -8px 24px rgba(16,24,40,.06);z-index:2200;backdrop-filter:blur(14px);}
+.aba-btn{border:0!important;border-radius:14px!important;padding:7px 8px!important;margin:0!important;background:transparent!important;color:#8a94a6;font-size:11px;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;font-weight:600;}
+.aba-btn .ui-icon{width:23px;height:23px;stroke-width:1.8;}
+.aba-btn.ativa{color:var(--brand)!important;background:#f4f7ff!important;}
+.aba-btn.ocorrencias-aba.ativa{color:#d92d20!important;background:#fff4f2!important;}
+.tab-icon-wrap{position:relative;display:inline-flex;}
+.tab-badge{position:absolute;right:-9px;top:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:#d92d20;color:#fff;font-size:9px;line-height:16px;text-align:center;border:2px solid #fff;}
+#areaAbas{min-height:calc(100dvh - var(--appbar-h) - var(--nav-h));}
+.container{padding:14px;}
+.home-container{max-width:760px;margin:0 auto;padding-bottom:24px;}
+.card{border-radius:20px;box-shadow:0 5px 20px rgba(16,24,40,.055);border:1px solid #eef0f4;}
+.home-rota-card{padding:18px;margin-bottom:14px;}
+.home-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.home-card-head h2{font-size:20px;letter-spacing:-.4px;margin:1px 0 0;}
+.eyebrow{font-size:10px;letter-spacing:1.2px;font-weight:800;color:var(--brand);}
+.versao-copiloto{margin:0;padding:5px 8px;border-radius:999px;background:#f2f4f7;color:#98a2b3;font-size:9px;white-space:nowrap;}
+.importar{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--brand);box-shadow:0 5px 14px rgba(0,60,189,.18);margin:0;padding:13px 14px;}
+.acoes-rota-home{display:grid;grid-template-columns:1fr auto;gap:9px;margin-top:9px;}
+.auto-v9-btn{margin:0;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:9px;align-items:center;text-align:left;background:var(--brand);padding:11px 13px;box-shadow:none;}
+.auto-v9-btn .ui-icon{grid-row:1/3;}
+.auto-v9-btn span{font-size:13.5px;font-weight:700;}
+.auto-v9-btn small{font-size:10px;margin:1px 0 0;opacity:.78;font-weight:500;}
+.config-otimizacao-btn{width:auto;margin:0;padding:0 13px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d8dee9;background:#fff;color:#344054;box-shadow:none;min-height:54px;}
+#btnConfigOtimizacaoV9 span{display:none;}
+#btnConfigOtimizacaoV9 .ui-icon{width:20px;height:20px;}
+.status-otimizacao-rota{margin-top:10px;padding:10px 12px;border:0;background:#f7f9fd;border-radius:12px;font-size:12px;}
+.status-otimizacao-rota .linha-status-rota{margin:0;gap:6px;font-size:12.5px;}
+.stats{grid-template-columns:repeat(5,1fr);gap:6px;margin-top:14px;}
+.stat{padding:10px 5px;border-radius:12px;background:#f5f7fa;min-width:0;}
+.stat.pendente-cor{background:#eef3ff;}
+.stat.ocorrencia-cor{grid-column:auto!important;background:#fff1f0;}
+.stat div:first-child{font-size:9.5px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat h2{font-size:18px;margin-top:2px;}
+.barra-progresso{margin-top:11px;height:7px;box-shadow:none;background:#eaecf0;}
+.barra-progresso-fill{font-size:0;line-height:7px;}
+.home-urgencias{margin-top:8px;}
+.section-heading{display:flex;align-items:center;gap:10px;padding:10px 3px 12px;}
+.section-heading-icon{width:35px;height:35px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#fff1f0;color:#d92d20;}
+.section-heading-icon .ui-icon{width:19px;height:19px;}
+.section-heading h2{font-size:16px;margin:0;letter-spacing:-.2px;}
+.section-heading p{font-size:11px;color:#98a2b3;margin:2px 0 0;}
+.section-count{margin-left:auto;min-width:25px;height:25px;border-radius:99px;background:#f2f4f7;color:#475467;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.home-urgencia-card{background:#fff;border:1px solid #f2d7d4;border-left:3px solid #d92d20;border-radius:15px;padding:13px 14px;margin-bottom:9px;box-shadow:0 3px 12px rgba(16,24,40,.035);}
+.home-urgencia-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.home-urgencia-label{display:flex;align-items:center;gap:6px;color:#d92d20;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+.home-urgencia-parada{font-size:11px;font-weight:700;color:#667085;}
+.home-urgencia-card strong{display:block;font-size:14px;margin-top:7px;}
+.home-urgencia-card p{font-size:11.5px;color:#667085;line-height:1.35;margin:3px 0 0;}
+.home-urgencia-actions{display:flex;gap:7px;margin-top:10px;}
+.home-urgencia-actions button{margin:0;padding:8px 10px;font-size:11.5px;border-radius:9px;width:auto;}
+.home-urgencia-open{background:#fff1f0;color:#b42318;border:1px solid #f4cac6;}
+.home-urgencia-map{background:#f2f6ff;color:var(--brand);}
+.home-sem-urgencias{padding:18px 8px;color:#98a2b3;text-align:center;font-size:12px;}
+#painelMapa{height:calc(100dvh - var(--appbar-h) - var(--nav-h) - env(safe-area-inset-bottom));overflow:hidden;}
+#mapa{height:100%;}
+#resumoMapa{top:10px;left:10px;right:10px;border-radius:14px;padding:10px 12px;gap:6px;box-shadow:0 3px 14px rgba(16,24,40,.13);}
+#resumoMapaTextos{font-size:12.5px;}
+.legenda-mapa{font-size:10.5px;}
+#statusLocalizacaoMapa{display:flex;align-items:center;gap:5px;font-size:10.5px;}
+.botao-flutuante-mapa,#botaoCentralizar,#botaoAjustarPosicao{display:flex;align-items:center;justify-content:center;color:#344054;font-size:0;}
+.botao-flutuante-mapa .ui-icon,#botaoCentralizar .ui-icon,#botaoAjustarPosicao .ui-icon{width:20px;height:20px;}
+.sheet-lista-mapa{position:absolute;left:0;right:0;bottom:0;height:min(78%,720px);background:#f7f8fb;border-radius:22px 22px 0 0;box-shadow:0 -8px 28px rgba(16,24,40,.18);z-index:520;transform:translateY(calc(100% - 67px));transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;touch-action:pan-y;}
+.sheet-lista-mapa.aberto{transform:translateY(0);}
+.sheet-lista-handle{background:#fff;border-radius:22px 22px 0 0;padding:8px 16px 10px;flex:0 0 auto;cursor:pointer;border-bottom:1px solid #eef0f4;}
+.sheet-grabber{width:38px;height:4px;background:#d0d5dd;border-radius:99px;margin:0 auto 8px;}
+.sheet-handle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.sheet-handle-row>div{display:flex;align-items:baseline;gap:8px;}
+.sheet-handle-row strong{font-size:14px;}
+.sheet-handle-row span{font-size:10.5px;color:#98a2b3;}
+.sheet-chevron{width:18px;height:18px;color:#667085;transition:transform .25s ease;}
+.sheet-lista-mapa.aberto .sheet-chevron{transform:rotate(180deg);}
+.sheet-lista-conteudo{padding:10px 12px 22px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.sheet-lista-conteudo .grupo,.sheet-lista-conteudo .parada-composta{margin-bottom:9px;}
+.organizar-pacotes-btn{margin:0 0 9px;width:auto;display:flex!important;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;font-size:11.5px;background:#fff;color:#475467;border:1px solid #e4e7ec;box-shadow:none;}
+.organizar-pacotes-btn[style*="display:none"]{display:none!important;}
+#painelInfoMapa{bottom:0;z-index:760;}
+#fundoInfoMapa{z-index:750;}
+.painel-aba#painelOcorrencias .container{max-width:760px;margin:0 auto;padding-bottom:24px;}
+.grupo h3,.organizar-titulo,.desenho-rota-titulo{display:flex;align-items:center;gap:6px;}
+.grupo h3 .ui-icon{width:17px;height:17px;color:var(--brand);}
+.btn-linha button,.waze,.toggle{display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-linha .ui-icon,.waze .ui-icon,.toggle .ui-icon{width:17px;height:17px;}
+.toast-copiloto{display:flex;align-items:center;gap:8px;max-width:min(92vw,420px);}
+.toast-copiloto .ui-icon{width:18px;height:18px;}
+.comparacao-rota{display:none;}
+.rota-referencia .rota-shopee-pill{display:none;}
+@media(max-width:430px){.stats{grid-template-columns:repeat(3,1fr)}.stat.ocorrencia-cor{grid-column:auto!important}.home-card-head h2{font-size:19px}}
+@media(min-width:800px){.home-container{padding-top:20px}.sheet-lista-mapa{left:auto;width:min(440px,42vw);height:82%;border-radius:22px 0 0 0}.sheet-lista-handle{border-radius:22px 0 0 0}.app-header{height:60px}.logo-app{font-size:22px}}
+
 </style>
 
+<style id="v10-extra-fixes">
+.rota-resumo-v10{display:flex;align-items:center;gap:8px;color:#344054}.rota-resumo-v10 .ui-icon{color:var(--brand)}.rota-resumo-v10 strong{display:block;font-size:12px}.rota-resumo-v10 small{display:block;font-size:10px;color:#667085;margin-top:1px}.otimizacao-caixa h2{display:flex;align-items:center;gap:7px}.destino-selecionado-info{display:flex;align-items:flex-start;gap:6px}.destino-selecionado-info .ui-icon{margin-top:1px}.icone-opcao{display:flex!important;align-items:center;justify-content:center}.icone-opcao .ui-icon{width:24px;height:24px}.organizar-parada-cab>.ui-icon,.organizar-pacote-codigo>.ui-icon{width:16px;height:16px}.badge-status{display:inline-flex!important;align-items:center;gap:4px}.badge-status .ui-icon{width:14px;height:14px}.ocorrencia-pacote-texto{display:flex;align-items:center;gap:5px}.ocorrencia-pacote-texto .ui-icon{width:15px;height:15px}
+</style>
 </head>
 
 <body translate="no">
+<svg class="svg-sprite" aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+<defs>
+<symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-7h5v7"/></symbol>
+<symbol id="icon-map" viewBox="0 0 24 24"><path d="m3 6 5-2 8 2 5-2v14l-5 2-8-2-5 2Z"/><path d="M8 4v14M16 6v14"/></symbol>
+<symbol id="icon-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16V9a3 3 0 0 1 3-3h7"/><path d="m14 4 2 2-2 2"/></symbol>
+<symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4Z"/><path d="M12 9v4.5M12 17h.01"/></symbol>
+<symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v5h14v-5"/></symbol>
+<symbol id="icon-settings" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></symbol>
+<symbol id="icon-package" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></symbol>
+<symbol id="icon-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
+<symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+<symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+<symbol id="icon-crosshair-pin" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></symbol>
+<symbol id="icon-pencil" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10Z"/><path d="m13.8 6.7 3.5 3.5"/></symbol>
+<symbol id="icon-hand" viewBox="0 0 24 24"><path d="M7 11V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v6c0 4-2.8 7-7 7h-1c-2.2 0-3.6-1-4.8-2.5L3.5 15a1.8 1.8 0 0 1 2.8-2.2Z"/></symbol>
+<symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12.5 4 4L19 7"/></symbol>
+<symbol id="icon-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></symbol>
+<symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="icon-flag" viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 5h10l-2 3 2 3H6"/></symbol>
+<symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+<symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></symbol>
+<symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="icon-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+<symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="icon-car" viewBox="0 0 24 24"><path d="m5 16-1-1v-4l2-5h12l2 5v4l-1 1"/><path d="M5 11h14M7 16v2M17 16v2"/><circle cx="7" cy="14" r="1"/><circle cx="17" cy="14" r="1"/></symbol>
+<symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="icon-waze" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 8 8H7l-3 2 1-4.5A8 8 0 0 1 4 12Z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M9 15c1.8 1.2 4.2 1.2 6 0"/></symbol>
+</defs>
+</svg>
 
-<header>
-<button id="botaoSom" class="botao-som" onclick="alternarSom()" title="Ligar/desligar som">🔊</button>
-<div class="marca">
-<span class="selo">🚚</span>
-<span>Copiloto Entregas</span>
-</div>
-<div class="subtitulo" id="saudacaoHeader">Sua rota, organizada do seu jeito</div>
+
+<header class="app-header">
+<div class="logo-app">Copiloto Entrega</div>
 </header>
 
-<div class="abas">
-<button class="aba-btn ativa" id="btnAbaLista" onclick="irParaAba(0)">📋 Lista (<span id="contadorLista">0</span>)</button>
-<button class="aba-btn" id="btnAbaMapa" onclick="irParaAba(1)">🗺️ Mapa</button>
-<button class="aba-btn ocorrencias-aba" id="btnAbaOcorrencias" onclick="irParaAba(2)">⚠️ Ocorrências (<span id="contadorOcorrencias">0</span>)</button>
-</div>
+<nav class="abas" aria-label="Navegação principal">
+<button class="aba-btn ativa" id="btnAbaLista" onclick="irParaAba(0)"><svg class="ui-icon"><use href="#icon-home"></use></svg><span>Home</span></button>
+<button class="aba-btn" id="btnAbaMapa" onclick="irParaAba(1)"><svg class="ui-icon"><use href="#icon-map"></use></svg><span>Mapa</span></button>
+<button class="aba-btn ocorrencias-aba" id="btnAbaOcorrencias" onclick="irParaAba(2)"><span class="tab-icon-wrap"><svg class="ui-icon"><use href="#icon-alert"></use></svg><b id="badgeOcorrenciasTab" class="tab-badge" style="display:none">0</b></span><span>Ocorrências</span></button>
+</nav>
 
 <div id="areaAbas">
 
 <div class="painel-aba ativo" id="painelLista">
+<div class="container home-container">
 
-<div class="container">
+<div class="card home-rota-card" id="cardPrincipalLista">
+<div class="home-card-head">
+<div>
+<div class="eyebrow">ROTA DO DIA</div>
+<h2>Comece sua rota</h2>
+</div>
+<div class="versao-copiloto">V10</div>
+</div>
 
-<div class="card" id="cardPrincipalLista">
+<input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
+<button class="importar" onclick="selecionarArquivoRota()"><svg class="ui-icon"><use href="#icon-upload"></use></svg><span>Importar rota</span></button>
 
-<h2>Importar Rota Shopee</h2>
-
-<input
-type="file"
-id="arquivo"
-accept=".xlsx,.xls">
-
-<button
-class="importar"
-onclick="importarExcel()">
-Importar Rota
-</button>
-
-<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="executarOtimizacaoPrincipalV9()">⚡ Otimizar rota<small id="resumoModoOtimizacaoV9">V9 padrão · tempo primeiro · km como desempate</small></button>
-<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()">⚙️ Configuração de otimização</button>
-<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;">✏️ Otimizar rota desenhando no mapa</button>
-<button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;">↩️ Restaurar ordem da Shopee</button>
-<div class="versao-copiloto">Copiloto V9.1</div>
+<div class="acoes-rota-home">
+<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="executarOtimizacaoPrincipalV9()"><svg class="ui-icon"><use href="#icon-route"></use></svg><span>Otimizar rota</span><small id="resumoModoOtimizacaoV9">Mais rápida</small></button>
+<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurar</span></button>
+</div>
+<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;"><svg class="ui-icon"><use href="#icon-pencil"></use></svg><span>Otimização manual</span></button>
+<button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;"><span>Restaurar ordem original</span></button>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
 
 <div class="stats">
-
-<div class="stat">
-<div>Pacotes</div>
-<h2 id="pacotes">0</h2>
+<div class="stat"><div>Pacotes</div><h2 id="pacotes">0</h2></div>
+<div class="stat"><div>Paradas</div><h2 id="locais">0</h2></div>
+<div class="stat pendente-cor"><div>Restantes</div><h2 id="qtdPendentes">0</h2></div>
+<div class="stat entregue-cor"><div>Entregues</div><h2 id="qtdEntregues">0</h2></div>
+<div class="stat ocorrencia-cor"><div>Ocorrências</div><h2 id="qtdOcorrencias">0</h2></div>
+</div>
+<div class="barra-progresso"><div class="barra-progresso-fill" id="barraProgresso">0%</div></div>
 </div>
 
-<div class="stat">
-<div>Paradas</div>
-<h2 id="locais">0</h2>
-</div>
-
-<div class="stat pendente-cor">
-<div>Pendentes</div>
-<h2 id="qtdPendentes">0</h2>
-</div>
-
-<div class="stat entregue-cor">
-<div>Entregues</div>
-<h2 id="qtdEntregues">0</h2>
-</div>
-
-<div class="stat ocorrencia-cor" style="grid-column:1 / span 2;">
-<div>Ocorrências</div>
-<h2 id="qtdOcorrencias">0</h2>
-</div>
+<section class="home-urgencias">
+<div class="section-heading"><div class="section-heading-icon urgencia"><svg class="ui-icon"><use href="#icon-alert"></use></svg></div><div><h2>Urgências</h2><p>Ocorrências que precisam da sua atenção</p></div><span id="homeUrgenciasContador" class="section-count">0</span></div>
+<div id="homeUrgencias"></div>
+</section>
 
 </div>
-
-<div class="barra-progresso">
-<div class="barra-progresso-fill" id="barraProgresso">0%</div>
-</div>
-
-</div>
-
-<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;">📦 Organizar pacotes</button>
-
-<div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
-<div class="organizar-header">
-<div>
-<div class="organizar-titulo">📦 Organizar pacotes no carro</div>
-<div class="organizar-subtitulo">Carregue na ordem inversa: a última entrega entra primeiro e a primeira fica mais acessível.</div>
-</div>
-<button class="organizar-fechar" onclick="fecharOrganizacaoPacotes()">Fechar</button>
-</div>
-<div class="organizar-progresso"><div id="barraOrganizarPacotes"></div></div>
-<div id="textoProgressoOrganizar" class="organizar-progresso-texto"></div>
-<div id="listaOrganizacaoPacotes"></div>
-</div>
-
-<div id="lista"></div>
-
-</div>
-
 </div>
 
 <div class="painel-aba" id="painelMapa">
 <div id="mapa"></div>
 
 <div id="resumoMapa">
-
-<div id="resumoMapaTextos">
-<span id="resumoMapaTexto">0 pendentes</span>
-<span id="resumoMapaOcorrencias">0 ocorrências</span>
+<div id="resumoMapaTextos"><span id="resumoMapaTexto">0 pendentes</span><span id="resumoMapaOcorrencias">0 ocorrências</span></div>
+<div class="legenda-mapa"><span><i class="ponto-legenda" style="background:#003CBD"></i> Pendente</span><span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span><span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span></div>
+<div id="statusLocalizacaoMapa"><svg class="ui-icon mini"><use href="#icon-pin"></use></svg><span>Localização: aguardando GPS...</span></div>
 </div>
 
-<div class="legenda-mapa">
-<span><i class="ponto-legenda" style="background:#003CBD"></i> Pendente</span>
-<span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span>
-<span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span>
-</div>
-
-<div id="statusLocalizacaoMapa">📍 Localização: aguardando GPS...</div>
-
-</div>
-
-<div id="painelBuscaMapa">
-<input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()">
-<button onclick="buscarParadaNoMapa()">🔍</button>
-</div>
-
-<button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada">🔍</button>
-
-<button id="botaoOcultarEntregues" class="botao-flutuante-mapa" style="top:146px;" onclick="alternarOcultarEntreguesMapa()" title="Ocultar/mostrar entregues">👁️</button>
-
-<button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar">🎯</button>
-<button id="botaoAjustarPosicao" style="display:none;" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa">📌</button>
+<div id="painelBuscaMapa"><input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()"><button onclick="buscarParadaNoMapa()" aria-label="Buscar"><svg class="ui-icon"><use href="#icon-search"></use></svg></button></div>
+<button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada"><svg class="ui-icon"><use href="#icon-search"></use></svg></button>
+<button id="botaoOcultarEntregues" class="botao-flutuante-mapa" style="top:146px;" onclick="alternarOcultarEntreguesMapa()" title="Ocultar/mostrar entregues"><svg class="ui-icon"><use href="#icon-eye"></use></svg></button>
+<button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar"><svg class="ui-icon"><use href="#icon-target"></use></svg></button>
+<button id="botaoAjustarPosicao" style="display:none;" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa"><svg class="ui-icon"><use href="#icon-crosshair-pin"></use></svg></button>
 
 <div id="painelDesenhoRota">
-<div class="desenho-rota-titulo">✏️ Desenhe a intenção da rota</div>
-<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Passe a linha POR CIMA do círculo de cada pin. ! azul = falta selecionar · ✓ = selecionado. Você pode mover o mapa e continuar.</div>
-<div class="desenho-modos">
-<button id="btnModoDesenharRota" class="ativo" onclick="definirModoInteracaoDesenho('desenhar')">✏️ Desenhar</button>
-<button id="btnModoMoverRota" onclick="definirModoInteracaoDesenho('mover')">✋ Mover mapa</button>
-</div>
-<div class="desenho-rota-acoes">
-<button class="desenho-limpar" onclick="limparDesenhoOtimizacao()">Limpar</button>
-<button class="desenho-cancelar" onclick="cancelarDesenhoOtimizacao()">Cancelar</button>
-<button class="desenho-aplicar" id="btnAplicarDesenhoRota" onclick="aplicarDesenhoOtimizacao()" disabled>Aplicar desenho</button>
-</div>
+<div class="desenho-rota-titulo"><svg class="ui-icon mini"><use href="#icon-pencil"></use></svg> Desenhe a intenção da rota</div>
+<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Passe a linha por cima do círculo de cada pin.</div>
+<div class="desenho-modos"><button id="btnModoDesenharRota" class="ativo" onclick="definirModoInteracaoDesenho('desenhar')"><svg class="ui-icon mini"><use href="#icon-pencil"></use></svg> Desenhar</button><button id="btnModoMoverRota" onclick="definirModoInteracaoDesenho('mover')"><svg class="ui-icon mini"><use href="#icon-hand"></use></svg> Mover mapa</button></div>
+<div class="desenho-rota-acoes"><button class="desenho-limpar" onclick="limparDesenhoOtimizacao()">Limpar</button><button class="desenho-cancelar" onclick="cancelarDesenhoOtimizacao()">Cancelar</button><button class="desenho-aplicar" id="btnAplicarDesenhoRota" onclick="aplicarDesenhoOtimizacao()" disabled>Aplicar desenho</button></div>
 </div>
 
 <div id="fundoInfoMapa" onclick="fecharInfoMapa()"></div>
-<div id="painelInfoMapa">
-<div class="alca-painel"></div>
-<div id="conteudoInfoMapa"></div>
-</div>
+<div id="painelInfoMapa"><div class="alca-painel"></div><div id="conteudoInfoMapa"></div></div>
 
+<section id="sheetListaMapa" class="sheet-lista-mapa" aria-label="Lista da rota">
+<div id="alcaListaMapa" class="sheet-lista-handle" onclick="alternarSheetListaMapa()">
+<div class="sheet-grabber"></div>
+<div class="sheet-handle-row"><div><strong>Paradas</strong><span id="sheetListaResumo">Arraste para cima</span></div><svg class="ui-icon sheet-chevron"><use href="#icon-chevron-up"></use></svg></div>
+</div>
+<div class="sheet-lista-conteudo">
+<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes</button>
+<div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
+<div class="organizar-header"><div><div class="organizar-titulo"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes no carro</div><div class="organizar-subtitulo">Carregue na ordem inversa: a última entrega entra primeiro.</div></div><button class="organizar-fechar" onclick="fecharOrganizacaoPacotes()">Fechar</button></div>
+<div class="organizar-progresso"><div id="barraOrganizarPacotes"></div></div><div id="textoProgressoOrganizar" class="organizar-progresso-texto"></div><div id="listaOrganizacaoPacotes"></div>
+</div>
+<div id="lista"></div>
+</div>
+</section>
 </div>
 
 <div class="painel-aba" id="painelOcorrencias">
@@ -1712,17 +1795,17 @@ Importar Rota
 <!-- V9.1: configuração principal da otimização -->
 <div class="otimizacao-fundo" id="modalConfigOtimizacaoV9">
 <div class="otimizacao-caixa">
-<h2>⚙️ Configuração de otimização</h2>
-<div class="otimizacao-subtitulo">Escolha como o motor V9 deve organizar suas próximas rotas. A configuração fica salva neste aparelho.</div>
+<h2><svg class="ui-icon mini"><use href="#icon-settings"></use></svg> Configuração de rota</h2>
+<div class="otimizacao-subtitulo">Escolha como o Copiloto deve organizar suas próximas rotas. A configuração fica salva neste aparelho.</div>
 
 <button class="otimizacao-opcao" id="opcaoV9Padrao" onclick="selecionarConfiguracaoV9Padrao()">
-<div class="icone-opcao">⚡</div>
-<div><div class="titulo-opcao">V9 padrão</div><div class="desc-opcao">Busca a melhor ordem a partir da sua localização atual. Tempo pelas vias é prioridade; quilômetros desempata.</div></div>
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
+<div><div class="titulo-opcao">Mais rápida</div><div class="desc-opcao">Busca a melhor ordem a partir da sua localização atual. Tempo pelas vias é prioridade; quilômetros desempata.</div></div>
 </button>
 
 <button class="otimizacao-opcao" id="opcaoV9Destino" onclick="selecionarConfiguracaoV9Destino()">
-<div class="icone-opcao">🏁</div>
-<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Usa o mesmo motor V9, mas favorece uma última entrega próxima ao ponto final escolhido no mapa ou por pesquisa.</div></div>
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-flag"></use></svg></div>
+<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Mantém a otimização por tempo, mas favorece uma última entrega próxima ao ponto final escolhido no mapa ou por pesquisa.</div></div>
 </button>
 
 <div class="config-v9-atual" id="textoConfigAtualV9"></div>
@@ -1733,12 +1816,12 @@ Importar Rota
 <!-- V9.1: seletor do destino final por mapa/pesquisa -->
 <div class="otimizacao-fundo" id="modalDestinoFinal">
 <div class="otimizacao-caixa destino-picker-caixa">
-<h2>🏁 Onde deseja terminar?</h2>
-<div class="otimizacao-subtitulo">Pesquise um endereço ou toque diretamente no mapa. A V9 continuará priorizando tempo, mas levará esse ponto em conta na reta final.</div>
+<h2><svg class="ui-icon mini"><use href="#icon-flag"></use></svg> Onde deseja terminar?</h2>
+<div class="otimizacao-subtitulo">Pesquise um endereço ou toque diretamente no mapa. O Copiloto continuará priorizando tempo e levará esse ponto em conta na reta final.</div>
 
 <div class="destino-busca-linha">
 <input id="buscaEnderecoDestinoV9" type="text" placeholder="Pesquisar endereço, bairro ou local..." onkeydown="if(event.key==='Enter') buscarEnderecoDestinoV9()">
-<button onclick="buscarEnderecoDestinoV9()">🔍 Buscar</button>
+<button onclick="buscarEnderecoDestinoV9()"><svg class="ui-icon mini"><use href="#icon-search"></use></svg> Buscar</button>
 </div>
 
 <div id="areaDestinosSalvos" style="display:none;margin-top:10px;">
@@ -1751,7 +1834,7 @@ Importar Rota
 <div id="destinoSelecionadoInfo">Nenhum ponto selecionado.</div>
 <input id="nomeDestinoSalvo" class="destino-nome-input" type="text" placeholder="Nome opcional para salvar: Casa, Base, Galpão...">
 <div class="destino-acoes">
-<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()">💾 Salvar local</button>
+<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()"><svg class="ui-icon mini"><use href="#icon-save"></use></svg> Salvar local</button>
 <button class="destino-usar-btn" onclick="confirmarDestinoSelecionadoV9()">Usar este destino</button>
 </div>
 <button class="fechar-otimizacao-btn visivel" onclick="fecharSeletorDestinoFinal()">Cancelar</button>
@@ -1788,6 +1871,16 @@ let localizacaoManualAtiva = false;
 let modoAjustePosicaoManual = false;
 let primeiraCentralizacaoGPSFeita = false;
 // (alvoAguardandoMotivo é declarado mais abaixo, junto da lógica de status)
+function iconeLinha(nome, classe='mini'){return `<svg class="ui-icon ${classe||''}" aria-hidden="true"><use href="#icon-${nome}"></use></svg>`;}
+function textoSemEmoji(texto){return String(texto||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').replace(/[\uFE0F\u200D]/g,'').replace(/\s{2,}/g,' ').trim();}
+function selecionarArquivoRota(){const input=document.getElementById('arquivo');if(input) input.click();}
+let sheetListaMapaAberto=false;
+let sheetTouchInicioY=null;
+function definirSheetListaMapa(aberto){sheetListaMapaAberto=!!aberto;const sheet=document.getElementById('sheetListaMapa');if(sheet) sheet.classList.toggle('aberto',sheetListaMapaAberto);}
+function alternarSheetListaMapa(){definirSheetListaMapa(!sheetListaMapaAberto);}
+function iniciarGestosSheetListaMapa(){const sheet=document.getElementById('sheetListaMapa');const alca=document.getElementById('alcaListaMapa');if(!sheet||!alca||sheet.dataset.gestos==='1')return;sheet.dataset.gestos='1';alca.addEventListener('touchstart',e=>{sheetTouchInicioY=e.touches&&e.touches[0]?e.touches[0].clientY:null;},{passive:true});alca.addEventListener('touchend',e=>{if(sheetTouchInicioY===null)return;const y=e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientY:sheetTouchInicioY;const d=y-sheetTouchInicioY;if(d<-28)definirSheetListaMapa(true);else if(d>28)definirSheetListaMapa(false);sheetTouchInicioY=null;},{passive:true});}
+function abrirListaMapaNoGrupo(id){irParaAba(1);definirSheetListaMapa(true);setTimeout(()=>destacarElemento('grupo_'+id),260);}
+
 let abaAtual = 0; // 0 = Lista, 1 = Mapa, 2 = Ocorrências
 let mapaFoiEnquadrado = false; // controla se já demos fitBounds (evita resetar o zoom)
 let celebracaoMostrada = false; // evita repetir a comemoração de rota 100% toda hora
@@ -2179,7 +2272,8 @@ atualizadoEm:Date.now()
 };
 salvarStorage();
 renderizarTudo();
-mostrarToast('📦 Rota carregada. Toque em ⚡ Otimizar rota para aplicar a V9.', 'sucesso');
+mostrarToast('Rota carregada. Agora você pode otimizar.', 'sucesso');
+const campoArquivo=document.getElementById('arquivo'); if(campoArquivo) campoArquivo.value='';
 
 }
 
@@ -2378,7 +2472,7 @@ try{ obj[habilitar ? 'enable' : 'disable'](); }catch(erro){}
 
 function atualizarInstrucaoDesenho(texto){
 const el=document.getElementById('instrucaoDesenhoRota');
-if(el) el.textContent=texto;
+if(el) el.textContent=textoSemEmoji(texto);
 }
 
 function paradaParticipaDoDesenhoV84(grupo){
@@ -2515,7 +2609,7 @@ for(const g of paradasValidasDesenhoV82()) atualizarClasseCapturaPinV86(g.id);
 }
 
 function descricaoParadaFaltanteV85(g){
-if(ehStopValido(g.stop)) return `Shopee ${String(g.stop).trim()}`;
+if(ehStopValido(g.stop)) return `Original ${String(g.stop).trim()}`;
 const e=String(g.endereco||'').trim();
 return e ? e.split(',').slice(0,2).join(',') : 'Extra';
 }
@@ -2936,7 +3030,7 @@ abrirOverlayOtimizacao('Obtendo sua localização para iniciar a rota...');
 inicio=await obterPontoInicialOtimizacao();
 }catch(e){
 fecharOverlayOtimizacao();
-const msg=ehDispositivoMovelV82()? '⚠️ Não consegui sua localização. Ative o GPS e tente novamente.' : '⚠️ Não consegui sua localização. Use o 📌 para definir sua posição e tente novamente.';
+const msg=ehDispositivoMovelV82()? '⚠️ Não consegui sua localização. Ative o GPS e tente novamente.' : '⚠️ Não consegui sua localização. Use o ajuste manual para definir sua posição e tente novamente.';
 mostrarToast(msg,'alerta');
 return;
 }
@@ -2950,7 +3044,7 @@ const refinado=refinarOrdemRuaConservadoraV82(ordem,matriz,indices,inicio);
 ordem=refinado.ordem;
 // Paradas ativas sem pin utilizável não podem ser desenhadas. Na V8.7 elas
 // não bloqueiam o motorista nem viram "faltando" fantasma: permanecem no
-// final da rota, preservando a ordem Shopee entre si, até terem a localização
+// final da rota, preservando a ordem original entre si, até terem a localização
 // corrigida. Grupos já entregues continuam depois delas.
 const idsOrdem=new Set(ordem.map(g=>g.id));
 const gruposNaoDesenhaveis=grupos
@@ -3012,7 +3106,7 @@ modoOrganizacaoPacotes=false;
 removerLinhaRotaGpsV81();
 salvarStorage();
 renderizarTudo();
-mostrarToast('↩️ Ordem original da Shopee restaurada', 'neutro');
+mostrarToast('Ordem original restaurada', 'neutro');
 }
 
 function removerMarcadoresInicioFimDesenho(){
@@ -3039,7 +3133,7 @@ if(latlngs.length<2) return;
 linhaRotaGps=L.polyline(latlngs,{color:'#003CBD',weight:5,opacity:.86,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-linha'}).addTo(mapa);
 const ultima=grupos[grupos.length-1];
 if(ultima && Number.isFinite(Number(ultima.lat))&&Number.isFinite(Number(ultima.lng))){
-const icFim=L.divIcon({html:'<div class="pin-fim-desenho">🏁</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+const icFim=L.divIcon({html:'<div class="pin-fim-desenho">'+iconeLinha('flag')+'</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
 marcadorFimDesenho=L.marker([Number(ultima.lat),Number(ultima.lng)],{icon:icFim,zIndexOffset:850,interactive:false}).addTo(mapa);
 }
 }
@@ -3054,7 +3148,8 @@ return !!(grupos.length && metaRota && ['desenho','auto_v9'].includes(metaRota.m
 function abrirOrganizacaoPacotes(){
 if(!organizacaoPacotesDisponivel()) return;
 modoOrganizacaoPacotes=true;
-irParaAba(0);
+irParaAba(1);
+definirSheetListaMapa(true);
 renderizarOrganizacaoPacotes();
 atualizarVisibilidadeOrganizacaoPacotes();
 // O botão fica acima da Parada 1; ao abrir, sempre começamos pelo topo
@@ -3063,8 +3158,7 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>{
 try{window.scrollTo({top:0,left:0,behavior:'auto'});}catch(e){window.scrollTo(0,0);}
 document.documentElement.scrollTop=0;
 document.body.scrollTop=0;
-const painel=document.getElementById('painelOrganizacaoPacotes');
-if(painel){try{painel.scrollIntoView({block:'start',behavior:'auto'});}catch(e){}}
+const conteudoSheet=document.querySelector('.sheet-lista-conteudo'); if(conteudoSheet) conteudoSheet.scrollTop=0;
 }));
 }
 
@@ -3077,11 +3171,9 @@ atualizarStatusOtimizacaoRota();
 function atualizarVisibilidadeOrganizacaoPacotes(){
 const painel=document.getElementById('painelOrganizacaoPacotes');
 const lista=document.getElementById('lista');
-const card=document.getElementById('cardPrincipalLista');
 const btn=document.getElementById('btnOrganizarPacotes');
 if(painel) painel.style.display=modoOrganizacaoPacotes?'block':'none';
 if(lista) lista.style.display=modoOrganizacaoPacotes?'none':'block';
-if(card) card.style.display=modoOrganizacaoPacotes?'none':'block';
 if(btn&&modoOrganizacaoPacotes) btn.style.display='none';
 if(modoOrganizacaoPacotes) renderizarOrganizacaoPacotes();
 }
@@ -3101,16 +3193,16 @@ const shopee=String(p.stop||g.stopOriginal||g.stop||'Extra');
 const rota=temOrdemOtimizada(g)?g.ordemOtimizada:'—';
 linhas+=`<div class="organizar-pacote">
 <div class="organizar-pacote-info">
-<div class="organizar-pacote-codigo">📦 ${escaparHtmlTexto(p.codigo)}</div>
-<div class="organizar-pacote-meta">Shopee: ${escaparHtmlTexto(shopee)} · Rota atual: ${rota}</div>
+<div class="organizar-pacote-codigo">${iconeLinha('package')} ${escaparHtmlTexto(p.codigo)}</div>
+<div class="organizar-pacote-meta">Original: ${escaparHtmlTexto(shopee)} · Rota: ${rota}</div>
 <div class="organizar-pacote-endereco">${escaparHtmlTexto(p.endereco)}</div>
 </div>
-<button class="organizar-pacote-acao" onclick="marcarPacoteOrganizadoV82('${g.id}',${idx})">✅ Pacote no carro</button>
+<button class="organizar-pacote-acao" onclick="marcarPacoteOrganizadoV82('${g.id}',${idx})">${iconeLinha('check')} Pacote no carro</button>
 </div>`;
 }
-html+=`<div class="organizar-parada"><div class="organizar-parada-cab">📍 Entrega ${temOrdemOtimizada(g)?g.ordemOtimizada:'—'}<small>Ordem Shopee: ${escaparHtmlTexto(g.stopOriginal||g.stop||'Extra')} · ${pendentes.length} pacote(s) restante(s)</small></div>${linhas}</div>`;
+html+=`<div class="organizar-parada"><div class="organizar-parada-cab">${iconeLinha('pin')} Entrega ${temOrdemOtimizada(g)?g.ordemOtimizada:'—'}<small>Original: ${escaparHtmlTexto(g.stopOriginal||g.stop||'Extra')} · ${pendentes.length} pacote(s) restante(s)</small></div>${linhas}</div>`;
 }
-container.innerHTML=html||'<div class="aviso-vazio">Todos os pacotes já foram organizados ✅</div>';
+container.innerHTML=html||'<div class="aviso-vazio">Todos os pacotes já foram organizados</div>';
 const todos=grupos.flatMap(g=>g.pacotes),feitos=todos.filter(p=>p.organizadoCarro).length,total=todos.length;
 const pct=total?Math.round(feitos/total*100):0;
 const barra=document.getElementById('barraOrganizarPacotes');if(barra) barra.style.width=pct+'%';
@@ -3171,12 +3263,12 @@ const opDestino=document.getElementById('opcaoV9Destino');
 if(resumo){
 resumo.textContent=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
 ? `Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`
-: 'V9 padrão · tempo primeiro · km como desempate';
+: 'Mais rápida';
 }
 if(atual){
 atual.innerHTML=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
-? `<strong>Configuração atual:</strong> 🏁 Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`
-: '<strong>Configuração atual:</strong> ⚡ V9 padrão';
+? `<strong>Configuração atual:</strong> ${iconeLinha('flag')} Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`
+: `<strong>Configuração atual:</strong> ${iconeLinha('route')} Mais rápida`;
 }
 if(opPadrao) opPadrao.classList.toggle('selecionada',cfg.modo==='padrao');
 if(opDestino) opDestino.classList.toggle('selecionada',cfg.modo==='destino');
@@ -3196,7 +3288,7 @@ if(modal) modal.classList.remove('aberto');
 function selecionarConfiguracaoV9Padrao(){
 salvarConfiguracaoV9('padrao',null);
 fecharConfiguracaoV9();
-mostrarToast('⚙️ V9 padrão selecionada','sucesso');
+mostrarToast('Configuração de rota atualizada','sucesso');
 }
 
 function selecionarConfiguracaoV9Destino(){
@@ -3260,7 +3352,7 @@ return otimizarRotaAutomaticamenteV9(null);
 // ======================================================================
 /*
 Princípios da V9:
-1) A ordem Shopee é sempre a baseline e nunca pode ser substituída por uma
+1) A ordem original é sempre a baseline e nunca pode ser substituída por uma
    alternativa pior em tempo. Em empate técnico (até 15 s), vence menor km.
 2) O custo usa matriz DIRECIONAL de tempo + distância pelas ruas (OSRM).
    A -> B e B -> A podem ter custos diferentes por mão única/retornos/acessos.
@@ -3540,9 +3632,9 @@ geometriaRota:geometria||null,paradasAnalisadas:ativos.length,organizacaoPacotes
 };
 modoOrganizacaoPacotes=false;mapaFoiEnquadrado=true;salvarStorage();fecharOverlayOtimizacao();renderizarTudo();
 if(melhorou){
-mostrarToast(destino?'⚡ V9 otimizou a rota terminando próximo ao destino':'⚡ V9 encontrou uma rota melhor que a Shopee','sucesso');
+mostrarToast(destino?'Rota otimizada terminando próximo ao destino':'Rota otimizada com sucesso','sucesso');
 }else{
-mostrarToast(destino?'✅ Melhor referência mantida respeitando o destino final':'✅ A Shopee já era a melhor referência encontrada — mantida','neutro');
+mostrarToast(destino?'✅ Melhor referência mantida respeitando o destino final':'✅ A ordem original já estava muito boa — mantida','neutro');
 }
 if(semCoordenada.length) setTimeout(()=>mostrarToast(`⚠️ ${semCoordenada.length} parada(s) sem coordenada ficaram no final da lista`,'alerta'),500);
 }catch(erro){
@@ -3754,7 +3846,7 @@ const nome = escaparHtmlTexto(item.nome || 'Local salvo');
 const endereco = escaparHtmlTexto(item.endereco || `${Number(item.lat).toFixed(5)}, ${Number(item.lng).toFixed(5)}`);
 return `
 <div class="destino-salvo-card">
-<div class="nome">📍 ${nome}</div>
+<div class="nome">${iconeLinha('pin')} ${nome}</div>
 <div class="endereco">${endereco}</div>
 <div class="destino-salvo-acoes">
 <button class="destino-salvo-usar" onclick="usarDestinoSalvoV9('${item.id}')">Usar</button>
@@ -3851,7 +3943,7 @@ if(marcadorDestinoSelecionado){
 marcadorDestinoSelecionado.setLatLng([lat,lng]);
 }else if(mapaDestinoFinal){
 const icone = L.divIcon({
-html:'<div class="pin-destino-final">🏁</div>',
+html:'<div class="pin-destino-final">'+iconeLinha('flag')+'</div>',
 className:'',
 iconSize:[30,30],
 iconAnchor:[15,15]
@@ -3860,7 +3952,7 @@ marcadorDestinoSelecionado = L.marker([lat,lng], {icon:icone, zIndexOffset:1000}
 }
 
 const info = document.getElementById('destinoSelecionadoInfo');
-if(info) info.textContent = '🏁 Ponto selecionado. Identificando o endereço...';
+if(info) info.innerHTML = iconeLinha('flag') + '<span>Ponto selecionado. Identificando o endereço...</span>'; 
 
 if(buscarEndereco){
 const endereco = await reverseGeocodificarPonto(lat,lng);
@@ -3871,9 +3963,7 @@ destinoSelecionadoAtual.texto = destinoSelecionadoAtual.nome || endereco || 'Pon
 }
 
 if(info && destinoSelecionadoAtual){
-info.textContent = destinoSelecionadoAtual.endereco
-? `🏁 ${destinoSelecionadoAtual.endereco}`
-: `🏁 Ponto escolhido: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+info.innerHTML = iconeLinha('flag') + '<span>' + escaparHtmlTexto(destinoSelecionadoAtual.endereco ? destinoSelecionadoAtual.endereco : `Ponto escolhido: ${lat.toFixed(5)}, ${lng.toFixed(5)}`) + '</span>'; 
 }
 }
 
@@ -4190,8 +4280,8 @@ vistas.add(assinatura);
 candidatas.push({nome, ordem:final});
 }
 
-// A ordem Shopee entra como candidata real. Assim a otimização nunca escolhe
-// conscientemente algo pior nos DOIS critérios quando a Shopee já estiver boa.
+// A ordem original entra como candidata real. Assim a otimização nunca escolhe
+// conscientemente algo pior nos DOIS critérios quando a rota original já estiver boa.
 adicionar('shopee', ordemShopee, false);
 adicionar('vizinho', rotaVizinhoMaisProximo(validos, inicio), true);
 
@@ -4976,7 +5066,7 @@ candidatas.push({nome:c.nome,ordemIndices});
 }
 }
 
-// A ordem Shopee NÃO entra como candidata de otimização nesta versão. Ela é
+// A ordem original NÃO entra como candidata de otimização nesta versão. Ela é
 // calculada separadamente apenas para comparação. Isso impede o motor de
 // escolher uma sequência que viole micro-regiões/continuidade de rua só
 // porque a ordem original teve um score matemático menor.
@@ -6584,12 +6674,12 @@ geométricas fossem capazes de vencer uma rota que, pelas próprias métricas
 viárias, era pior que a ordem original.
 
 A V7.11 trabalha como um motorista experiente:
-1) a ordem da Shopee é a BASELINE que precisa ser superada;
+1) a ordem original é a BASELINE que precisa ser superada;
 2) Scanner/Fronteira/heurísticas só GERAM ideias de rota;
 3) cada ideia é refinada globalmente, podendo mover qualquer parada;
 4) tempo pelas vias é o critério primário e absoluto;
 5) quilômetros só decidem quando os tempos são praticamente iguais;
-6) se nenhuma alternativa superar a Shopee, MANTÉM A SHOPEE.
+6) se nenhuma alternativa superar a rota original, MANTÉM A ORDEM ORIGINAL.
 
 Assim, uma rota nunca mais é chamada de "otimizada" quando aumenta o tempo.
 */
@@ -6790,7 +6880,7 @@ janelas:avaliarJanelasRotaV75(shopee,resultado,validos),nome:'shopee'
 };
 const factiveis=avaliadas.filter(a=>metricasRotaValidas(a.metricas)&&a.janelas.violacoesHard.length===0);
 let pool=factiveis.length?factiveis:avaliadas.filter(a=>metricasRotaValidas(a.metricas));
-if(!pool.length) return {melhor:baseShopee,baseline:baseShopee,avaliadas,manteveShopee:true};
+if(!pool.length) return {melhor:baseShopee,baseline:baseShopee,avaliadas,manteveOriginal:true};
 
 // Se a Shopee já cumpre janelas HARD, nenhuma alternativa mais lenta é aceita.
 if(baseShopee.janelas.violacoesHard.length===0 && metricasRotaValidas(baseShopee.metricas)){
@@ -6851,7 +6941,7 @@ let avaliacoes = [];
 try{
 matrizGlobal = await consultarMatrizGlobalOSRM(pontosGlobais);
 
-atualizarProgressoOtimizacao('Comparando a Shopee com alternativas e melhorando apenas o que realmente reduz tempo...');
+atualizarProgressoOtimizacao('Comparando a rota original com alternativas e melhorando apenas o que realmente reduz tempo...');
 const decisaoV711 = otimizarComoMotoristaV711(validos, ordemShopee, matrizGlobal, indiceDestinoFinal, inicio, destino);
 avaliacoes = decisaoV711.avaliadas || [];
 if(!decisaoV711.melhor) throw new Error('SEM_ROTA_GLOBAL');
@@ -6886,8 +6976,8 @@ else ordem=antes;
 console.warn('Matriz global indisponível; usando fallback viário completo:', erroGlobal);
 
 // Sem matriz viária confiável não tentamos "inventar" uma otimização.
-// Mantemos a ordem Shopee, porque ela é a baseline segura da V7.11.
-atualizarProgressoOtimizacao('Roteador indisponível; mantendo a ordem da Shopee com segurança...');
+// Mantemos a ordem original, porque ela é a baseline segura da V7.11.
+atualizarProgressoOtimizacao('Roteador indisponível; mantendo a ordem original com segurança...');
 ordem=[...ordemShopee];
 metricasShopee=await calcularMetricasRota(ordemShopee,inicio,destino);
 if(metricasRotaValidas(metricasShopee)){
@@ -6895,10 +6985,10 @@ metricasShopee.duracao += ordemShopee.reduce((acc,g)=>acc+tempoServicoGrupoSegun
 }
 metricasMelhor=metricasShopee?{...metricasShopee}:null;
 matrizGlobal={provedor:'FALLBACK_SHOPEE_V711'};
-mostrarToast('⚠️ Sem matriz viária confiável; mantive a ordem da Shopee', 'alerta');
+mostrarToast('⚠️ Sem matriz viária confiável; mantive a ordem original', 'alerta');
 }
 
-atualizarProgressoOtimizacao('Validando que a nova rota realmente supera a ordem da Shopee...');
+atualizarProgressoOtimizacao('Validando a nova rota...');
 if(!metricasRotaValidas(metricasMelhor)){
 metricasMelhor = await calcularMetricasRota(ordem, inicio, destino);
 }
@@ -6911,7 +7001,7 @@ invalidos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 grupos = [...ordem, ...invalidos];
 grupos.forEach((g,indice)=>{ g.ordemOtimizada = indice + 1; });
 
-atualizarProgressoOtimizacao('Calculando a comparação com a ordem da Shopee...');
+atualizarProgressoOtimizacao('Calculando a comparação com a rota original...');
 
 metaRota = {
 modo,
@@ -6931,14 +7021,14 @@ mapaFoiEnquadrado = false;
 salvarStorage();
 renderizarTudo();
 fecharOverlayOtimizacao();
-mostrarToast(metaRota.resultadoOtimizacao==='shopee_mantida' ? '✅ A Shopee já era a melhor referência encontrada; ordem mantida' : '⚡ Rota melhorada: menor tempo primeiro, km depois', 'sucesso');
+mostrarToast(metaRota.resultadoOtimizacao==='shopee_mantida' ? '✅ A ordem original já era a melhor referência encontrada; ordem mantida' : '⚡ Rota melhorada: menor tempo primeiro, km depois', 'sucesso');
 
 }catch(erro){
 console.error('Falha na otimização da rota:', erro);
 fecharOverlayOtimizacao();
 
 if(erro && erro.message === 'LOCALIZACAO_INDISPONIVEL'){
-mostrarToast('⚠️ Não consegui sua localização. No PC, use 📌 no mapa e tente novamente.', 'alerta');
+mostrarToast('⚠️ Não consegui sua localização. No PC, use o ajuste manual no mapa e tente novamente.', 'alerta');
 abrirModalOtimizacao(false);
 return;
 }
@@ -6969,119 +7059,39 @@ return metros >= 1000 ? `${(metros/1000).toFixed(metros >= 10000 ? 0 : 1)} km` :
 
 function htmlComparacaoTempoRota(){
 if(!metaRota) return '';
-const tempoShopee = formatarDuracaoRota(metaRota.duracaoShopeeSegundos);
-const tempoOtimizado = formatarDuracaoRota(metaRota.duracaoSegundos);
-const distShopee = formatarDistanciaRota(metaRota.distanciaShopeeMetros);
-const distOtimizada = formatarDistanciaRota(metaRota.distanciaMetros);
-
-if(!tempoShopee && !tempoOtimizado && !distShopee && !distOtimizada) return '';
-
-let diferencaHtml = '';
-const temTempo = Number.isFinite(metaRota.duracaoShopeeSegundos) && Number.isFinite(metaRota.duracaoSegundos);
-const temDistancia = Number.isFinite(metaRota.distanciaShopeeMetros) && Number.isFinite(metaRota.distanciaMetros);
-
-if(temTempo || temDistancia){
-const deltaTempo = temTempo ? metaRota.duracaoShopeeSegundos - metaRota.duracaoSegundos : 0;
-const deltaDist = temDistancia ? metaRota.distanciaShopeeMetros - metaRota.distanciaMetros : 0;
-const partes = [];
-
-if(temTempo && Math.abs(deltaTempo) > 30){
-partes.push(deltaTempo > 0
-? `${formatarDuracaoRota(deltaTempo)} mais rápida`
-: `${formatarDuracaoRota(Math.abs(deltaTempo))} a mais`);
-}
-
-if(temDistancia && Math.abs(deltaDist) > 100){
-partes.push(deltaDist > 0
-? `${formatarDistanciaRota(deltaDist)} a menos`
-: `${formatarDistanciaRota(Math.abs(deltaDist))} a mais`);
-}
-
-if(partes.length){
-const ambosMelhores = (!temTempo || deltaTempo >= -30) && (!temDistancia || deltaDist >= -100) && (deltaTempo > 30 || deltaDist > 100);
-const prefixoEconomia = metaRota.modo === 'desenho' && deltaTempo > 30 ? '⏱️ Economia estimada: ' : (ambosMelhores ? '⚡ ' : '⚖️ ');
-diferencaHtml = `<div class="economia-rota${ambosMelhores ? '' : ' pior'}">${prefixoEconomia}${partes.join(' · ')}</div>`;
-}else{
-diferencaHtml = `<div class="economia-rota">≈ Resultado muito próximo da ordem da Shopee</div>`;
-}
-}
-
-return `
-<div class="comparacao-rota">
-<div class="comparacao-grid">
-<div class="comparacao-item">
-📦 Ordem Shopee
-<strong>${tempoShopee || '—'}${distShopee ? ` · ${distShopee}` : ''}</strong>
-</div>
-<div class="comparacao-item otimizada">
-${metaRota.modo === 'desenho' ? '✏️ Sua rota' : (metaRota.resultadoOtimizacao === 'shopee_mantida' ? '✅ Melhor referência mantida' : (metaRota.modo === 'auto_v9' ? '⚡ V9 automática' : '⚡ Otimizada'))}
-<strong>${tempoOtimizado || '—'}${distOtimizada ? ` · ${distOtimizada}` : ''}</strong>
-</div>
-</div>
-${diferencaHtml}
-<div class="comparacao-nota">${metaRota.modo === 'desenho' ? 'Estimativa calculada com a mesma origem e as mesmas paradas nas duas ordens. O tempo inclui deslocamento pelas vias + o mesmo tempo de serviço em cada parada.' : 'Tempo total estimado = deslocamento pelas vias + tempo de serviço. A ordem Shopee é a baseline: o Copiloto só troca a sequência quando encontra uma alternativa que não aumenta o tempo. Entre tempos equivalentes, vence a menor quilometragem.'}</div>
-</div>`;
+const tempoAtual=formatarDuracaoRota(metaRota.duracaoSegundos);
+const distAtual=formatarDistanciaRota(metaRota.distanciaMetros);
+const temTempo=Number.isFinite(metaRota.duracaoShopeeSegundos)&&Number.isFinite(metaRota.duracaoSegundos);
+const temDist=Number.isFinite(metaRota.distanciaShopeeMetros)&&Number.isFinite(metaRota.distanciaMetros);
+let ganho='';
+if(temTempo){const d=metaRota.duracaoShopeeSegundos-metaRota.duracaoSegundos;if(d>30)ganho=`${formatarDuracaoRota(d)} mais rápida`;else if(d<-30)ganho=`${formatarDuracaoRota(Math.abs(d))} a mais`;}
+if(temDist){const d=metaRota.distanciaShopeeMetros-metaRota.distanciaMetros;if(Math.abs(d)>100){const txt=d>0?`${formatarDistanciaRota(d)} a menos`:`${formatarDistanciaRota(Math.abs(d))} a mais`;ganho=ganho?`${ganho} · ${txt}`:txt;}}
+return `<div class="rota-resumo-v10">${iconeLinha('clock')}<div><strong>${tempoAtual||'Rota calculada'}${distAtual?` · ${distAtual}`:''}</strong>${ganho?`<small>${ganho}</small>`:''}</div></div>`;
 }
 
 function atualizarStatusOtimizacaoRota(){
-const el = document.getElementById('statusOtimizacaoRota');
-const btnRestaurar = document.getElementById('btnRestaurarShopee');
-const btnOrganizar = document.getElementById('btnOrganizarPacotes');
-if(!el) return;
-
-if(!grupos.length){
+const el=document.getElementById('statusOtimizacaoRota');
+const btnRestaurar=document.getElementById('btnRestaurarShopee');
+const btnOrganizar=document.getElementById('btnOrganizarPacotes');
+if(!el)return;
+if(!grupos.length){el.style.display='none';if(btnRestaurar)btnRestaurar.style.display='none';if(btnOrganizar)btnOrganizar.style.display='none';return;}
+if(btnRestaurar)btnRestaurar.style.display='none';
+const rotaReorganizada=metaRota&&['desenho','auto_v9'].includes(metaRota.modo);
+if(btnOrganizar)btnOrganizar.style.display=(rotaReorganizada&&!metaRota.organizacaoPacotesConcluida)?'flex':'none';
+if(metaRota&&metaRota.modo==='auto_v9'){
+ const manteve=metaRota.resultadoOtimizacao==='shopee_mantida';
+ const destino=pontoValido(metaRota.destinoFinal);
+ el.style.display='block';
+ el.innerHTML=`<div class="linha-status-rota">${iconeLinha(destino?'flag':'route')}<span>${manteve?'Rota analisada':'Rota otimizada'}${destino?' · final configurado':''}</span></div>${htmlComparacaoTempoRota()}`;
+ return;
+}
+if(metaRota&&metaRota.modo==='desenho'){el.style.display='block';el.innerHTML=`<div class="linha-status-rota">${iconeLinha('pencil')}<span>Rota manual aplicada</span></div>${htmlComparacaoTempoRota()}`;return;}
 el.style.display='none';
-if(btnRestaurar) btnRestaurar.style.display='none';
-if(btnOrganizar) btnOrganizar.style.display='none';
-return;
-}
-
-el.style.display='block';
-const manual = metaRota && metaRota.modo === 'desenho';
-const autoV9 = metaRota && metaRota.modo === 'auto_v9';
-const rotaReorganizada = manual || autoV9;
-if(btnRestaurar) btnRestaurar.style.display = 'none'; // V9.1: função preservada no código, botão oculto
-if(btnOrganizar) btnOrganizar.style.display = (rotaReorganizada && !metaRota.organizacaoPacotesConcluida) ? 'block' : 'none';
-
-if(autoV9){
-const comparacaoAuto = htmlComparacaoTempoRota();
-const manteve = metaRota.resultadoOtimizacao === 'shopee_mantida';
-const comDestino = pontoValido(metaRota.destinoFinal);
-const destinoTxt = comDestino ? escaparHtmlTexto(textoDestinoCurtoV9(metaRota.destinoFinal)) : '';
-el.innerHTML = `
-<div class="linha-status-rota">${manteve ? '✅ V9 analisou a rota e manteve a melhor referência' : (comDestino ? '🏁 V9 aplicada · final próximo do destino' : '⚡ Rota automática V9 aplicada')}</div>
-<div>${manteve ? 'Nenhuma alternativa testada conseguiu superar a referência em tempo de deslocamento.' : (comDestino ? `Destino configurado: <strong>${destinoTxt}</strong>. A V9 otimiza a rota inteira e inclui o custo da última entrega até esse ponto.` : 'A V9 usa a matriz direcional das ruas, gera múltiplas candidatas e refina a sequência. Tempo é o critério principal; em empate técnico, vence a menor quilometragem.')}</div>
-${comparacaoAuto}`;
-return;
-}
-
-if(!manual){
-el.innerHTML = `
-<div class="linha-status-rota">📦 Ordem da Shopee ativa</div>
-<div>Você pode usar <strong>“⚡ Otimizar automaticamente — V9”</strong> ou desenhar sua própria ordem. Nenhuma otimização é obrigatória.</div>`;
-return;
-}
-
-const capt = Number(metaRota.paradasCapturadas || 0);
-const longe = Number(metaRota.paradasLongeDoTraco || 0);
-const temRotaViaria = Array.isArray(metaRota.geometriaRota) && metaRota.geometriaRota.length>1;
-const comparacaoManual = htmlComparacaoTempoRota();
-el.innerHTML = `
-<div class="linha-status-rota">✏️ Rota manual aplicada</div>
-<div>O desenho define a ordem. Todas as paradas precisam ser selecionadas; o Copiloto só inverte um trecho da mesma rua quando houver ganho viário claramente relevante.</div>
-<div style="margin-top:6px;"><strong>${grupos.length} parada(s)</strong>${capt ? ` · ${capt} selecionada(s) pelo desenho` : ''}${metaRota.ajustesOrientacaoRua ? ` · ${metaRota.ajustesOrientacaoRua} ajuste(s) claro(s) de orientação` : ''}${temRotaViaria ? ' · 🛣️ caminho encaixado nas ruas' : ''}</div>
-${comparacaoManual}`;
 }
 
 function htmlReferenciaRota(grupo){
 if(!temOrdemOtimizada(grupo)) return '';
-const shopee = ehStopValido(grupo.stopOriginal ?? grupo.stop) ? String(grupo.stopOriginal ?? grupo.stop) : 'Extra';
-const rotulo = metaRota && metaRota.modo === 'desenho' ? '✏️ Manual' : (metaRota && metaRota.modo === 'auto_v9' ? '⚡ V9' : '⚡ Otimizada');
-return `
-<div class="rota-referencia">
-<span class="rota-otimizada-pill">${rotulo}: <strong>${grupo.ordemOtimizada}</strong></span>
-<span class="rota-shopee-pill">📦 Shopee: <strong>${shopee}</strong></span>
-</div>`;
+return `<div class="rota-referencia"><span class="rota-otimizada-pill">${iconeLinha('route')} <strong>${grupo.ordemOtimizada}</strong></span></div>`;
 }
 
 // ----------------------------------------------------------------------
@@ -7281,9 +7291,9 @@ return grupo && grupo.ordemOtimizada !== null && grupo.ordemOtimizada !== undefi
 
 function tituloParada(grupo){
 if(temOrdemOtimizada(grupo)){
-return "📍 Parada " + grupo.ordemOtimizada;
+return iconeLinha('pin') + " Parada " + grupo.ordemOtimizada;
 }
-return ehStopValido(grupo.stop) ? ("📍 Parada " + grupo.stop) : "⭐ Extra";
+return ehStopValido(grupo.stop) ? (iconeLinha('pin') + " Parada " + grupo.stop) : (iconeLinha('pin') + " Extra");
 }
 
 // Extrai só o primeiro nome do destinatário (evita expor o sobrenome completo)
@@ -7305,15 +7315,15 @@ let acaoPacoteHtml = "";
 
 if(pacote.status === 'ocorrencia'){
 acaoPacoteHtml = `
-<div class="ocorrencia-pacote-texto">⚠️ Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
+<div class="ocorrencia-pacote-texto">${iconeLinha('alert')} Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
 <div class="btn-linha-pacote">
-<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">✅ Entregar</button>
-<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">↩️ Desfazer</button>
+<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">${iconeLinha('check')} Entregar</button>
+<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">${iconeLinha('undo')} Desfazer</button>
 </div>
 `;
 }else{
 acaoPacoteHtml = `
-<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">⚠️ Ocorrência só neste pacote</button>
+<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">${iconeLinha('alert')} Ocorrência só neste pacote</button>
 `;
 }
 
@@ -7325,13 +7335,13 @@ htmlPacotes += `
 ${pacote.codigo}
 </div>
 
-${pacote.destinatario ? `<div class="nome-cliente-pacote">👤 ${primeiroNome(pacote.destinatario)}</div>` : ''}
+${pacote.destinatario ? `<div class="nome-cliente-pacote">${iconeLinha('user')} ${primeiroNome(pacote.destinatario)}</div>` : ''}
 
 <div class="detalhe">
 ${pacote.endereco}
 </div>
 
-${pacote.status === 'entregue' ? '<div class="entregue-pacote-texto">✅ Entregue</div>' : acaoPacoteHtml}
+${pacote.status === 'entregue' ? `<div class="entregue-pacote-texto">${iconeLinha('check')} Entregue</div>` : acaoPacoteHtml}
 
 </div>
 
@@ -7369,19 +7379,12 @@ ${htmlPacotes}
 
 </div>
 
-<button
-class="waze"
-onclick="
-abrirWaze(
-'${grupo.lat}',
-'${grupo.lng}'
-)">
-Abrir no Waze</button>
+<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">${iconeLinha('waze')} Abrir no Waze</button>
 
 <div class="btn-linha">
-<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">✅ Entregue</button>
-<button class="ocorrencia-btn" onclick="abrirModalMotivo('${grupo.id}')">⚠️ Ocorrência</button>
-<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">↩️ Desfazer</button>
+<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">${iconeLinha('check')} Entregue</button>
+<button class="ocorrencia-btn" onclick="abrirModalMotivo('${grupo.id}')">${iconeLinha('alert')} Ocorrência</button>
+<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">${iconeLinha('undo')} Desfazer</button>
 </div>
 
 `;
@@ -7413,7 +7416,7 @@ const grupo = ordenados[i];
 const statusGrupo = statusEfetivoGrupo(grupo);
 
 if(statusGrupo === 'entregue' && !divisoriaEntreguesInserida){
-lista.innerHTML += `<div class="divisoria-entregues"><span>✅ Entregues</span></div>`;
+lista.innerHTML += `<div class="divisoria-entregues"><span>${iconeLinha('check')} Entregues</span></div>`;
 divisoriaEntreguesInserida = true;
 }
 
@@ -7457,7 +7460,7 @@ ${construirConteudoLocal(item)}
 lista.innerHTML += `
 <div class="parada-composta">
 <h3>${tituloParada(grupo)}</h3>
-<div class="badge-total-parada">📦 ${totalPacotesBloco} pacote(s) ao todo nesta parada</div>
+<div class="badge-total-parada">${iconeLinha('package')} ${totalPacotesBloco} pacote(s) ao todo nesta parada</div>
 ${subLocaisHtml}
 </div>
 `;
@@ -7471,6 +7474,7 @@ i = j;
 atualizarEstatisticas();
 atualizarMapa();
 renderizarOcorrencias();
+renderizarOcorrenciasHome();
 atualizarStatusOtimizacaoRota();
 atualizarVisibilidadeOrganizacaoPacotes();
 
@@ -7482,7 +7486,7 @@ const container = document.getElementById('listaOcorrencias');
 const ocorrencias = grupos.filter(g => g.pacotes.some(p => p.status === 'ocorrencia'));
 
 if(ocorrencias.length === 0){
-container.innerHTML = `<div class="aviso-vazio">Nenhuma ocorrência no momento 🎉</div>`;
+container.innerHTML = `<div class="aviso-vazio">Nenhuma ocorrência no momento</div>`;
 return;
 }
 
@@ -7498,24 +7502,24 @@ let acaoPacoteHtml = "";
 
 if(pacote.status === 'ocorrencia'){
 acaoPacoteHtml = `
-<div class="ocorrencia-pacote-texto">⚠️ Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
+<div class="ocorrencia-pacote-texto">${iconeLinha('alert')} Ocorrência${pacote.motivo ? ': ' + pacote.motivo : ''}</div>
 <div class="btn-linha-pacote">
-<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">✅ Entregar</button>
-<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">↩️ Desfazer</button>
+<button class="entregue-pacote-btn" onclick="marcarEntreguePacote('${grupo.id}', ${indice})">${iconeLinha('check')} Entregar</button>
+<button class="desfazer-pacote-btn" onclick="desfazerStatusPacote('${grupo.id}', ${indice})">${iconeLinha('undo')} Desfazer</button>
 </div>
 `;
 }else{
 acaoPacoteHtml = `
-<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">⚠️ Ocorrência só neste pacote</button>
+<button class="ocorrencia-pacote-btn" onclick="abrirModalMotivoPacote('${grupo.id}', ${indice})">${iconeLinha('alert')} Ocorrência só neste pacote</button>
 `;
 }
 
 htmlPacotes += `
 <div class="pacote pacote-status-${pacote.status}">
 <div class="codigo">${pacote.codigo}</div>
-${pacote.destinatario ? `<div class="nome-cliente-pacote">👤 ${primeiroNome(pacote.destinatario)}</div>` : ''}
+${pacote.destinatario ? `<div class="nome-cliente-pacote">${iconeLinha('user')} ${primeiroNome(pacote.destinatario)}</div>` : ''}
 <div class="detalhe">${pacote.endereco}</div>
-${pacote.status === 'entregue' ? '<div class="entregue-pacote-texto">✅ Entregue</div>' : acaoPacoteHtml}
+${pacote.status === 'entregue' ? `<div class="entregue-pacote-texto">${iconeLinha('check')} Entregue</div>` : acaoPacoteHtml}
 </div>
 `;
 
@@ -7532,11 +7536,11 @@ ${badgeStatusGrupoHtml(grupo)}
 <button class="toggle" onclick="alternarPacotes('oc_${grupo.id}')">Mostrar/Ocultar pacotes</button>
 <div id="pacotes_oc_${grupo.id}" class="pacotes" style="${painelPacotesAbertos.has('oc_' + grupo.id) ? 'display:block;' : ''}">${htmlPacotes}</div>
 
-<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">Abrir no Waze</button>
+<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">${iconeLinha('waze')} Abrir no Waze</button>
 
 <div class="btn-linha">
-<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">✅ Entregue</button>
-<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">↩️ Desfazer</button>
+<button class="entregue-btn" onclick="marcarEntregue('${grupo.id}')">${iconeLinha('check')} Entregue</button>
+<button class="desfazer-btn" onclick="desfazerStatus('${grupo.id}')">${iconeLinha('undo')} Desfazer</button>
 </div>
 </div>
 `;
@@ -7544,6 +7548,24 @@ ${badgeStatusGrupoHtml(grupo)}
 });
 
 }
+
+function renderizarOcorrenciasHome(){
+const container=document.getElementById('homeUrgencias');
+const contador=document.getElementById('homeUrgenciasContador');
+if(!container)return;
+const itens=[];
+grupos.forEach(g=>g.pacotes.forEach((p,indice)=>{if(p.status==='ocorrencia')itens.push({g,p,indice});}));
+if(contador)contador.textContent=String(itens.length);
+if(!itens.length){container.innerHTML='<div class="home-sem-urgencias">Nenhuma urgência no momento.</div>';return;}
+container.innerHTML=itens.map(({g,p,indice})=>`<article class="home-urgencia-card">
+<div class="home-urgencia-top"><span class="home-urgencia-label">${iconeLinha('alert')} Urgência</span><span class="home-urgencia-parada">${temOrdemOtimizada(g)?'Parada '+g.ordemOtimizada:(ehStopValido(g.stop)?'Parada '+g.stop:'Extra')}</span></div>
+<strong>${escaparHtmlTexto(p.motivo||'Ocorrência registrada')}</strong>
+<p>${escaparHtmlTexto(p.endereco||g.endereco||'')}</p>
+<div class="home-urgencia-actions"><button class="home-urgencia-open" onclick="irParaOcorrenciaHome('${g.id}')">${iconeLinha('alert')} Abrir ocorrência</button><button class="home-urgencia-map" onclick="focarGrupoNoMapaV10('${g.id}')">${iconeLinha('map')} Ver no mapa</button></div>
+</article>`).join('');
+}
+function irParaOcorrenciaHome(id){irParaAba(2);setTimeout(()=>destacarElemento('grupo_oc_'+id),220);}
+function focarGrupoNoMapaV10(id){const g=encontrarGrupo(id);if(!g)return;irParaAba(1);setTimeout(()=>{inicializarMapaSeNecessario();const lat=Number(g.lat),lng=Number(g.lng);if(mapa&&Number.isFinite(lat)&&Number.isFinite(lng)){mapa.setView([lat,lng],17);abrirInfoMapa(id);}},220);}
 
 function alternarPacotes(id){
 
@@ -7626,15 +7648,15 @@ const misto = (ocorrencias > 0 && (entregues > 0 || pendentes > 0));
 
 if(misto){
 let partes = [];
-if(pendentes > 0) partes.push(`🟡 ${pendentes} pendente(s)`);
-if(entregues > 0) partes.push(`✅ ${entregues} entregue(s)`);
-if(ocorrencias > 0) partes.push(`⚠️ ${ocorrencias} ocorrência(s)`);
+if(pendentes > 0) partes.push(`${pendentes} pendente(s)`);
+if(entregues > 0) partes.push(`${entregues} entregue(s)`);
+if(ocorrencias > 0) partes.push(`${ocorrencias} ocorrência(s)`);
 return `<span class="badge-status misto">${partes.join(' · ')}</span>`;
 }
 
-if(entregues === total) return `<span class="badge-status entregue">✅ Entregue</span>`;
-if(ocorrencias === total) return `<span class="badge-status ocorrencia">⚠️ Ocorrência</span>`;
-return `<span class="badge-status pendente">🟡 Pendente</span>`;
+if(entregues === total) return `<span class="badge-status entregue">${iconeLinha('check')} Entregue</span>`;
+if(ocorrencias === total) return `<span class="badge-status ocorrencia">${iconeLinha('alert')} Ocorrência</span>`;
+return `<span class="badge-status pendente">${iconeLinha('package')} Pendente</span>`;
 
 }
 
@@ -7817,7 +7839,8 @@ toast.id = 'toastCopiloto';
 document.body.appendChild(toast);
 }
 
-toast.textContent = mensagem;
+const nomeIcone=tipo==='sucesso'?'check':(tipo==='alerta'?'alert':'route');
+toast.innerHTML=iconeLinha(nomeIcone)+'<span>'+escaparHtmlTexto(textoSemEmoji(mensagem))+'</span>';
 toast.className = 'toast-copiloto toast-' + tipo + ' aparecer';
 
 // Reinicia o timer se o usuário disparar outra ação rapidinho em seguida
@@ -7850,8 +7873,8 @@ document.getElementById('qtdEntregues').innerText = pacotesEntregues;
 document.getElementById('qtdOcorrencias').innerText = pacotesOcorrencia;
 
 // Contadores das abas = mesma base (quantidade de pacotes)
-document.getElementById('contadorLista').innerText = pacotesPendentes;
-document.getElementById('contadorOcorrencias').innerText = pacotesOcorrencia;
+const badgeTab=document.getElementById('badgeOcorrenciasTab'); if(badgeTab){badgeTab.textContent=String(pacotesOcorrencia);badgeTab.style.display=pacotesOcorrencia?'block':'none';}
+const resumoSheet=document.getElementById('sheetListaResumo'); if(resumoSheet) resumoSheet.textContent=pacotesPendentes?`${pacotesPendentes} pacote(s) restante(s) · arraste para cima`:'Rota concluída';
 
 const totalPacotes = todosPacotes.length;
 const percentual = totalPacotes > 0
@@ -7969,7 +7992,7 @@ try{ metaRota = JSON.parse(metaSalva); }catch(erro){}
 if(metaRota && metaRota.organizacaoPacotesConcluida === undefined) metaRota.organizacaoPacotesConcluida = false;
 
 // V8.1 desativa definitivamente a otimização automática antiga. Rotas salvas
-// pelas versões V7 voltam para a ordem da Shopee; somente um desenho manual
+// pelas versões V7 voltam para a ordem original; somente um desenho manual
 // V8.1 é preservado ao reabrir o navegador.
 if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo)){
 grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
@@ -8052,7 +8075,7 @@ mostrarToast('🗺️ Camada alternativa do mapa ativada', 'neutro');
 
 camadaBasePrincipal.addTo(mapa);
 
-// Fallback manual de localização: quando ativado pelo botão 📌, o próximo
+// Fallback manual de localização: quando ativado pelo ajuste manual, o próximo
 // toque no mapa vira a posição do usuário. É útil principalmente no PC,
 // onde normalmente não existe GPS e a localização por rede pode ser imprecisa.
 mapa.on('click', function(e){
@@ -8089,13 +8112,13 @@ mapa.setBearing(0);
 
 if(localizacaoManualAtiva && meuMarcador){
 mapa.setView(meuMarcador.getLatLng(), Math.max(mapa.getZoom(), 17));
-mostrarToast('📌 Usando a posição ajustada manualmente', 'neutro');
+mostrarToast(' Usando a posição ajustada manualmente', 'neutro');
 return;
 }
 
 if(!geolocalizacaoPodeFuncionarAqui()){
-atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra o Copiloto pelo link HTTPS ou use o botão 📌.', 'erro');
-mostrarToast('⚠️ Arquivo aberto fora de HTTPS: use o link publicado ou ajuste com 📌', 'alerta');
+atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra o Copiloto pelo link HTTPS ou use o ajuste manual.', 'erro');
+mostrarToast('⚠️ Arquivo aberto fora de HTTPS: use o link publicado ou ajuste com ', 'alerta');
 return;
 }
 
@@ -8121,13 +8144,13 @@ return false;
 function atualizarStatusLocalizacao(texto, tipo){
 const el = document.getElementById('statusLocalizacaoMapa');
 if(!el) return;
-el.textContent = texto;
+el.innerHTML = iconeLinha('pin') + '<span>' + escaparHtmlTexto(textoSemEmoji(texto)) + '</span>';
 el.className = tipo || '';
 }
 
 function mensagemErroGeolocalizacao(erro){
 if(!geolocalizacaoPodeFuncionarAqui()){
-return 'GPS bloqueado porque o Copiloto foi aberto como arquivo. Abra o link HTTPS publicado ou use 📌.';
+return 'GPS bloqueado porque o Copiloto foi aberto como arquivo. Abra o link HTTPS publicado ou use o ajuste manual.';
 }
 if(erro && erro.code === 1) return 'Permissão de localização negada. Libere Localização para este site no navegador.';
 if(erro && erro.code === 2) return 'Localização indisponível. Ative o GPS e tente novamente.';
@@ -8245,12 +8268,12 @@ function iniciarRastreamentoLocalizacao(){
 if(localizacaoManualAtiva) return;
 
 if(!navigator.geolocation){
-atualizarStatusLocalizacao('⚠️ Este navegador não oferece geolocalização. Use 📌.', 'erro');
+atualizarStatusLocalizacao('⚠️ Este navegador não oferece geolocalização. Use .', 'erro');
 return;
 }
 
 if(!geolocalizacaoPodeFuncionarAqui()){
-atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra pelo link HTTPS ou use 📌.', 'erro');
+atualizarStatusLocalizacao('⚠️ GPS bloqueado neste modo. Abra pelo link HTTPS ou use o ajuste manual.', 'erro');
 return;
 }
 
@@ -8297,8 +8320,8 @@ modoAjustePosicaoManual = !modoAjustePosicaoManual;
 if(botao) botao.classList.toggle('ativo', modoAjustePosicaoManual);
 
 if(modoAjustePosicaoManual){
-atualizarStatusLocalizacao('📌 Toque no ponto exato onde você está', 'alerta');
-mostrarToast('📌 Agora toque no seu ponto exato no mapa', 'neutro');
+atualizarStatusLocalizacao(' Toque no ponto exato onde você está', 'alerta');
+mostrarToast(' Agora toque no seu ponto exato no mapa', 'neutro');
 }else{
 atualizarStatusLocalizacao('📍 Ajuste manual cancelado', 'alerta');
 }
@@ -8321,8 +8344,8 @@ circuloPrecisaoUsuario = null;
 }
 
 criarOuAtualizarMarcadorUsuario(latlng.lat, latlng.lng, null, true);
-atualizarStatusLocalizacao('📌 Posição ajustada manualmente', 'ok');
-mostrarToast('✅ Posição manual definida. Toque em 📌 de novo para voltar ao GPS.', 'sucesso');
+atualizarStatusLocalizacao(' Posição ajustada manualmente', 'ok');
+mostrarToast('✅ Posição manual definida. Toque no ajuste manual de novo para voltar ao GPS.', 'sucesso');
 }
 
 function corPorStatus(status){
@@ -8337,20 +8360,20 @@ function conteudoInfoHtml(grupo){
 
 return `
 <h3 style="margin:0;">${tituloParada(grupo)}</h3>
-${grupo.destinatario ? `<div class="nome-destinatario">👤 ${primeiroNome(grupo.destinatario)}</div>` : ''}
+${grupo.destinatario ? `<div class="nome-destinatario">${iconeLinha('user')} ${primeiroNome(grupo.destinatario)}</div>` : ''}
 <div class="endereco">${grupo.endereco}</div>
 ${htmlReferenciaRota(grupo)}
 <div class="badge">${grupo.pacotes.length} pacote(s) neste local</div>
 ${badgeStatusGrupoHtml(grupo)}
 
-<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">Abrir no Waze</button>
-<button class="toggle" onclick="verNaLista('${grupo.id}')">📋 Ver na lista</button>
-<button class="toggle" onclick="verificarLocalizacaoPin('${grupo.id}')">🔍 Verificar localização</button>
+<button class="waze" onclick="abrirWaze('${grupo.lat}','${grupo.lng}')">${iconeLinha('waze')} Abrir no Waze</button>
+<button class="toggle" onclick="verNaLista('${grupo.id}')">${iconeLinha('home')} Ver na lista</button>
+<button class="toggle" onclick="verificarLocalizacaoPin('${grupo.id}')">${iconeLinha('search')} Verificar localização</button>
 
 <div class="btn-linha">
-<button class="entregue-btn" onclick="acaoNoPainelInfo('${grupo.id}','entregue')">✅ Entregue</button>
-<button class="ocorrencia-btn" onclick="acaoNoPainelInfo('${grupo.id}','ocorrencia')">⚠️ Ocorrência</button>
-<button class="desfazer-btn" onclick="acaoNoPainelInfo('${grupo.id}','desfazer')">↩️ Desfazer</button>
+<button class="entregue-btn" onclick="acaoNoPainelInfo('${grupo.id}','entregue')">${iconeLinha('check')} Entregue</button>
+<button class="ocorrencia-btn" onclick="acaoNoPainelInfo('${grupo.id}','ocorrencia')">${iconeLinha('alert')} Ocorrência</button>
+<button class="desfazer-btn" onclick="acaoNoPainelInfo('${grupo.id}','desfazer')">${iconeLinha('undo')} Desfazer</button>
 </div>
 `;
 }
@@ -8451,8 +8474,9 @@ if(grupo.pacotes.some(p => p.status === 'ocorrencia')){
 irParaAba(2);
 setTimeout(()=> destacarElemento('grupo_oc_' + id), 200);
 }else{
-irParaAba(0);
-setTimeout(()=> destacarElemento('grupo_' + id), 200);
+irParaAba(1);
+definirSheetListaMapa(true);
+setTimeout(()=> destacarElemento('grupo_' + id), 260);
 }
 }
 
@@ -8576,7 +8600,7 @@ marcadorDestinoRota = null;
 if(metaRota && metaRota.destinoFinal &&
 Number.isFinite(Number(metaRota.destinoFinal.lat)) && Number.isFinite(Number(metaRota.destinoFinal.lng))){
 const iconeDestino = L.divIcon({
-html:'<div class="pin-destino-final">🏁</div>',
+html:'<div class="pin-destino-final">'+iconeLinha('flag')+'</div>',
 className:'',
 iconSize:[30,30],
 iconAnchor:[15,15]
@@ -8623,6 +8647,7 @@ document.getElementById(idBtn).classList.toggle('ativa', i === indice);
 // tamanho (necessário porque ele estava com display:none)
 if(indice === 1){
 inicializarMapaSeNecessario();
+iniciarGestosSheetListaMapa();
 iniciarRastreamentoLocalizacao();
 setTimeout(()=>{
 mapa.invalidateSize();
@@ -8662,7 +8687,7 @@ if(somAtivado) tocarSomEntrega(); // dá um exemplo do som ao ligar
 
 function atualizarIconeSom(){
 const botao = document.getElementById('botaoSom');
-if(botao) botao.innerText = somAtivado ? '🔊' : '🔇';
+if(botao) botao.innerHTML=iconeLinha('settings');
 }
 
 // Toca um "ding" curtinho sintetizado (sem precisar de arquivo de áudio)
@@ -8736,14 +8761,14 @@ frases = [
 ];
 }
 
-document.getElementById('saudacaoHeader').innerText =
-frases[Math.floor(Math.random() * frases.length)];
+const saudacao=document.getElementById('saudacaoHeader'); if(saudacao) saudacao.innerText=textoSemEmoji(frases[Math.floor(Math.random()*frases.length)]);
 
 }
 
 aplicarSaudacao();
 carregarPreferenciaSom();
 atualizarResumoConfiguracaoV9();
+iniciarGestosSheetListaMapa();
 
 // ----------------------------------------------------------------------
 // INICIALIZAÇÃO
