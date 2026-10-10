@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10.1</title>
+<title>Copiloto Entrega V10.3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1638,7 +1638,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 </style>
 
 <style id="v10-extra-fixes">
-/* V10.1 */
+/* V10.3 */
 .auto-v9-btn{background:#2a57c8!important;}
 .acoes-rota-home{grid-template-columns:1fr;}
 #btnConfigOtimizacaoV9{display:none!important;}
@@ -1666,9 +1666,13 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 .settings-switch:checked{background:var(--brand);}
 .settings-switch:checked::after{transform:translateX(18px);}
 @media(max-width:799px){
-  .sheet-lista-mapa{transform:translateY(100%)!important;height:min(88%,760px);pointer-events:none;}
-  .sheet-lista-mapa.aberto{transform:translateY(0)!important;pointer-events:auto;}
-  .sheet-lista-mapa:not(.aberto) .sheet-lista-handle,.sheet-lista-mapa:not(.aberto) .sheet-lista-conteudo{pointer-events:none;}
+  .sheet-lista-mapa{transform:translateY(calc(100% - 25px))!important;height:min(88%,760px);pointer-events:auto;border-radius:14px 14px 0 0;box-shadow:0 -3px 12px rgba(16,24,40,.10);}
+  .sheet-lista-mapa.aberto{transform:translateY(0)!important;pointer-events:auto;border-radius:22px 22px 0 0;box-shadow:0 -8px 28px rgba(16,24,40,.18);}
+  .sheet-lista-handle{height:25px;min-height:25px;padding:10px 16px 11px;border:0!important;border-radius:14px 14px 0 0;background:rgba(255,255,255,.98);}
+  .sheet-lista-mapa.aberto .sheet-lista-handle{border-radius:22px 22px 0 0;}
+  .sheet-grabber{width:44px;height:4px;margin:0 auto;background:#c7cdd6;}
+  .sheet-handle-row{display:none!important;}
+  .sheet-lista-mapa:not(.aberto) .sheet-lista-conteudo{pointer-events:none;}
   #botaoListaMapaDesktop{display:none!important;}
 }
 @media(min-width:800px){
@@ -1736,16 +1740,13 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10.1</div>
+<div class="versao-copiloto">V10.3</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
 <button class="importar" onclick="selecionarArquivoRota()"><svg class="ui-icon"><use href="#icon-upload"></use></svg><span>Importar rota</span></button>
 
-<div class="acoes-rota-home">
-<button class="auto-v9-btn" id="btnOtimizarAutoV9" onclick="executarOtimizacaoPrincipalV9()"><svg class="ui-icon"><use href="#icon-route"></use></svg><span>Otimizar rota</span><small id="resumoModoOtimizacaoV9">Mais rápida</small></button>
-<button class="config-otimizacao-btn" id="btnConfigOtimizacaoV9" onclick="abrirConfiguracaoV9()" style="display:none"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurar</span></button>
-</div>
+
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;"><svg class="ui-icon"><use href="#icon-pencil"></use></svg><span>Otimização manual</span></button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;"><span>Restaurar ordem original</span></button>
 <div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
@@ -1872,12 +1873,17 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 <button class="otimizacao-opcao" id="opcaoV9Padrao" onclick="selecionarConfiguracaoV9Padrao()">
 <div class="icone-opcao"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
-<div><div class="titulo-opcao">Mais rápida</div><div class="desc-opcao">Busca a melhor ordem a partir da sua localização atual. Tempo pelas vias é prioridade; quilômetros desempata.</div></div>
+<div><div class="titulo-opcao">Mais rápida</div><div class="desc-opcao">Busca automaticamente a melhor ordem a partir da sua localização atual. Tempo pelas vias é prioridade; quilômetros desempata.</div></div>
 </button>
 
 <button class="otimizacao-opcao" id="opcaoV9Destino" onclick="selecionarConfiguracaoV9Destino()">
 <div class="icone-opcao"><svg class="ui-icon"><use href="#icon-flag"></use></svg></div>
 <div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Mantém a otimização por tempo, mas favorece uma última entrega próxima ao ponto final escolhido no mapa ou por pesquisa.</div></div>
+</button>
+
+<button class="otimizacao-opcao" id="opcaoV9Nenhuma" onclick="selecionarConfiguracaoV9Nenhuma()">
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-list"></use></svg></div>
+<div><div class="titulo-opcao">Não otimizar</div><div class="desc-opcao">Mantém exatamente a ordem original da rota importada, sem reorganizar as paradas.</div></div>
 </button>
 
 <div class="config-v9-atual" id="textoConfigAtualV9"></div>
@@ -2033,6 +2039,7 @@ let baseProgressoTracoAtual = 0;
 let linhaTracoAtual = null;
 let modoInteracaoDesenho = 'desenhar';
 let linhaRotaGps = null;
+let linhaRotaGpsContorno = null;
 let modoOrganizacaoPacotes = false;
 
 // ----------------------------------------------------------------------
@@ -2373,8 +2380,17 @@ atualizadoEm:Date.now()
 };
 salvarStorage();
 renderizarTudo();
-mostrarToast('Rota carregada. Agora você pode otimizar.', 'sucesso');
 const campoArquivo=document.getElementById('arquivo'); if(campoArquivo) campoArquivo.value='';
+
+// V10.3: a importação já executa automaticamente o modo escolhido nas configurações.
+// No modo "Não otimizar", a ordem original é mantida sem qualquer cálculo de rota.
+const configImportacao=carregarConfiguracaoV9();
+if(configImportacao.modo==='nenhuma'){
+mostrarToast('Rota importada na ordem original','sucesso');
+}else{
+mostrarToast('Rota importada. Otimizando automaticamente...','neutro');
+await executarOtimizacaoPrincipalV9();
+}
 
 }
 
@@ -2399,26 +2415,86 @@ function esperar(ms){
 return new Promise(resolver => setTimeout(resolver, ms));
 }
 
-// Monta uma consulta de endereço completa (rua, bairro, cidade, CEP)
-// para a geocodificação ser muito mais precisa do que só a rua sozinha
-// - evita confundir com uma rua de mesmo nome em outra cidade.
+// V10.3 - NORMALIZAÇÃO DE ENDEREÇOS
+// Expande abreviações brasileiras comuns de logradouro antes de consultar
+// o geocodificador. O endereço original continua intacto para exibição.
+const REGRAS_LOGRADOURO = [
+{re:/^(?:av\.?|aven\.?|avenida)\s+/i, nome:'Avenida '},
+{re:/^(?:r\.?|rua)\s+/i, nome:'Rua '},
+{re:/^(?:rod\.?|rodovia)\s+/i, nome:'Rodovia '},
+{re:/^(?:est\.?|estr\.?|estrada)\s+/i, nome:'Estrada '},
+{re:/^(?:tv\.?|trav\.?|travessa)\s+/i, nome:'Travessa '},
+{re:/^(?:al\.?|alameda)\s+/i, nome:'Alameda '},
+{re:/^(?:pca\.?|pça\.?|praca|praça)\s+/i, nome:'Praça '},
+{re:/^(?:lgo\.?|lg\.?|largo)\s+/i, nome:'Largo '},
+{re:/^(?:serv\.?|servidao|servidão)\s+/i, nome:'Servidão '},
+{re:/^(?:psg\.?|passagem)\s+/i, nome:'Passagem '},
+{re:/^(?:ac\.?|acesso)\s+/i, nome:'Acesso '},
+{re:/^(?:beco|bc\.?)\s+/i, nome:'Beco '}
+];
+
+function expandirAbreviacaoLogradouro(texto){
+let valor = String(texto || '').trim().replace(/\s+/g,' ');
+if(!valor) return '';
+for(const regra of REGRAS_LOGRADOURO){
+if(regra.re.test(valor)) return valor.replace(regra.re, regra.nome);
+}
+return valor;
+}
+
+function limparEnderecoParaGeocodificacao(texto){
+let valor = expandirAbreviacaoLogradouro(texto);
+if(!valor) return '';
+
+// "S/N" não ajuda o geocodificador e pode atrapalhar a interpretação.
+valor = valor
+.replace(/\s*,?\s*\b(?:s\s*[\/.]?\s*n|sn|sem\s+n[uú]mero)\b\.?/gi, '')
+// Remove instruções de entrega comuns que não fazem parte do endereço.
+.replace(/\s*[,;|–—-]\s*(?:procurar\s+por|ponto\s+de\s+refer[eê]ncia|refer[eê]ncia|obs(?:erva[cç][aã]o)?|entregar\s+(?:em|no|na)|deixar\s+(?:em|no|na)|falar\s+com|chamar\s+no|interfone|port[aã]o)\b.*$/i, '')
+.replace(/\s*,\s*,+/g, ', ')
+.replace(/\s+/g, ' ')
+.replace(/^[,;\s]+|[,;\s]+$/g, '')
+.trim();
+return valor;
+}
+
+function normalizarConsultaGeocodificacao(consulta){
+// Trabalha sobre a consulta inteira para também remover "S/N" e instruções
+// quando vierem em segmentos separados por vírgula. Cidade/bairro/CEP permanecem.
+return limparEnderecoParaGeocodificacao(String(consulta || ''));
+}
+
+// Monta uma consulta completa e já normalizada (logradouro, bairro, cidade, CEP).
+// Ex.: "AV. Brasil" -> "Avenida Brasil"; "R João" -> "Rua João".
 function montarConsultaEndereco(grupo){
-const partes = [grupo.endereco, grupo.bairro, grupo.cidade, grupo.cep]
+const endereco = limparEnderecoParaGeocodificacao(grupo.endereco);
+const partes = [endereco, grupo.bairro, grupo.cidade, grupo.cep]
 .filter(p => p && String(p).trim() && String(p).trim() !== "-");
 return partes.join(", ");
 }
 
 async function geocodificarEndereco(consulta){
+const original = String(consulta || '').trim();
+const normalizada = normalizarConsultaGeocodificacao(original);
+const candidatas = [...new Set([normalizada, original].filter(Boolean))];
+
+for(let i=0;i<candidatas.length;i++){
+const tentativa = candidatas[i];
 try{
-const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=" + encodeURIComponent(consulta);
+const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=" + encodeURIComponent(tentativa);
 const resposta = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-if(!resposta.ok) return null;
+if(resposta.ok){
 const dados = await resposta.json();
 if(dados && dados.length > 0){
-return { lat: dados[0].lat, lng: dados[0].lon };
+return { lat: dados[0].lat, lng: dados[0].lon, consultaUsada: tentativa };
+}
 }
 }catch(erro){
-console.warn("Falha ao buscar coordenada para:", consulta, erro);
+console.warn("Falha ao buscar coordenada para:", tentativa, erro);
+}
+// Se a versão normalizada não encontrar, tentamos o texto original sem
+// desrespeitar o intervalo usado pelo geocodificador público.
+if(i < candidatas.length - 1) await esperar(1100);
 }
 return null;
 }
@@ -3218,7 +3294,9 @@ marcadorInicioDesenho=null;marcadorFimDesenho=null;
 
 function removerLinhaRotaGpsV81(){
 if(linhaRotaGps && mapa && mapa.hasLayer(linhaRotaGps)) mapa.removeLayer(linhaRotaGps);
+if(linhaRotaGpsContorno && mapa && mapa.hasLayer(linhaRotaGpsContorno)) mapa.removeLayer(linhaRotaGpsContorno);
 linhaRotaGps=null;
+linhaRotaGpsContorno=null;
 if(linhaDesenhoSalva && mapa && mapa.hasLayer(linhaDesenhoSalva)) mapa.removeLayer(linhaDesenhoSalva);
 linhaDesenhoSalva=null;
 removerMarcadoresInicioFimDesenho();
@@ -3231,7 +3309,8 @@ if(modoDesenhoRota) return;
 if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo) || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
 const latlngs=metaRota.geometriaRota.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
 if(latlngs.length<2) return;
-linhaRotaGps=L.polyline(latlngs,{color:'#003CBD',weight:5,opacity:.86,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-linha'}).addTo(mapa);
+linhaRotaGpsContorno=L.polyline(latlngs,{color:'#ffffff',weight:9,opacity:.94,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-contorno'}).addTo(mapa);
+linhaRotaGps=L.polyline(latlngs,{color:'#003CBD',weight:5.5,opacity:.96,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-linha'}).addTo(mapa);
 const ultima=grupos[grupos.length-1];
 if(ultima && Number.isFinite(Number(ultima.lat))&&Number.isFinite(Number(ultima.lng))){
 const icFim=L.divIcon({html:'<div class="pin-fim-desenho">'+iconeLinha('flag')+'</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
@@ -3336,7 +3415,7 @@ function carregarConfiguracaoV9(){
 try{
 const bruto=localStorage.getItem(CONFIG_OTIMIZACAO_V9_KEY);
 const cfg=bruto?JSON.parse(bruto):null;
-if(!cfg||!['padrao','destino'].includes(cfg.modo)) return {modo:'padrao',destinoFinal:null};
+if(!cfg||!['padrao','destino','nenhuma'].includes(cfg.modo)) return {modo:'padrao',destinoFinal:null};
 return {modo:cfg.modo,destinoFinal:pontoValido(cfg.destinoFinal)?cfg.destinoFinal:null};
 }catch(erro){
 return {modo:'padrao',destinoFinal:null};
@@ -3344,7 +3423,8 @@ return {modo:'padrao',destinoFinal:null};
 }
 
 function salvarConfiguracaoV9(modo,destinoFinal=null){
-const cfg={modo:modo==='destino'?'destino':'padrao',destinoFinal:pontoValido(destinoFinal)?destinoFinal:null};
+const modoSeguro=modo==='destino'?'destino':(modo==='nenhuma'?'nenhuma':'padrao');
+const cfg={modo:modoSeguro,destinoFinal:modoSeguro==='destino'&&pontoValido(destinoFinal)?destinoFinal:null};
 try{localStorage.setItem(CONFIG_OTIMIZACAO_V9_KEY,JSON.stringify(cfg));}catch(erro){}
 atualizarResumoConfiguracaoV9();
 return cfg;
@@ -3361,18 +3441,21 @@ const resumo=document.getElementById('resumoModoOtimizacaoV9');
 const atual=document.getElementById('textoConfigAtualV9');
 const opPadrao=document.getElementById('opcaoV9Padrao');
 const opDestino=document.getElementById('opcaoV9Destino');
-if(resumo){
-resumo.textContent=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
+const opNenhuma=document.getElementById('opcaoV9Nenhuma');
+const textoResumo=cfg.modo==='nenhuma'
+? 'Não otimizar'
+: (cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
 ? `Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`
-: 'Mais rápida';
-}
+: 'Mais rápida');
+if(resumo) resumo.textContent=textoResumo;
 if(atual){
-atual.innerHTML=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
-? `<strong>Configuração atual:</strong> ${iconeLinha('flag')} Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`
-: `<strong>Configuração atual:</strong> ${iconeLinha('route')} Mais rápida`;
+if(cfg.modo==='nenhuma') atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('list')} Não otimizar · manter ordem original`;
+else if(cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)) atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('flag')} Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`;
+else atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('route')} Mais rápida`;
 }
 if(opPadrao) opPadrao.classList.toggle('selecionada',cfg.modo==='padrao');
 if(opDestino) opDestino.classList.toggle('selecionada',cfg.modo==='destino');
+if(opNenhuma) opNenhuma.classList.toggle('selecionada',cfg.modo==='nenhuma');
 atualizarResumoSettingsV10();
 }
 
@@ -3398,6 +3481,12 @@ fecharConfiguracaoV9();
 const cfg=carregarConfiguracaoV9();
 destinoSelecionadoAtual=pontoValido(cfg.destinoFinal)?{...cfg.destinoFinal}:null;
 abrirSeletorDestinoFinal();
+}
+
+function selecionarConfiguracaoV9Nenhuma(){
+salvarConfiguracaoV9('nenhuma',null);
+fecharConfiguracaoV9();
+mostrarToast('Configuração salva: manter a ordem original','sucesso');
 }
 
 async function buscarEnderecoDestinoV9(){
@@ -3438,6 +3527,7 @@ mostrarToast(`🏁 ${item.nome||'Destino'} selecionado`,'sucesso');
 
 async function executarOtimizacaoPrincipalV9(){
 const cfg=carregarConfiguracaoV9();
+if(cfg.modo==='nenhuma') return;
 if(cfg.modo==='destino'){
 if(!pontoValido(cfg.destinoFinal)){
 mostrarToast('🏁 Escolha primeiro onde deseja terminar','alerta');
@@ -3958,6 +4048,37 @@ return `
 }).join('');
 }
 
+// V10.3 - mapa mais limpo, com leitura próxima a apps de navegação.
+// Usamos o Esri Light Gray Canvas (sem chave) e mantemos o mapa de ruas
+// como fallback automático caso a camada clara apresente falhas.
+function adicionarMapaBaseLimpoV102(mapaAlvo, avisarFallback=false){
+let erros=0;
+let fallbackAtivo=false;
+const base=L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+{maxZoom:19,attribution:'Tiles &copy; Esri'}
+);
+const referencia=L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+{maxZoom:19,attribution:'Labels &copy; Esri'}
+);
+function ativarFallback(){
+if(fallbackAtivo) return;
+fallbackAtivo=true;
+try{if(mapaAlvo.hasLayer(base)) mapaAlvo.removeLayer(base);}catch(e){}
+try{if(mapaAlvo.hasLayer(referencia)) mapaAlvo.removeLayer(referencia);}catch(e){}
+L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+{maxZoom:19,attribution:'Tiles &copy; Esri'}
+).addTo(mapaAlvo);
+if(avisarFallback) mostrarToast('Mapa alternativo ativado','neutro');
+}
+base.on('tileerror',()=>{erros++;if(erros>=4)ativarFallback();});
+base.addTo(mapaAlvo);
+referencia.addTo(mapaAlvo);
+return {base,referencia};
+}
+
 function inicializarMapaDestinoFinal(){
 if(mapaDestinoFinal) return;
 
@@ -3966,13 +4087,7 @@ zoomControl:true,
 attributionControl:true
 }).setView([-14.235,-51.925], 4);
 
-L.tileLayer(
-'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-{
-maxZoom:19,
-attribution:'Tiles &copy; Esri'
-}
-).addTo(mapaDestinoFinal);
+adicionarMapaBaseLimpoV102(mapaDestinoFinal,false);
 
 mapaDestinoFinal.on('click', function(e){
 definirDestinoSelecionado({lat:e.latlng.lat, lng:e.latlng.lng}, true);
@@ -7245,6 +7360,10 @@ return posicoes;
 // vem antes desse número.
 function extrairRuaENumero(enderecoNormalizado){
 
+// A mesma normalização usada na geocodificação é aplicada à comparação
+// entre endereços, para "AV.", "AV" e "Avenida" serem equivalentes.
+enderecoNormalizado = normalizarTexto(expandirAbreviacaoLogradouro(enderecoNormalizado));
+
 const numeroRegex = /\d+/g;
 const posicoesUnidade = posicoesDeNumeroDeUnidade(enderecoNormalizado);
 let m;
@@ -7262,13 +7381,7 @@ let rua = enderecoNormalizado
 .replace(/,\s*$/, "")
 .trim();
 
-rua = rua
-.replace(/^r\.?\s+/, "rua ")
-.replace(/^av\.?\s+/, "avenida ")
-.replace(/^al\.?\s+/, "alameda ")
-.replace(/^tv\.?\s+/, "travessa ")
-.replace(/^estr\.?\s+/, "estrada ")
-.trim();
+rua = normalizarTexto(expandirAbreviacaoLogradouro(rua)).trim();
 
 return { rua: rua || null, numero: m[0] };
 
@@ -8133,50 +8246,9 @@ bearing: 0
 
 L.control.zoom({ position: 'bottomleft' }).addTo(mapa);
 
-// Camada base do mapa sem necessidade de API key. A versão anterior
-// usava CARTO e passou a exibir "API KEY REQUIRED" em alguns acessos.
-// Agora a Esri World Street Map é a camada principal. Se houver falhas
-// repetidas de tiles, o app troca sozinho para a camada Humanitarian do
-// OpenStreetMap, sem exigir configuração do usuário.
-let errosTilesMapa = 0;
-let fallbackMapaAtivado = false;
-let camadaFallbackMapa = null;
-
-const camadaBasePrincipal = L.tileLayer(
-'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-{
-maxZoom: 19,
-attribution: 'Tiles &copy; Esri'
-}
-);
-
-camadaBasePrincipal.on('tileerror', function(){
-errosTilesMapa++;
-
-// Um erro isolado pode ser apenas oscilação de conexão. Só muda de camada
-// depois de várias falhas na mesma abertura do mapa.
-if(errosTilesMapa >= 4 && !fallbackMapaAtivado){
-fallbackMapaAtivado = true;
-
-if(mapa.hasLayer(camadaBasePrincipal)){
-mapa.removeLayer(camadaBasePrincipal);
-}
-
-camadaFallbackMapa = L.tileLayer(
-'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-{
-subdomains: 'abc',
-maxZoom: 19,
-attribution: '&copy; OpenStreetMap contributors, Tiles style by HOT'
-}
-);
-
-camadaFallbackMapa.addTo(mapa);
-mostrarToast('🗺️ Camada alternativa do mapa ativada', 'neutro');
-}
-});
-
-camadaBasePrincipal.addTo(mapa);
+// V10.3: mapa claro e menos carregado para priorizar rota, pins e nomes de ruas.
+// Se a camada clara falhar, volta automaticamente para o mapa de ruas da Esri.
+adicionarMapaBaseLimpoV102(mapa,true);
 
 // Fallback manual de localização: quando ativado pelo ajuste manual, o próximo
 // toque no mapa vira a posição do usuário. É útil principalmente no PC,
@@ -8766,7 +8838,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function atualizarResumoSettingsV10(){
 const cfg=carregarConfiguracaoV9();
 const el=document.getElementById('settingsResumoOtimizacao');
-if(el)el.textContent=cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)?`Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`:'Mais rápida';
+if(el)el.textContent=cfg.modo==='nenhuma'?'Não otimizar':(cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)?`Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`:'Mais rápida');
 }
 function atualizarInformacoesHomeV101(percentual){
 const p=document.getElementById('homeInsightProgresso');if(p)p.textContent=`${Number.isFinite(percentual)?percentual:0}%`;
