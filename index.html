@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10.4</title>
+<title>Copiloto Entrega V10.5</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1740,7 +1740,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10.4</div>
+<div class="versao-copiloto">V10.5</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -4048,20 +4048,24 @@ return `
 }).join('');
 }
 
-// V10.4 - mapa claro com zoom seguro acima do limite nativo do provedor.
-// Usamos o Esri Light Gray Canvas (sem chave) e mantemos o mapa de ruas
-// como fallback automático caso a camada clara apresente falhas.
+// V10.5 - mapa híbrido: visão geral limpa + ruas nítidas no zoom de entrega.
+// O Light Gray continua deixando a rota fácil de ler de longe. A partir do
+// zoom 16 trocamos automaticamente para o World Street Map, que possui tiles
+// nativos de maior detalhe. Assim evitamos ampliar artificialmente o mapa claro.
 function adicionarMapaBaseLimpoV102(mapaAlvo, avisarFallback=false){
-let erros=0;
+const ZOOM_DETALHE = 16;
 let fallbackAtivo=false;
+let camadaAtual='';
+let errosVisaoGeral=0;
+let errosDetalhe=0;
+
 const base=L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
 {
-  // O Light Gray Canvas só possui tiles nativos até este nível.
-  // Acima disso o Leaflet amplia o último tile real, evitando o quadro
-  // "Map data not yet available" devolvido pelo próprio serviço.
   maxNativeZoom:16,
-  maxZoom:20,
+  maxZoom:16,
+  keepBuffer:3,
+  updateWhenZooming:false,
   attribution:'Tiles &copy; Esri'
 }
 );
@@ -4069,27 +4073,81 @@ const referencia=L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
 {
   maxNativeZoom:16,
-  maxZoom:20,
+  maxZoom:16,
+  keepBuffer:3,
+  updateWhenZooming:false,
   attribution:'Labels &copy; Esri'
 }
 );
-function ativarFallback(){
-if(fallbackAtivo) return;
-fallbackAtivo=true;
-try{if(mapaAlvo.hasLayer(base)) mapaAlvo.removeLayer(base);}catch(e){}
-try{if(mapaAlvo.hasLayer(referencia)) mapaAlvo.removeLayer(referencia);}catch(e){}
-L.tileLayer(
+const ruas=L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-{maxZoom:19,attribution:'Tiles &copy; Esri'}
-).addTo(mapaAlvo);
-if(avisarFallback) mostrarToast('Mapa alternativo ativado','neutro');
+{
+  maxNativeZoom:19,
+  maxZoom:20,
+  keepBuffer:3,
+  updateWhenZooming:false,
+  attribution:'Tiles &copy; Esri'
 }
-base.on('tileerror',()=>{erros++;if(erros>=4)ativarFallback();});
-base.addTo(mapaAlvo);
-referencia.addTo(mapaAlvo);
-return {base,referencia};
+);
+const ruasFallback=L.tileLayer(
+'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+{
+  maxNativeZoom:19,
+  maxZoom:20,
+  keepBuffer:3,
+  updateWhenZooming:false,
+  attribution:'&copy; OpenStreetMap contributors, Tiles style by HOT'
+}
+);
+
+function removerCamadas(){
+  [base,referencia,ruas,ruasFallback].forEach(c=>{try{if(mapaAlvo.hasLayer(c)) mapaAlvo.removeLayer(c);}catch(e){}});
+}
+function usarVisaoGeral(){
+  if(camadaAtual==='geral' && mapaAlvo.hasLayer(base)) return;
+  removerCamadas();
+  base.addTo(mapaAlvo);
+  referencia.addTo(mapaAlvo);
+  camadaAtual='geral';
+}
+function usarDetalhe(preferirFallback=false){
+  const alvo=preferirFallback?ruasFallback:ruas;
+  if(camadaAtual===(preferirFallback?'fallback':'detalhe') && mapaAlvo.hasLayer(alvo)) return;
+  removerCamadas();
+  alvo.addTo(mapaAlvo);
+  camadaAtual=preferirFallback?'fallback':'detalhe';
+}
+function sincronizarComZoom(){
+  const z=mapaAlvo.getZoom();
+  if(fallbackAtivo){
+    usarDetalhe(true);
+    return;
+  }
+  if(z>=ZOOM_DETALHE) usarDetalhe(false);
+  else usarVisaoGeral();
+}
+function ativarFallback(){
+  if(fallbackAtivo) return;
+  fallbackAtivo=true;
+  usarDetalhe(true);
+  if(avisarFallback) mostrarToast('Mapa alternativo ativado','neutro');
 }
 
+base.on('tileerror',()=>{
+  errosVisaoGeral++;
+  if(errosVisaoGeral>=4) ativarFallback();
+});
+ruas.on('tileerror',()=>{
+  errosDetalhe++;
+  if(errosDetalhe>=4) ativarFallback();
+});
+
+try{mapaAlvo.setMaxZoom(20);}catch(e){}
+sincronizarComZoom();
+mapaAlvo.on('zoomend',sincronizarComZoom);
+
+return {base,referencia,ruas,ruasFallback,sincronizarComZoom};
+}
 function inicializarMapaDestinoFinal(){
 if(mapaDestinoFinal) return;
 
@@ -8257,8 +8315,8 @@ bearing: 0
 
 L.control.zoom({ position: 'bottomleft' }).addTo(mapa);
 
-// V10.4: mapa claro e menos carregado; zoom alto amplia o último nível nativo em vez de pedir tiles inexistentes.
-// Se a camada clara falhar, volta automaticamente para o mapa de ruas da Esri.
+// V10.5: visão geral limpa e troca automática para mapa de ruas nativo no zoom alto.
+// Assim o mapa continua leve de longe e fica nítido próximo das entregas.
 adicionarMapaBaseLimpoV102(mapa,true);
 
 // Fallback manual de localização: quando ativado pelo ajuste manual, o próximo
