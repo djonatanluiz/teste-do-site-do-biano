@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10.3</title>
+<title>Copiloto Entrega V10.4</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1740,7 +1740,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10.3</div>
+<div class="versao-copiloto">V10.4</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -4048,7 +4048,7 @@ return `
 }).join('');
 }
 
-// V10.3 - mapa mais limpo, com leitura próxima a apps de navegação.
+// V10.4 - mapa claro com zoom seguro acima do limite nativo do provedor.
 // Usamos o Esri Light Gray Canvas (sem chave) e mantemos o mapa de ruas
 // como fallback automático caso a camada clara apresente falhas.
 function adicionarMapaBaseLimpoV102(mapaAlvo, avisarFallback=false){
@@ -4056,11 +4056,22 @@ let erros=0;
 let fallbackAtivo=false;
 const base=L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-{maxZoom:19,attribution:'Tiles &copy; Esri'}
+{
+  // O Light Gray Canvas só possui tiles nativos até este nível.
+  // Acima disso o Leaflet amplia o último tile real, evitando o quadro
+  // "Map data not yet available" devolvido pelo próprio serviço.
+  maxNativeZoom:16,
+  maxZoom:20,
+  attribution:'Tiles &copy; Esri'
+}
 );
 const referencia=L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-{maxZoom:19,attribution:'Labels &copy; Esri'}
+{
+  maxNativeZoom:16,
+  maxZoom:20,
+  attribution:'Labels &copy; Esri'
+}
 );
 function ativarFallback(){
 if(fallbackAtivo) return;
@@ -8246,7 +8257,7 @@ bearing: 0
 
 L.control.zoom({ position: 'bottomleft' }).addTo(mapa);
 
-// V10.3: mapa claro e menos carregado para priorizar rota, pins e nomes de ruas.
+// V10.4: mapa claro e menos carregado; zoom alto amplia o último nível nativo em vez de pedir tiles inexistentes.
 // Se a camada clara falhar, volta automaticamente para o mapa de ruas da Esri.
 adicionarMapaBaseLimpoV102(mapa,true);
 
