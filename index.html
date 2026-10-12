@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10.6</title>
+<title>Copiloto Entrega V11.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +24,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
 <style>
 
@@ -1682,6 +1684,32 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 }
 
 .rota-resumo-v10{display:flex;align-items:center;gap:8px;color:#344054}.rota-resumo-v10 .ui-icon{color:var(--brand)}.rota-resumo-v10 strong{display:block;font-size:12px}.rota-resumo-v10 small{display:block;font-size:10px;color:#667085;margin-top:1px}.otimizacao-caixa h2{display:flex;align-items:center;gap:7px}.destino-selecionado-info{display:flex;align-items:flex-start;gap:6px}.destino-selecionado-info .ui-icon{margin-top:1px}.icone-opcao{display:flex!important;align-items:center;justify-content:center}.icone-opcao .ui-icon{width:24px;height:24px}.organizar-parada-cab>.ui-icon,.organizar-pacote-codigo>.ui-icon{width:16px;height:16px}.badge-status{display:inline-flex!important;align-items:center;gap:4px}.badge-status .ui-icon{width:14px;height:14px}.ocorrencia-pacote-texto{display:flex;align-items:center;gap:5px}.ocorrencia-pacote-texto .ui-icon{width:15px;height:15px}
+
+
+/* ================================================================
+   V11.1 — MapLibre + OpenFreeMap, com Leaflet como fallback
+   ================================================================ */
+#mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
+#mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
+#mapaLivreV11{display:none;z-index:5;background:#eef1f5;}
+#mapaLivreV11.ativo{display:block;}
+#mapaWrapV11.mapa-livre-ativo>#mapa{visibility:hidden;pointer-events:none;}
+#mapaLivreV11 .maplibregl-canvas{outline:none;}
+#mapaLivreV11 .maplibregl-ctrl-bottom-left{bottom:34px;}
+#mapaLivreV11 .maplibregl-ctrl-group{border-radius:12px;overflow:hidden;box-shadow:0 3px 12px rgba(16,24,40,.13);}
+#mapaLivreV11 .maplibregl-ctrl-attrib{font-size:9px;background:rgba(255,255,255,.82);}
+.mapa-livre-badge-v11{position:absolute;left:12px;bottom:14px;z-index:450;background:rgba(255,255,255,.95);border:1px solid #e4e7ec;border-radius:10px;padding:7px 10px;font-size:10px;font-weight:700;color:#475467;box-shadow:0 3px 12px rgba(16,24,40,.12);backdrop-filter:blur(8px);}
+.mapa-livre-pin-v11{--pin-cor:#003CBD;position:relative;width:30px;height:38px;padding:0;border:0;background:transparent;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(16,24,40,.24));}
+.mapa-livre-pin-corpo-v11{position:absolute;left:2px;top:1px;width:27px;height:27px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--pin-cor);border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
+.mapa-livre-pin-corpo-v11>span{transform:rotate(45deg);color:#fff;font-weight:800;line-height:1;}
+.mapa-livre-pin-v11.selecionado .mapa-livre-pin-corpo-v11{box-shadow:0 0 0 4px rgba(0,60,189,.20),0 2px 5px rgba(16,24,40,.25);transform:rotate(-45deg) scale(1.10);}
+.mapa-livre-pin-v11.destino{width:33px;height:40px;}
+.mapa-livre-pin-v11.destino .mapa-livre-pin-corpo-v11{width:30px;height:30px;}
+.mapa-livre-usuario-v11{width:22px;height:22px;border-radius:50%;background:rgba(37,99,235,.22);display:flex;align-items:center;justify-content:center;}
+.mapa-livre-usuario-v11 span{display:block;width:13px;height:13px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 1px 5px rgba(16,24,40,.32);box-sizing:content-box;}
+.mapa-livre-info-v11{padding:12px 16px 14px;border-top:1px solid #f2f4f7;color:#667085;font-size:10.5px;line-height:1.5;}
+.mapa-livre-info-v11 strong{color:#344054;}
+@media(max-width:799px){#mapaLivreV11 .maplibregl-ctrl-bottom-left{bottom:26px}.mapa-livre-badge-v11{bottom:18px;left:10px;font-size:9px}}
 </style>
 </head>
 
@@ -1740,7 +1768,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10.6</div>
+<div class="versao-copiloto">V11.1</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -1775,7 +1803,11 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 </div>
 
 <div class="painel-aba" id="painelMapa">
+<div id="mapaWrapV11">
 <div id="mapa"></div>
+<div id="mapaLivreV11" aria-label="Mapa vetorial do Copiloto"></div>
+<div id="mapaLivreBadgeV11" class="mapa-livre-badge-v11" style="display:none"></div>
+</div>
 
 <div id="painelBuscaMapa"><input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()"><button onclick="buscarParadaNoMapa()" aria-label="Buscar"><svg class="ui-icon"><use href="#icon-search"></use></svg></button></div>
 <button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada"><svg class="ui-icon"><use href="#icon-search"></use></svg></button>
@@ -1825,6 +1857,14 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="settings-row-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Mais rápida</span></div>
 <svg class="ui-icon settings-arrow"><use href="#icon-chevron-up"></use></svg>
 </button>
+</section>
+
+<section class="settings-card">
+<div class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-map"></use></svg></div>
+<div class="settings-row-copy"><strong>Mapa e navegação</strong><span id="mapaLivreStatusSettingsV11">MapLibre + OpenFreeMap · sem chave</span></div>
+</div>
+<div class="mapa-livre-info-v11"><strong>Mapa vetorial gratuito.</strong> O visual usa MapLibre/OpenFreeMap e o caminho real pelas ruas é calculado pelo OSRM. Se o mapa vetorial ficar indisponível, o Copiloto mantém automaticamente o mapa compatível de fallback.</div>
 </section>
 
 <section class="settings-card">
@@ -2601,6 +2641,7 @@ renderizarTudo();
 
 // Leva o mapa até onde o pin ficou, pra você ver na hora pra onde ele foi
 mapa.setView([latNova, lngNova], Math.max(mapa.getZoom(), 17));
+centralizarMapaLivreV11(latNova,lngNova,17);
 setTimeout(()=> destacarMarcador(grupo.id), 150);
 
 if(distanciaMudanca !== null && distanciaMudanca < 15){
@@ -7906,7 +7947,7 @@ container.innerHTML=itens.map(({g,p,indice})=>`<article class="home-urgencia-car
 </article>`).join('');
 }
 function irParaOcorrenciaHome(id){focarGrupoNoMapaV10(id);}
-function focarGrupoNoMapaV10(id){const g=encontrarGrupo(id);if(!g)return;irParaAba(1);setTimeout(()=>{inicializarMapaSeNecessario();const lat=Number(g.lat),lng=Number(g.lng);if(mapa&&Number.isFinite(lat)&&Number.isFinite(lng)){mapa.setView([lat,lng],17);abrirInfoMapa(id);}},220);}
+function focarGrupoNoMapaV10(id){const g=encontrarGrupo(id);if(!g)return;irParaAba(1);setTimeout(()=>{inicializarMapaSeNecessario();const lat=Number(g.lat),lng=Number(g.lng);if(mapa&&Number.isFinite(lat)&&Number.isFinite(lng)){mapa.setView([lat,lng],17);centralizarMapaLivreV11(lat,lng,17);abrirInfoMapa(id);}},220);}
 
 function alternarPacotes(id){
 
@@ -8360,7 +8401,7 @@ console.error("Não foi possível carregar a rota salva:", erro);
 // ----------------------------------------------------------------------
 
 function inicializarMapaSeNecessario(){
-if(mapa) return;
+if(mapa){ iniciarMapaLivreV11(false); return; }
 
 mapa = L.map('mapa', {
 rotate: true,        // habilita a rotação do mapa
@@ -8372,8 +8413,7 @@ bearing: 0
 
 L.control.zoom({ position: 'bottomleft' }).addTo(mapa);
 
-// V10.5: visão geral limpa e troca automática para mapa de ruas nativo no zoom alto.
-// Assim o mapa continua leve de longe e fica nítido próximo das entregas.
+// Fallback raster: fica por baixo do mapa vetorial e só aparece se o MapLibre/OpenFreeMap falhar.
 adicionarMapaBaseLimpoV102(mapa,true);
 
 // Fallback manual de localização: quando ativado pelo ajuste manual, o próximo
@@ -8386,6 +8426,7 @@ definirPosicaoManual(e.latlng);
 });
 
 instalarEventosDesenhoRota();
+iniciarMapaLivreV11(false);
 
 }
 
@@ -8412,7 +8453,9 @@ mapa.setBearing(0);
 }
 
 if(localizacaoManualAtiva && meuMarcador){
-mapa.setView(meuMarcador.getLatLng(), Math.max(mapa.getZoom(), 17));
+const posManual=meuMarcador.getLatLng();
+mapa.setView(posManual, Math.max(mapa.getZoom(), 17));
+centralizarMapaLivreV11(posManual.lat,posManual.lng,17);
 mostrarToast(' Usando a posição ajustada manualmente', 'neutro');
 return;
 }
@@ -8494,6 +8537,8 @@ circuloPrecisaoUsuario.setRadius(precisao);
 mapa.removeLayer(circuloPrecisaoUsuario);
 circuloPrecisaoUsuario = null;
 }
+
+criarOuAtualizarMarcadorUsuarioLivreV11(lat,lng,precisao,!!centralizar);
 
 if(centralizar){
 mapa.setView([lat,lng], Math.max(mapa.getZoom(), 17));
@@ -8706,6 +8751,10 @@ const pinAnterior = elAnterior ? elAnterior.querySelector('.pin-mapa') : null;
 if(pinAnterior) pinAnterior.classList.remove('marcador-selecionado');
 marcadores[marcadorSelecionadoId].setZIndexOffset(0);
 }
+if(marcadorSelecionadoId && marcadoresLivreV11 && marcadoresLivreV11[marcadorSelecionadoId]){
+const elLivreAnterior=marcadoresLivreV11[marcadorSelecionadoId].getElement();
+if(elLivreAnterior) elLivreAnterior.classList.remove('selecionado');
+}
 
 marcadorSelecionadoId = id;
 
@@ -8714,6 +8763,10 @@ const el = marcadores[id].getElement();
 const pin = el ? el.querySelector('.pin-mapa') : null;
 if(pin) pin.classList.add('marcador-selecionado');
 marcadores[id].setZIndexOffset(1000);
+}
+if(id && marcadoresLivreV11 && marcadoresLivreV11[id]){
+const elLivre=marcadoresLivreV11[id].getElement();
+if(elLivre) elLivre.classList.add('selecionado');
 }
 
 }
@@ -8837,6 +8890,7 @@ return;
 }
 
 mapa.setView([lat, lng], Math.max(mapa.getZoom(), 17));
+centralizarMapaLivreV11(lat,lng,17);
 destacarMarcador(grupo.id);
 document.getElementById('buscaParadaMapa').value = '';
 document.getElementById('buscaParadaMapa').blur();
@@ -8912,8 +8966,220 @@ mapaFoiEnquadrado = true;
 }
 
 atualizarResumoMapa();
+if(mapaLivreAtivoV11) atualizarMapaLivreV11(false);
 if(modoDesenhoRota) setTimeout(()=>atualizarDestaqueFaltantesDesenhoV82(),0);
 
+}
+
+
+
+// ======================================================================
+// V11.1 - MAPA LIVRE VETORIAL + ROTA REAL PELAS RUAS
+// MapLibre + OpenFreeMap na visualizacao; OSRM calcula a geometria da rota.
+// O Leaflet permanece por baixo somente como fallback e compatibilidade.
+// ======================================================================
+const MAPA_LIVRE_ESTILO_V11='https://tiles.openfreemap.org/styles/liberty';
+let mapaLivreAtivoV11=false;
+let mapaLivreV11=null;
+let mapaLivreCarregadoV11=false;
+let mapaLivreFalhouV11=false;
+let marcadoresLivreV11={};
+let marcadorUsuarioLivreV11=null;
+let marcadorDestinoLivreV11=null;
+let assinaturaRotaLivreV11='';
+let mapaLivreRotaGeracaoV11=0;
+let mapaLivrePrimeiroEnquadramentoV11=false;
+const MAPA_LIVRE_SOURCE_ROTA='copiloto-rota-v11';
+const MAPA_LIVRE_LAYER_ROTA_CASING='copiloto-rota-casing-v11';
+const MAPA_LIVRE_LAYER_ROTA='copiloto-rota-v11';
+const MAPA_LIVRE_SOURCE_PRECISAO='copiloto-precisao-v11';
+const MAPA_LIVRE_LAYER_PRECISAO_FILL='copiloto-precisao-fill-v11';
+const MAPA_LIVRE_LAYER_PRECISAO_LINE='copiloto-precisao-line-v11';
+
+function atualizarStatusMapaLivreV11(texto,tipo=''){
+const s=document.getElementById('mapaLivreStatusSettingsV11');if(s)s.textContent=texto;
+const b=document.getElementById('mapaLivreBadgeV11');
+if(b){b.textContent=texto;b.style.display=(tipo==='erro'||tipo==='carregando')?'block':'none';}
+}
+function preencherConfigMapaLivreV11(){
+if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial gratuito');
+else if(mapaLivreFalhouV11) atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial indisponível','erro');
+else atualizarStatusMapaLivreV11('MapLibre + OpenFreeMap · sem chave');
+}
+function posicaoInicialMapaLivreV11(){
+if(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario))return [Number(ultimaPosicaoUsuario.lng),Number(ultimaPosicaoUsuario.lat)];
+const p=grupos.find(g=>coordenadaValida(g.lat,g.lng));if(p)return [Number(p.lng),Number(p.lat)];
+return [-46.6333,-23.5505];
+}
+function removerMarcadoresMapaLivreV11(){
+Object.values(marcadoresLivreV11).forEach(m=>{try{m.remove();}catch(e){}});marcadoresLivreV11={};
+if(marcadorDestinoLivreV11){try{marcadorDestinoLivreV11.remove();}catch(e){}marcadorDestinoLivreV11=null;}
+}
+function criarElementoPinMapaLivreV11(rotulo,cor,classeExtra=''){
+const el=document.createElement('button');
+el.type='button';
+el.className='mapa-livre-pin-v11 '+classeExtra;
+el.style.setProperty('--pin-cor',cor);
+el.setAttribute('aria-label','Parada '+String(rotulo));
+const tamanho=String(rotulo).length>=3?'8px':'10px';
+el.innerHTML=`<span class="mapa-livre-pin-corpo-v11"><span style="font-size:${tamanho}">${escaparHtmlTexto(rotulo)}</span></span>`;
+return el;
+}
+function geoJsonCirculoMapaLivreV11(lat,lng,raioMetros){
+const coords=[];const passos=64;const R=6378137;const latRad=Number(lat)*Math.PI/180;const lngRad=Number(lng)*Math.PI/180;const ang=Number(raioMetros)/R;
+for(let i=0;i<=passos;i++){
+const brg=2*Math.PI*i/passos;
+const lat2=Math.asin(Math.sin(latRad)*Math.cos(ang)+Math.cos(latRad)*Math.sin(ang)*Math.cos(brg));
+const lng2=lngRad+Math.atan2(Math.sin(brg)*Math.sin(ang)*Math.cos(latRad),Math.cos(ang)-Math.sin(latRad)*Math.sin(lat2));
+coords.push([lng2*180/Math.PI,lat2*180/Math.PI]);
+}
+return {type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[coords]}};
+}
+function garantirCamadaPrecisaoMapaLivreV11(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
+try{
+if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO)){
+mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_PRECISAO,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_FILL,type:'fill',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'fill-color':'#2563eb','fill-opacity':0.08}});
+mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_LINE,type:'line',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'line-color':'#2563eb','line-opacity':0.55,'line-width':1.2}});
+}
+}catch(e){console.warn('[V11.1] Falha ao criar círculo de precisão:',e);}
+}
+function atualizarCirculoPrecisaoMapaLivreV11(lat,lng,precisao){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
+garantirCamadaPrecisaoMapaLivreV11();
+const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO);if(!src)return;
+if(Number.isFinite(Number(precisao))&&Number(precisao)>0)src.setData({type:'FeatureCollection',features:[geoJsonCirculoMapaLivreV11(Number(lat),Number(lng),Number(precisao))]});
+else src.setData({type:'FeatureCollection',features:[]});
+}
+function criarOuAtualizarMarcadorUsuarioLivreV11(lat,lng,precisao,centralizar){
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!window.maplibregl)return;
+const pos=[Number(lng),Number(lat)];
+if(!marcadorUsuarioLivreV11){
+const el=document.createElement('div');el.className='mapa-livre-usuario-v11';el.innerHTML='<span></span>';
+marcadorUsuarioLivreV11=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(pos).addTo(mapaLivreV11);
+}else marcadorUsuarioLivreV11.setLngLat(pos);
+atualizarCirculoPrecisaoMapaLivreV11(lat,lng,precisao);
+if(centralizar)mapaLivreV11.easeTo({center:pos,zoom:Math.max(mapaLivreV11.getZoom()||12,17),duration:420});
+}
+function centralizarMapaLivreV11(lat,lng,zoom=17){
+if(mapaLivreAtivoV11&&mapaLivreV11&&mapaLivreCarregadoV11)mapaLivreV11.easeTo({center:[Number(lng),Number(lat)],zoom:Math.max(mapaLivreV11.getZoom()||12,zoom),duration:420});
+}
+function assinaturaRotaAtualMapaLivreV11(){
+const pts=[];
+if(metaRota&&metaRota.inicioRota&&pontoValido(metaRota.inicioRota))pts.push(`I:${Number(metaRota.inicioRota.lat).toFixed(5)},${Number(metaRota.inicioRota.lng).toFixed(5)}`);
+else if(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario))pts.push(`U:${Number(ultimaPosicaoUsuario.lat).toFixed(5)},${Number(ultimaPosicaoUsuario.lng).toFixed(5)}`);
+for(const g of grupos){if(coordenadaValida(g.lat,g.lng))pts.push(`${g.id}:${Number(g.lat).toFixed(5)},${Number(g.lng).toFixed(5)}`);}
+if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))pts.push(`F:${Number(metaRota.destinoFinal.lat).toFixed(5)},${Number(metaRota.destinoFinal.lng).toFixed(5)}`);
+return pts.join('|')+'|'+String(metaRota&&metaRota.atualizadoEm||'');
+}
+function pontosRotaMapaLivreV11(){
+const out=[];
+const inicio=(metaRota&&metaRota.inicioRota&&pontoValido(metaRota.inicioRota))?metaRota.inicioRota:(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario)?ultimaPosicaoUsuario:null);
+if(inicio)out.push({lat:Number(inicio.lat),lng:Number(inicio.lng)});
+for(const g of grupos){if(coordenadaValida(g.lat,g.lng))out.push({lat:Number(g.lat),lng:Number(g.lng)});}
+if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))out.push({lat:Number(metaRota.destinoFinal.lat),lng:Number(metaRota.destinoFinal.lng)});
+return out;
+}
+function garantirCamadaRotaMapaLivreV11(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return false;
+try{
+if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA)){
+mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_ROTA,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA_CASING,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-opacity':0.98,'line-width':9}});
+mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#003CBD','line-opacity':1,'line-width':5.5}});
+}
+return true;
+}catch(e){console.warn('[V11.1] Falha ao criar camada de rota:',e);return false;}
+}
+function desenharRotaMapaLivreV11(pontos){
+if(!Array.isArray(pontos)||pontos.length<2||!garantirCamadaRotaMapaLivreV11())return;
+const coords=pontos.filter(p=>pontoValido(p)).map(p=>[Number(p.lng),Number(p.lat)]);if(coords.length<2)return;
+const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords}});
+}
+function limparRotaMapaLivreV11(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return;try{const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'FeatureCollection',features:[]});}catch(e){}
+}
+async function consultarGeometriaOSRMMapaLivreV11(pontos){
+const validos=(pontos||[]).filter(p=>pontoValido(p)).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+if(validos.length<2)return [];
+const geometria=[];const MAX=25;
+for(let base=0;base<validos.length-1;base+=MAX-1){
+const parte=validos.slice(base,Math.min(validos.length,base+MAX));if(parte.length<2)break;
+const coords=parte.map(p=>`${p.lng},${p.lat}`).join(';');
+const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&steps=false&geometries=geojson`;
+const r=await fetch(url);if(!r.ok)throw new Error('OSRM_ROUTE_'+r.status);
+const d=await r.json();const rota=d.routes&&d.routes[0];const arr=rota&&rota.geometry&&rota.geometry.coordinates;
+if(!Array.isArray(arr)||arr.length<2)throw new Error('OSRM_ROUTE_INVALIDA');
+arr.forEach((c,idx)=>{if(geometria.length&&idx===0)return;if(Array.isArray(c)&&c.length>=2)geometria.push({lat:Number(c[1]),lng:Number(c[0])});});
+if(base+MAX-1<validos.length-1)await esperar(140);
+}
+return geometria;
+}
+async function recalcularRotaMapaLivreV11(assinatura){
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
+const pontos=pontosRotaMapaLivreV11();if(pontos.length<2){limparRotaMapaLivreV11();return;}
+const geracao=++mapaLivreRotaGeracaoV11;
+try{
+const geometria=await consultarGeometriaOSRMMapaLivreV11(pontos);
+if(geracao!==mapaLivreRotaGeracaoV11||!geometria.length)return;
+desenharRotaMapaLivreV11(geometria);assinaturaRotaLivreV11=assinatura;
+}catch(erro){
+console.warn('[V11.1] OSRM indisponível; mantendo geometria salva/fallback:',erro);
+if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);
+}
+}
+function atualizarMapaLivreV11(forcarRota=false){
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!window.maplibregl)return;
+removerMarcadoresMapaLivreV11();
+const bounds=new maplibregl.LngLatBounds();let temPonto=false;
+for(const grupo of grupos){
+if(!coordenadaValida(grupo.lat,grupo.lng))continue;
+const status=statusEfetivoGrupo(grupo);if(ocultarEntreguesMapa&&status==='entregue')continue;
+const lat=Number(grupo.lat),lng=Number(grupo.lng);const rotulo=temOrdemOtimizada(grupo)?grupo.ordemOtimizada:(ehStopValido(grupo.stop)?grupo.stop:'•');
+const el=criarElementoPinMapaLivreV11(rotulo,corPorStatus(status));el.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();abrirInfoMapa(grupo.id);});
+marcadoresLivreV11[grupo.id]=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([lng,lat]).addTo(mapaLivreV11);
+bounds.extend([lng,lat]);temPonto=true;
+}
+if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal)){
+const p=[Number(metaRota.destinoFinal.lng),Number(metaRota.destinoFinal.lat)];const el=criarElementoPinMapaLivreV11('◆','#111827','destino');el.setAttribute('aria-label','Destino final');
+marcadorDestinoLivreV11=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(p).addTo(mapaLivreV11);bounds.extend(p);temPonto=true;
+}
+if(!mapaLivrePrimeiroEnquadramentoV11&&temPonto){
+try{mapaLivreV11.fitBounds(bounds,{padding:{top:72,right:54,bottom:112,left:54},maxZoom:16.5,duration:0});mapaLivrePrimeiroEnquadramentoV11=true;}catch(e){}
+}
+if(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario))criarOuAtualizarMarcadorUsuarioLivreV11(Number(ultimaPosicaoUsuario.lat),Number(ultimaPosicaoUsuario.lng),precisaoLocalizacaoMetros,false);
+const assinatura=assinaturaRotaAtualMapaLivreV11();
+if(forcarRota||assinatura!==assinaturaRotaLivreV11){
+if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);else limparRotaMapaLivreV11();
+recalcularRotaMapaLivreV11(assinatura);
+}
+}
+async function iniciarMapaLivreV11(forcar=false){
+preencherConfigMapaLivreV11();
+if(mapaLivreAtivoV11&&mapaLivreV11&&!forcar)return true;
+if(!window.maplibregl){mapaLivreFalhouV11=true;atualizarStatusMapaLivreV11('Fallback ativo · MapLibre não carregou','erro');return false;}
+const el=document.getElementById('mapaLivreV11');if(!el)return false;
+try{
+mapaLivreFalhouV11=false;atualizarStatusMapaLivreV11('Carregando mapa vetorial…','carregando');
+if(mapaLivreV11&&forcar){try{mapaLivreV11.remove();}catch(e){}mapaLivreV11=null;mapaLivreCarregadoV11=false;}
+if(!mapaLivreV11){
+mapaLivreV11=new maplibregl.Map({container:el,style:MAPA_LIVRE_ESTILO_V11,center:posicaoInicialMapaLivreV11(),zoom:12,minZoom:3,maxZoom:20,attributionControl:true,dragRotate:false,pitchWithRotate:false,touchPitch:false,cooperativeGestures:false});
+mapaLivreV11.addControl(new maplibregl.NavigationControl({showCompass:false,showZoom:true,visualizePitch:false}),'bottom-left');
+mapaLivreV11.on('click',ev=>{if(!modoAjustePosicaoManual||!ev.lngLat)return;definirPosicaoManual({lat:ev.lngLat.lat,lng:ev.lngLat.lng});});
+mapaLivreV11.on('load',()=>{
+mapaLivreCarregadoV11=true;mapaLivreAtivoV11=true;mapaLivreFalhouV11=false;
+const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.add('mapa-livre-ativo');el.classList.add('ativo');
+atualizarStatusMapaLivreV11('Ativo · mapa vetorial gratuito');
+atualizarMapaLivreV11(true);
+});
+mapaLivreV11.on('error',ev=>{console.warn('[V11.1] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
+setTimeout(()=>{if(!mapaLivreCarregadoV11){mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial demorou a carregar','erro');}},15000);
+}
+return true;
+}catch(erro){
+console.warn('[V11.1] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;
+}
 }
 
 
@@ -9013,9 +9279,10 @@ else {let cfg={sheetDesktop:true};try{cfg={...cfg,...JSON.parse(localStorage.get
 setTimeout(()=>{
 mapa.invalidateSize();
 atualizarMapa();
+if(mapaLivreAtivoV11&&mapaLivreV11){mapaLivreV11.resize();atualizarMapaLivreV11(false);}
 }, 100);
 }
-if(indice===2){carregarPreferenciasV10();atualizarResumoSettingsV10();}
+if(indice===2){carregarPreferenciasV10();atualizarResumoSettingsV10();preencherConfigMapaLivreV11();}
 
 }
 
@@ -9139,6 +9406,8 @@ iniciarGestosSheetListaMapa();
 carregarStorage();
 configurarControlesPorDispositivoV82();
 carregarPreferenciasV10();
+preencherConfigMapaLivreV11();
+iniciarMapaLivreV11(false);
 
 // V7.1 é focada no celular: começa a pedir/acompanhar o GPS já ao abrir o
 // Copiloto, para a otimização ter um ponto inicial pronto antes da importação.
