@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V11.7</title>
+<title>Copiloto Entrega V11.8</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1691,7 +1691,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 
 /* ================================================================
-   V11.7 — otimização manual por botão + geometria contínua real + prioridade visual de cruzamentos
+   V11.8 — scanner global conectado a microblocos + otimização por custo operacional
    ================================================================ */
 #mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
 #mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
@@ -1772,7 +1772,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V11.7</div>
+<div class="versao-copiloto">V11.8</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -3392,7 +3392,7 @@ function atualizarLinhaRotaManualNoMapa(){
 if(!mapa) return;
 removerLinhaRotaGpsV81();
 if(modoDesenhoRota) return;
-if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo) || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
+if(!metaRota || !['desenho','auto_v9','auto_v118'].includes(metaRota.modo) || !Array.isArray(metaRota.geometriaRota) || metaRota.geometriaRota.length<2) return;
 const latlngs=metaRota.geometriaRota.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).map(p=>[Number(p.lat),Number(p.lng)]);
 if(latlngs.length<2) return;
 linhaRotaGpsContorno=L.polyline(latlngs,{color:'#ffffff',weight:9,opacity:.94,interactive:false,lineCap:'round',lineJoin:'round',className:'rota-gps-contorno'}).addTo(mapa);
@@ -3408,7 +3408,7 @@ marcadorFimDesenho=L.marker([Number(ultima.lat),Number(ultima.lng)],{icon:icFim,
 // V8.3 - ORGANIZAÇÃO DOS PACOTES NO CARRO (ORDEM INVERSA)
 // ----------------------------------------------------------------------
 function organizacaoPacotesDisponivel(){
-return !!(grupos.length && metaRota && ['desenho','auto_v9'].includes(metaRota.modo) && !metaRota.organizacaoPacotesConcluida);
+return !!(grupos.length && metaRota && ['desenho','auto_v9','auto_v118'].includes(metaRota.modo) && !metaRota.organizacaoPacotesConcluida);
 }
 
 function abrirOrganizacaoPacotes(){
@@ -3992,6 +3992,191 @@ if(i<finalistas.length-1) await esperar(0);
 return melhor;
 }
 
+// ======================================================================
+// V11.8 - SCANNER GLOBAL CONECTADO A MICRO BLOCOS
+// ======================================================================
+// O microbloco NÃO é uma regra isolada. Ele entra como parte da função de
+// custo global: o motor decide onde entrar, em que sentido percorrer, por
+// onde sair e qual bloco vem depois. Sair de um bloco incompleto é permitido
+// quando o ganho global compensa; voltar ao mesmo bloco depois é penalizado.
+const V118_PESO_METRO = 0.045;          // ~45 s equivalentes por km extra
+const V118_PENAL_REENTRADA_BLOCO = 135; // evita sair e voltar sem proibir
+const V118_PENAL_REENTRADA_RUA = 55;
+const V118_PENAL_INVERSAO_RUA = 80;
+
+function limitarV118(v,min,max){return Math.max(min,Math.min(max,v));}
+function medianaV118(valores){
+ const a=(valores||[]).filter(Number.isFinite).slice().sort((x,y)=>x-y),n=a.length;
+ if(!n)return 1;return n%2?a[n>>1]:(a[n/2-1]+a[n/2])/2;
+}
+function chaveRuaGrupoV118(grupo){
+ try{
+  const info=extrairRuaENumero(normalizarTexto(grupo&&grupo.endereco||''));
+  if(info&&info.rua)return normalizarTexto(info.rua);
+ }catch(e){}
+ const bruto=normalizarTexto(grupo&&grupo.endereco||'');
+ return bruto?normalizarTexto(bruto.split(',')[0]):'';
+}
+function pontoLocalV118(p,lat0,lng0,cosLat){
+ return {x:(Number(p.lng)-lng0)*111320*cosLat,y:(Number(p.lat)-lat0)*110540};
+}
+function distanciaLocalV118(a,b){return Math.hypot(Number(a.x)-Number(b.x),Number(a.y)-Number(b.y));}
+
+function detectarMicroblocosV118(indices,resultado,pontosLocais,ruaPorIndice){
+ const vizinhos=new Map(),menores=[],arestas=[];
+ for(const i of indices){
+  const pares=indices.filter(j=>j!==i).map(j=>[Math.min(valorMatriz(resultado.distancias,i,j),valorMatriz(resultado.distancias,j,i)),j]).filter(x=>Number.isFinite(x[0])).sort((a,b)=>a[0]-b[0]);
+  vizinhos.set(i,pares.slice(0,3).map(x=>x[1]));if(pares.length)menores.push(pares[0][0]);
+ }
+ const eps=limitarV118(medianaV118(menores)*2.6,110,420);
+ const diametroMax=limitarV118(eps*1.15,135,340);
+ for(let a=0;a<indices.length;a++)for(let b=a+1;b<indices.length;b++){
+  const i=indices[a],j=indices[b],road=Math.min(valorMatriz(resultado.distancias,i,j),valorMatriz(resultado.distancias,j,i));
+  if(!Number.isFinite(road))continue;
+  const geo=distanciaLocalV118(pontosLocais[i],pontosLocais[j]);
+  const mesmaRua=ruaPorIndice[i]&&ruaPorIndice[i]===ruaPorIndice[j];
+  const mutuos=(vizinhos.get(i)||[]).includes(j)&&(vizinhos.get(j)||[]).includes(i);
+  if((mesmaRua&&road<=eps*1.35&&geo<=diametroMax*1.2)||(mutuos&&road<=eps&&geo<=diametroMax))arestas.push({i,j,road});
+ }
+ arestas.sort((a,b)=>a.road-b.road);
+ const parent=new Map(indices.map(i=>[i,i])),membros=new Map(indices.map(i=>[i,[i]]));
+ function raiz(x){let r=x;while(parent.get(r)!==r)r=parent.get(r);while(parent.get(x)!==x){const n=parent.get(x);parent.set(x,r);x=n;}return r;}
+ function podeUnir(A,B){const arr=[...(membros.get(A)||[]),...(membros.get(B)||[])];if(arr.length>9)return false;for(let a=0;a<arr.length;a++)for(let b=a+1;b<arr.length;b++)if(distanciaLocalV118(pontosLocais[arr[a]],pontosLocais[arr[b]])>diametroMax)return false;return true;}
+ for(const aresta of arestas){let A=raiz(aresta.i),B=raiz(aresta.j);if(A===B||!podeUnir(A,B))continue;parent.set(B,A);membros.set(A,[...(membros.get(A)||[]),...(membros.get(B)||[])]);membros.delete(B);}
+ const comps=new Map();for(const i of indices){const r=raiz(i);if(!comps.has(r))comps.set(r,[]);comps.get(r).push(i);}
+ const blocos=[...comps.values()],blocoPorIndice={};blocos.forEach((bloco,bi)=>bloco.forEach(i=>blocoPorIndice[i]=bi));
+ return {blocos,blocoPorIndice,raioBase:eps,diametroMax};
+}
+
+function construirContextoScannerV118(indices,resultado,ativos,inicio,destino,porId){
+ const lat0=Number(inicio.lat),lng0=Number(inicio.lng),cosLat=Math.cos(lat0*Math.PI/180);
+ const pontosLocais={0:{x:0,y:0}},ruaPorIndice={},grupoPorIndice={};
+ for(const g of ativos){const idx=porId.get(g.id);if(!Number.isInteger(idx))continue;pontosLocais[idx]=pontoLocalV118(g,lat0,lng0,cosLat);ruaPorIndice[idx]=chaveRuaGrupoV118(g);grupoPorIndice[idx]=g;}
+ const destIndex=Number.isInteger(resultado&&resultado.indiceDestinoFinalV9)?resultado.indiceDestinoFinalV9:null;
+ let destinoLocal=null;if(destino&&pontoValido(destino))destinoLocal=pontoLocalV118(destino,lat0,lng0,cosLat);
+ const micro=detectarMicroblocosV118(indices,resultado,pontosLocais,ruaPorIndice);
+ let ux=1,uy=0;
+ if(destinoLocal&&Math.hypot(destinoLocal.x,destinoLocal.y)>20){const n=Math.hypot(destinoLocal.x,destinoLocal.y);ux=destinoLocal.x/n;uy=destinoLocal.y/n;}
+ else{
+  const mx=indices.reduce((s,i)=>s+pontosLocais[i].x,0)/indices.length,my=indices.reduce((s,i)=>s+pontosLocais[i].y,0)/indices.length;
+  let sxx=0,syy=0,sxy=0;for(const i of indices){const x=pontosLocais[i].x-mx,y=pontosLocais[i].y-my;sxx+=x*x;syy+=y*y;sxy+=x*y;}
+  const ang=.5*Math.atan2(2*sxy,sxx-syy);ux=Math.cos(ang);uy=Math.sin(ang);
+  let maisLonge=indices[0],dMax=-1;for(const i of indices){const d=distanciaLocalV118(pontosLocais[i],pontosLocais[0]);if(d>dMax){dMax=d;maisLonge=i;}}
+  if(pontosLocais[maisLonge].x*ux+pontosLocais[maisLonge].y*uy<0){ux=-ux;uy=-uy;}
+ }
+ const projecao={0:0};for(const i of indices)projecao[i]=pontosLocais[i].x*ux+pontosLocais[i].y*uy;
+ const porRua={};for(const i of indices){const r=ruaPorIndice[i];if(r)(porRua[r]??=[]).push(i);}
+ const eixoRua={};for(const [r,arr] of Object.entries(porRua)){
+  if(arr.length<2)continue;let melhor=null;
+  for(let a=0;a<arr.length;a++)for(let b=a+1;b<arr.length;b++){const d=distanciaLocalV118(pontosLocais[arr[a]],pontosLocais[arr[b]]);if(!melhor||d>melhor.d)melhor={d,a:arr[a],b:arr[b]};}
+  if(melhor){let vx=pontosLocais[melhor.b].x-pontosLocais[melhor.a].x,vy=pontosLocais[melhor.b].y-pontosLocais[melhor.a].y,n=Math.hypot(vx,vy)||1;eixoRua[r]={ux:vx/n,uy:vy/n};}
+ }
+ const vizinhos={};for(const i of indices){vizinhos[i]=indices.filter(j=>j!==i).sort((a,b)=>{
+  const ca=valorMatriz(resultado.duracoes,i,a)+V118_PESO_METRO*valorMatriz(resultado.distancias,i,a);
+  const cb=valorMatriz(resultado.duracoes,i,b)+V118_PESO_METRO*valorMatriz(resultado.distancias,i,b);return ca-cb;
+ }).slice(0,10);}
+ return {indices,resultado,pontosLocais,ruaPorIndice,grupoPorIndice,destIndex,destinoLocal,projecao,eixoRua,vizinhos,...micro};
+}
+
+function avaliarOrdemScannerV118(ordem,ctx){
+ const r=ctx.resultado;let anterior=0,tempo=0,distancia=0;
+ for(const x of ordem){const t=valorMatriz(r.duracoes,anterior,x),d=valorMatriz(r.distancias,anterior,x);if(!Number.isFinite(t)||!Number.isFinite(d))return {score:Infinity,tempo:Infinity,distancia:Infinity};tempo+=t;distancia+=d;anterior=x;}
+ if(Number.isInteger(ctx.destIndex)&&ordem.length){const t=valorMatriz(r.duracoes,anterior,ctx.destIndex),d=valorMatriz(r.distancias,anterior,ctx.destIndex);if(!Number.isFinite(t)||!Number.isFinite(d))return {score:Infinity,tempo:Infinity,distancia:Infinity};tempo+=t;distancia+=d;}
+ let score=tempo+V118_PESO_METRO*distancia;
+ const corridasBloco={},corridasRua={};let ultimoBloco=null,ultimaRua=null;
+ for(const x of ordem){const b=ctx.blocoPorIndice[x],rua=ctx.ruaPorIndice[x];if(b!==ultimoBloco)corridasBloco[b]=(corridasBloco[b]||0)+1;if(rua&&rua!==ultimaRua)corridasRua[rua]=(corridasRua[rua]||0)+1;ultimoBloco=b;ultimaRua=rua;}
+ for(const n of Object.values(corridasBloco))score+=Math.max(0,n-1)*V118_PENAL_REENTRADA_BLOCO;
+ for(const n of Object.values(corridasRua))score+=Math.max(0,n-1)*V118_PENAL_REENTRADA_RUA;
+ let projAnterior=0;for(const x of ordem){const p=ctx.projecao[x]||0,volta=projAnterior-p;if(volta>120)score+=(volta-120)*.08;projAnterior=p;}
+ for(let i=0;i<ordem.length;){const rua=ctx.ruaPorIndice[ordem[i]],inicio=i;while(i<ordem.length&&ctx.ruaPorIndice[ordem[i]]===rua)i++;const eixo=ctx.eixoRua[rua];if(eixo&&i-inicio>=3){let pAnterior=null,sinalAnterior=0;for(let k=inicio;k<i;k++){const pt=ctx.pontosLocais[ordem[k]],p=pt.x*eixo.ux+pt.y*eixo.uy;if(pAnterior!==null){const delta=p-pAnterior,sinal=delta>12?1:delta<-12?-1:0;if(sinal&&sinalAnterior&&sinal!==sinalAnterior)score+=V118_PENAL_INVERSAO_RUA;if(sinal)sinalAnterior=sinal;}pAnterior=p;}}}
+ // arrependimento: se uma parada futura praticamente cabia no trecho atual,
+ // deixá-la para depois recebe custo adicional, especialmente no mesmo bloco.
+ anterior=0;for(let i=0;i<ordem.length;i++){const atual=ordem[i],t0=valorMatriz(r.duracoes,anterior,atual),d0=valorMatriz(r.distancias,anterior,atual);for(let j=i+2;j<Math.min(ordem.length,i+10);j++){const x=ordem[j],dt=valorMatriz(r.duracoes,anterior,x)+valorMatriz(r.duracoes,x,atual)-t0,dd=valorMatriz(r.distancias,anterior,x)+valorMatriz(r.distancias,x,atual)-d0;if(dt<20&&dd<160){score+=(20-Math.max(0,dt))*1.8+(160-Math.max(0,dd))*.05;if(ctx.blocoPorIndice[x]===ctx.blocoPorIndice[atual])score+=25;}}anterior=atual;}
+ return {score,tempo,distancia};
+}
+
+function sementeScannerGlobalV118(ctx,forcaPermanencia=1,primeiroForcado=null){
+ const rem=new Set(ctx.indices),ordem=[];let atual=0,blocoAtual=null;
+ if(Number.isInteger(primeiroForcado)&&rem.has(primeiroForcado)){ordem.push(primeiroForcado);rem.delete(primeiroForcado);atual=primeiroForcado;blocoAtual=ctx.blocoPorIndice[primeiroForcado];}
+ while(rem.size){let melhor=null;
+  for(const candidato of rem){
+   const t=valorMatriz(ctx.resultado.duracoes,atual,candidato),d=valorMatriz(ctx.resultado.distancias,atual,candidato);if(!Number.isFinite(t)||!Number.isFinite(d))continue;
+   const custoAresta=t+V118_PESO_METRO*d,bloco=ctx.blocoPorIndice[candidato];let penal=0;
+   const restamNoBloco=[...rem].filter(x=>blocoAtual!==null&&ctx.blocoPorIndice[x]===blocoAtual&&x!==candidato);
+   if(blocoAtual!==null&&bloco!==blocoAtual&&restamNoBloco.length){
+    const ficar=Math.min(...restamNoBloco.map(x=>valorMatriz(ctx.resultado.duracoes,atual,x)+V118_PESO_METRO*valorMatriz(ctx.resultado.distancias,atual,x)));
+    penal+=forcaPermanencia*Math.max(35,110-.35*Math.max(0,custoAresta-ficar));
+    const retorno=Math.min(...restamNoBloco.map(x=>valorMatriz(ctx.resultado.duracoes,candidato,x)+V118_PESO_METRO*valorMatriz(ctx.resultado.distancias,candidato,x)));
+    if(Number.isFinite(retorno))penal+=forcaPermanencia*Math.min(100,retorno*.14);
+   }else if(blocoAtual!==null&&bloco===blocoAtual)penal-=12*forcaPermanencia;
+   const volta=(ctx.projecao[atual]||0)-(ctx.projecao[candidato]||0);if(volta>120)penal+=(volta-120)*.07;
+   const outros=[...rem].filter(x=>x!==candidato);let look=0;
+   if(outros.length){look=Math.min(...outros.map(x=>valorMatriz(ctx.resultado.duracoes,candidato,x)+V118_PESO_METRO*valorMatriz(ctx.resultado.distancias,candidato,x)));const locais=outros.filter(x=>ctx.blocoPorIndice[x]===bloco);if(locais.length){const local=Math.min(...locais.map(x=>valorMatriz(ctx.resultado.duracoes,candidato,x)+V118_PESO_METRO*valorMatriz(ctx.resultado.distancias,candidato,x)));look=.65*local+.35*look;}}
+   const valor=custoAresta+penal+.18*look;if(!melhor||valor<melhor.valor)melhor={valor,candidato};
+  }
+  if(!melhor)break;ordem.push(melhor.candidato);rem.delete(melhor.candidato);atual=melhor.candidato;blocoAtual=ctx.blocoPorIndice[atual];
+ }
+ return ordem;
+}
+
+function refinarScannerV118(semente,ctx,rodadas=6){
+ let atual=[...semente],met=avaliarOrdemScannerV118(atual,ctx),n=atual.length;
+ for(let rodada=0;rodada<rodadas;rodada++){
+  let melhorMet=met,melhor=null;const pos=new Map(atual.map((x,i)=>[x,i]));
+  for(let i=0;i<n;i++){
+   const x=atual[i],base=[...atual.slice(0,i),...atual.slice(i+1)];let destinos;
+   if(n<=14)destinos=Array.from({length:n},(_,k)=>k);
+   else{
+    const set=new Set([Math.max(0,i-2),Math.max(0,i-1),Math.min(n-1,i),Math.min(n-1,i+1),Math.min(n-1,i+2),0,n-1]);
+    for(const y of ctx.vizinhos[x]||[]){const p=pos.get(y);if(p!==undefined){set.add(Math.max(0,p-1));set.add(p);set.add(Math.min(n-1,p+1));}}
+    for(let p=0;p<n;p++)if(ctx.blocoPorIndice[atual[p]]===ctx.blocoPorIndice[x])set.add(p);
+    destinos=[...set].filter(j=>j>=0&&j<n);
+   }
+   for(const j of destinos){const cand=[...base.slice(0,j),x,...base.slice(j)],m=avaliarOrdemScannerV118(cand,ctx);if(m.score<melhorMet.score-1e-6){melhorMet=m;melhor=cand;}}
+  }
+  for(let i=0;i<n-1;i++){
+   const alvos=n<=14?Array.from({length:n-i-1},(_,k)=>i+1+k):[...new Set([...Array.from({length:Math.min(8,n-i-1)},(_,k)=>i+1+k),...(ctx.vizinhos[atual[i]]||[]).map(x=>pos.get(x)).filter(p=>p>i)])];
+   for(const j of alvos){
+    const troca=[...atual];[troca[i],troca[j]]=[troca[j],troca[i]];let m=avaliarOrdemScannerV118(troca,ctx);if(m.score<melhorMet.score-1e-6){melhorMet=m;melhor=troca;}
+    if(j-i<=12||n<=14){const inv=[...atual.slice(0,i),...atual.slice(i,j+1).reverse(),...atual.slice(j+1)];m=avaliarOrdemScannerV118(inv,ctx);if(m.score<melhorMet.score-1e-6){melhorMet=m;melhor=inv;}}
+   }
+  }
+  if(!melhor)break;atual=melhor;met=melhorMet;
+ }
+ return {ordem:atual,metricas:met};
+}
+
+async function motorScannerGlobalV118(indices,resultado,ativos,inicio,destino,porId,baselineIndices){
+ const ctx=construirContextoScannerV118(indices,resultado,ativos,inicio,destino,porId);
+ atualizarProgressoOtimizacao(`Scanner global: ${ctx.blocos.length} microbloco(s) conectados à rota inteira…`);
+ const sementes=[
+  sementeScannerGlobalV118(ctx,.55),sementeScannerGlobalV118(ctx,.8),sementeScannerGlobalV118(ctx,1),sementeScannerGlobalV118(ctx,1.25),sementeScannerGlobalV118(ctx,1.6)
+ ];
+ const primeiros=[...indices].sort((a,b)=>{
+  const ca=valorMatriz(resultado.duracoes,0,a)+V118_PESO_METRO*valorMatriz(resultado.distancias,0,a);
+  const cb=valorMatriz(resultado.duracoes,0,b)+V118_PESO_METRO*valorMatriz(resultado.distancias,0,b);return ca-cb;
+ }).slice(0,Math.min(6,indices.length));
+ for(const primeiro of primeiros){sementes.push(sementeScannerGlobalV118(ctx,.8,primeiro));sementes.push(sementeScannerGlobalV118(ctx,1.25,primeiro));}
+ // A ordem importada entra apenas como mais uma semente de segurança; ela não
+ // recebe preferência e não muda o critério do scanner.
+ if(Array.isArray(baselineIndices)&&baselineIndices.length===indices.length)sementes.push([...baselineIndices]);
+ let restantes=new Set(indices),vizinho=[],atual=0;
+ while(restantes.size){let melhor=null;for(const x of restantes){const v=valorMatriz(resultado.duracoes,atual,x)+V118_PESO_METRO*valorMatriz(resultado.distancias,atual,x);if(!melhor||v<melhor.v)melhor={v,x};}if(!melhor)break;vizinho.push(melhor.x);restantes.delete(melhor.x);atual=melhor.x;}
+ if(vizinho.length===indices.length)sementes.push(vizinho);
+ const unicas=[],vistos=new Set();for(const s of sementes){if(s.length!==indices.length)continue;const k=s.join(',');if(!vistos.has(k)){vistos.add(k);unicas.push(s);}}
+ const ranqueadas=unicas.map(ordem=>({ordem,metricas:avaliarOrdemScannerV118(ordem,ctx)})).filter(x=>Number.isFinite(x.metricas.score)).sort((a,b)=>a.metricas.score-b.metricas.score);
+ if(!ranqueadas.length)throw new Error('SCANNER_V118_SEM_CANDIDATA');
+ const limite=indices.length<=14?Math.min(10,ranqueadas.length):Math.min(6,ranqueadas.length);let melhor=null;
+ for(let i=0;i<limite;i++){
+  atualizarProgressoOtimizacao(`Scanner global: refinando candidata ${i+1}/${limite}…`);
+  const refinada=refinarScannerV118(ranqueadas[i].ordem,ctx,indices.length<=14?8:6);
+  if(!melhor||refinada.metricas.score<melhor.metricas.score)melhor=refinada;
+  await esperar(0);
+ }
+ return {...melhor,contexto:ctx};
+}
+
+
 async function obterPontoInicialOtimizacaoV117(){
 try{
 const ponto=await obterPontoInicialOtimizacao();
@@ -4019,70 +4204,56 @@ throw erro;
 }
 
 async function otimizarRotaAutomaticamenteV9(destinoFinal=null){
-if(!grupos.length){mostrarToast('⚠️ Importe uma rota primeiro','alerta');return;}
+if(!grupos.length){mostrarToast('Importe uma rota primeiro','alerta');return;}
 const ativos=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g));
 const semCoordenada=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&!paradaTemCoordenadaValidaV84(g));
 const entregues=grupos.filter(g=>!paradaParticipaDoDesenhoV84(g));
-if(ativos.length<2){mostrarToast('⚠️ Não há paradas suficientes para otimizar','alerta');return;}
+if(ativos.length<2){mostrarToast('Não há paradas suficientes para otimizar','alerta');return;}
 const destino = pontoValido(destinoFinal) ? {
-lat:Number(destinoFinal.lat),
-lng:Number(destinoFinal.lng),
-nome:destinoFinal.nome||'',
-endereco:destinoFinal.endereco||'',
-texto:destinoFinal.texto||destinoFinal.nome||destinoFinal.endereco||'Destino final'
+ lat:Number(destinoFinal.lat),lng:Number(destinoFinal.lng),nome:destinoFinal.nome||'',endereco:destinoFinal.endereco||'',texto:destinoFinal.texto||destinoFinal.nome||destinoFinal.endereco||'Destino final'
 } : null;
 let inicio;
 try{
-abrirOverlayOtimizacao(destino?'Obtendo sua localização e preparando o destino final...':'Obtendo sua localização atual...');
-inicio=await obterPontoInicialOtimizacaoV117();
-atualizarProgressoOtimizacao(destino?'Montando matriz das ruas com o destino final...':'Montando matriz direcional das ruas...');
-const pontos=[inicio,...ativos.map(pontoGrupo),...(destino?[destino]:[])];
-const matriz=await consultarMatrizGlobalOSRM(pontos);
-matriz.indiceDestinoFinalV9 = destino ? pontos.length-1 : null;
-const porId=new Map(ativos.map((g,i)=>[g.id,i+1]));
-const baselineGrupos=[...ativos].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
-const baselineIndices=baselineGrupos.map(g=>porId.get(g.id));
-const indices=ativos.map(g=>porId.get(g.id));
-const resultado=await motorAutomaticoV9(indices,matriz,baselineIndices);
-const gruposPorIndice=new Map(ativos.map((g,i)=>[i+1,g]));
-let ordemGrupos=resultado.ordem.map(i=>gruposPorIndice.get(i)).filter(Boolean);
-// V11.4: elimina regressões locais e depois valida o caminho real para evitar
-// passar perto de uma entrega e voltar nela mais tarde.
-const suavizada=suavizarSequenciaLocalV113(ordemGrupos,matriz,porId);
-ordemGrupos=suavizada.ordem;
-atualizarProgressoOtimizacao('Eliminando voltas desnecessárias...');
-ordemGrupos=await repararPassagensReaisV113(ordemGrupos,inicio,destino,matriz,ativos,porId);
-const convergida=refinarAteConvergirV115(ordemGrupos,matriz,porId);
-ordemGrupos=suavizarSequenciaLocalV113(convergida.ordem,matriz,porId).ordem;
-const metricasCorrigidas=metricasIndicesV9(ordemGrupos.map(g=>porId.get(g.id)).filter(Number.isInteger),matriz);
-const baselineMet=metricasIndicesV9(baselineIndices,matriz);
-const melhorou = avaliacaoMelhorV9(metricasCorrigidas,baselineMet);
-const ordemFinal=melhorou?ordemGrupos:baselineGrupos;
-const metFinal=melhorou?metricasCorrigidas:baselineMet;
-const tempoServico=ordemFinal.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
-const metricasFinal={duracao:metFinal.tempo+tempoServico,distancia:metFinal.distancia};
-const metricasShopee={duracao:baselineMet.tempo+tempoServico,distancia:baselineMet.distancia};
-const naoRoteaveis=[...semCoordenada].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
-grupos=[...ordemFinal,...naoRoteaveis,...entregues];
-grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;(g.pacotes||[]).forEach(p=>p.organizadoCarro=false);});
-atualizarProgressoOtimizacao('Desenhando a rota vencedora pelas ruas...');
-const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio,destino);
-metaRota={
-modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:destino?'v11_5_tempo_estrito_sem_voltas_destino':'v11_5_tempo_estrito_sem_voltas',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
-distanciaMetros:metricasFinal.distancia,duracaoSegundos:metricasFinal.duracao,
-distanciaShopeeMetros:metricasShopee.distancia,duracaoShopeeSegundos:metricasShopee.duracao,
-destinoFinal:destino,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
-geometriaRota:geometria||null,paradasAnalisadas:ativos.length,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
-};
-modoOrganizacaoPacotes=false;mapaFoiEnquadrado=true;salvarStorage();fecharOverlayOtimizacao();renderizarTudo();
-if(melhorou){
-mostrarToast(destino?'Rota otimizada terminando próximo ao destino':'Rota otimizada com sucesso','sucesso');
-}else{
-mostrarToast(destino?'✅ Melhor referência mantida respeitando o destino final':'✅ A ordem original já estava muito boa — mantida','neutro');
-}
-if(semCoordenada.length) setTimeout(()=>mostrarToast(`⚠️ ${semCoordenada.length} parada(s) sem coordenada ficaram no final da lista`,'alerta'),500);
+ abrirOverlayOtimizacao(destino?'Preparando rota até o destino final…':'Preparando scanner global da rota…');
+ inicio=await obterPontoInicialOtimizacaoV117();
+ atualizarProgressoOtimizacao('Calculando tempos e distâncias reais entre todas as paradas…');
+ const pontos=[inicio,...ativos.map(pontoGrupo),...(destino?[destino]:[])];
+ const matriz=await consultarMatrizGlobalOSRM(pontos);
+ matriz.indiceDestinoFinalV9=destino?pontos.length-1:null;
+ const porId=new Map(ativos.map((g,i)=>[g.id,i+1]));
+ const baselineGrupos=[...ativos].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+ const baselineIndices=baselineGrupos.map(g=>porId.get(g.id)).filter(Number.isInteger);
+ const indices=ativos.map(g=>porId.get(g.id)).filter(Number.isInteger);
+ const resultado=await motorScannerGlobalV118(indices,matriz,ativos,inicio,destino,porId,baselineIndices);
+ const gruposPorIndice=new Map(ativos.map((g,i)=>[i+1,g]));
+ const ordemFinal=resultado.ordem.map(i=>gruposPorIndice.get(i)).filter(Boolean);
+ if(ordemFinal.length!==ativos.length)throw new Error('SCANNER_V118_ORDEM_INCOMPLETA');
+ const metFinal=resultado.metricas;
+ const baselineMet=avaliarOrdemScannerV118(baselineIndices,resultado.contexto);
+ const tempoServico=ordemFinal.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
+ const metricasFinal={duracao:metFinal.tempo+tempoServico,distancia:metFinal.distancia};
+ const metricasOriginal={duracao:baselineMet.tempo+tempoServico,distancia:baselineMet.distancia};
+ const naoRoteaveis=[...semCoordenada].sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0));
+ grupos=[...ordemFinal,...naoRoteaveis,...entregues];
+ grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;(g.pacotes||[]).forEach(p=>p.organizadoCarro=false);});
+ atualizarProgressoOtimizacao('Scanner concluído. Desenhando o caminho real pelas ruas…');
+ const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio,destino);
+ metaRota={
+  modo:'auto_v118',provedor:'OSRM_GLOBAL',criterio:destino?'v11_8_scanner_global_microblocos_destino':'v11_8_scanner_global_microblocos',resultadoOtimizacao:'scanner_v118',
+  distanciaMetros:metricasFinal.distancia,duracaoSegundos:metricasFinal.duracao,
+  distanciaShopeeMetros:metricasOriginal.distancia,duracaoShopeeSegundos:metricasOriginal.duracao,
+  scoreOperacionalV118:metFinal.score,microblocosV118:resultado.contexto.blocos.length,raioMicroblocoV118:resultado.contexto.raioBase,
+  destinoFinal:destino,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
+  geometriaRota:geometria||null,paradasAnalisadas:ativos.length,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()
+ };
+ modoOrganizacaoPacotes=false;mapaFoiEnquadrado=true;salvarStorage();fecharOverlayOtimizacao();renderizarTudo();
+ const ganhoKm=(metricasOriginal.distancia-metricasFinal.distancia)/1000;
+ const ganhoMin=(metricasOriginal.duracao-metricasFinal.duracao)/60;
+ if(ganhoMin>0.2||ganhoKm>0.1)mostrarToast(`Scanner global concluído · ${ganhoMin>0?ganhoMin.toFixed(0)+' min ':''}${ganhoKm>0?ganhoKm.toFixed(1)+' km a menos':''}`.trim(),'sucesso');
+ else mostrarToast('Scanner global concluído','sucesso');
+ if(semCoordenada.length)setTimeout(()=>mostrarToast(`${semCoordenada.length} parada(s) sem coordenada ficaram no final da lista`,'alerta'),500);
 }catch(erro){
-console.error('Falha na otimização V9:',erro);fecharOverlayOtimizacao();mostrarToast('⚠️ Não consegui calcular a matriz das ruas. A ordem atual foi mantida.','alerta');
+ console.error('Falha no scanner global V11.8:',erro);fecharOverlayOtimizacao();mostrarToast('Não consegui concluir o scanner da rota. A ordem atual foi mantida.','alerta');
 }
 }
 
@@ -7649,9 +7820,9 @@ atualizarBotaoOtimizacaoManualV116();
 if(!el)return;
 if(!grupos.length){el.style.display='none';if(btnRestaurar)btnRestaurar.style.display='none';if(btnOrganizar)btnOrganizar.style.display='none';return;}
 if(btnRestaurar)btnRestaurar.style.display='none';
-const rotaReorganizada=metaRota&&['desenho','auto_v9'].includes(metaRota.modo);
+const rotaReorganizada=metaRota&&['desenho','auto_v9','auto_v118'].includes(metaRota.modo);
 if(btnOrganizar)btnOrganizar.style.display=(rotaReorganizada&&!metaRota.organizacaoPacotesConcluida)?'flex':'none';
-if(metaRota&&metaRota.modo==='auto_v9'){
+if(metaRota&&['auto_v9','auto_v118'].includes(metaRota.modo)){
  const manteve=metaRota.resultadoOtimizacao==='shopee_mantida';
  const destino=pontoValido(metaRota.destinoFinal);
  el.style.display='block';
@@ -8593,7 +8764,7 @@ if(metaRota && metaRota.organizacaoPacotesConcluida === undefined) metaRota.orga
 // V8.1 desativa definitivamente a otimização automática antiga. Rotas salvas
 // pelas versões V7 voltam para a ordem original; somente um desenho manual
 // V8.1 é preservado ao reabrir o navegador.
-if(!metaRota || !['desenho','auto_v9'].includes(metaRota.modo)){
+if(!metaRota || !['desenho','auto_v9','auto_v118'].includes(metaRota.modo)){
 grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
 grupos.forEach(g=>{ g.ordemOtimizada = null; (g.pacotes||[]).forEach(p=>p.organizadoCarro=false); });
 metaRota = {modo:'shopee',provedor:null,distanciaMetros:null,duracaoSegundos:null,distanciaShopeeMetros:null,duracaoShopeeSegundos:null,destinoFinal:null,organizacaoPacotesConcluida:false,atualizadoEm:Date.now()};
