@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR" translate="no">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Copiloto Entrega">
+<meta name="google" content="notranslate">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<title>Copiloto Entrega V11.1</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+<script src="assets/xlsx.js"></script>
+<link rel="stylesheet" href="assets/leaflet.css">
+<script src="assets/leaflet.js"></script>
+<script src="assets/leaflet-rotate.js"></script>
+
+<script src="assets/zxing-browser.js"></script>
+<link rel="stylesheet" href="assets/copiloto.css">
+
+<style id="v10-extra-fixes">
+/* V10.3 */
+.auto-v9-btn{background:#2a57c8!important;}
+.acoes-rota-home{grid-template-columns:1fr;}
+#btnConfigOtimizacaoV9{display:none!important;}
+.home-insights{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px;}
+.home-insight{background:#f8f9fc;border:1px solid #eef1f6;border-radius:11px;padding:9px 10px;min-width:0;}
+.home-insight span{display:block;font-size:9.5px;color:#98a2b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.home-insight strong{display:block;font-size:13px;color:#344054;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sheet-route-summary{position:static!important;inset:auto!important;margin:0 0 10px!important;border:1px solid #e7eaf0;box-shadow:none!important;border-radius:14px!important;padding:11px 12px!important;background:#fff!important;z-index:auto!important;}
+#botaoListaMapaDesktop{display:none;}
+.settings-container{max-width:760px;margin:0 auto;padding-top:18px;padding-bottom:28px;}
+.settings-title{padding:4px 3px 13px;}
+.settings-title h2{font-size:22px;margin:2px 0 2px;letter-spacing:-.5px;}
+.settings-title p{font-size:12px;color:#98a2b3;margin:0;}
+.settings-card{background:#fff;border:1px solid #eaecf0;border-radius:18px;overflow:hidden;margin-bottom:12px;box-shadow:0 4px 16px rgba(16,24,40,.035);}
+.settings-row{width:100%;margin:0;padding:14px 15px;border:0;border-bottom:1px solid #f0f2f5;border-radius:0;background:#fff;color:#344054;display:grid;grid-template-columns:38px 1fr auto;gap:11px;align-items:center;text-align:left;box-shadow:none;}
+.settings-row:last-child{border-bottom:0;}
+.settings-row-button{cursor:pointer;}
+.settings-row-icon{width:38px;height:38px;border-radius:12px;background:#f2f6ff;color:var(--brand);display:flex;align-items:center;justify-content:center;}
+.settings-row-icon .ui-icon{width:20px;height:20px;}
+.settings-row-copy strong{display:block;font-size:13.5px;color:#101828;}
+.settings-row-copy span{display:block;font-size:10.5px;color:#98a2b3;line-height:1.35;margin-top:2px;}
+.settings-arrow{width:17px;height:17px;color:#98a2b3;transform:rotate(90deg);}
+.settings-switch{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:999px;background:#d0d5dd;position:relative;transition:.2s;cursor:pointer;margin:0;}
+.settings-switch::after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s;}
+.settings-switch:checked{background:var(--brand);}
+.settings-switch:checked::after{transform:translateX(18px);}
+@media(max-width:799px){
+  .sheet-lista-mapa{transform:translateY(calc(100% - 25px))!important;height:min(88%,760px);pointer-events:auto;border-radius:14px 14px 0 0;box-shadow:0 -3px 12px rgba(16,24,40,.10);}
+  .sheet-lista-mapa.aberto{transform:translateY(0)!important;pointer-events:auto;border-radius:22px 22px 0 0;box-shadow:0 -8px 28px rgba(16,24,40,.18);}
+  .sheet-lista-handle{height:25px;min-height:25px;padding:10px 16px 11px;border:0!important;border-radius:14px 14px 0 0;background:rgba(255,255,255,.98);}
+  .sheet-lista-mapa.aberto .sheet-lista-handle{border-radius:22px 22px 0 0;}
+  .sheet-grabber{width:44px;height:4px;margin:0 auto;background:#c7cdd6;}
+  .sheet-handle-row{display:none!important;}
+  .sheet-lista-mapa:not(.aberto) .sheet-lista-conteudo{pointer-events:none;}
+  #botaoListaMapaDesktop{display:none!important;}
+}
+@media(min-width:800px){
+  #botaoListaMapaDesktop{display:flex;}
+  .sheet-lista-mapa{transform:translateY(calc(100% - 67px));}
+  .sheet-lista-mapa.aberto{transform:translateY(0);}
+}
+
+.rota-resumo-v10{display:flex;align-items:center;gap:8px;color:#344054}.rota-resumo-v10 .ui-icon{color:var(--brand)}.rota-resumo-v10 strong{display:block;font-size:12px}.rota-resumo-v10 small{display:block;font-size:10px;color:#667085;margin-top:1px}.otimizacao-caixa h2{display:flex;align-items:center;gap:7px}.destino-selecionado-info{display:flex;align-items:flex-start;gap:6px}.destino-selecionado-info .ui-icon{margin-top:1px}.icone-opcao{display:flex!important;align-items:center;justify-content:center}.icone-opcao .ui-icon{width:24px;height:24px}.organizar-parada-cab>.ui-icon,.organizar-pacote-codigo>.ui-icon{width:16px;height:16px}.badge-status{display:inline-flex!important;align-items:center;gap:4px}.badge-status .ui-icon{width:14px;height:14px}.ocorrencia-pacote-texto{display:flex;align-items:center;gap:5px}.ocorrencia-pacote-texto .ui-icon{width:15px;height:15px}
+</style>
+<link rel="stylesheet" href="assets/operacao.css">
+</head>
+
+<body translate="no">
+<svg class="svg-sprite" aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+<defs>
+<symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-7h5v7"/></symbol>
+<symbol id="icon-map" viewBox="0 0 24 24"><path d="m3 6 5-2 8 2 5-2v14l-5 2-8-2-5 2Z"/><path d="M8 4v14M16 6v14"/></symbol>
+<symbol id="icon-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".8"/><circle cx="3.5" cy="12" r=".8"/><circle cx="3.5" cy="18" r=".8"/></symbol>
+<symbol id="icon-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16V9a3 3 0 0 1 3-3h7"/><path d="m14 4 2 2-2 2"/></symbol>
+<symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4Z"/><path d="M12 9v4.5M12 17h.01"/></symbol>
+<symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 14v5h14v-5"/></symbol>
+<symbol id="icon-settings" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></symbol>
+<symbol id="icon-package" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></symbol>
+<symbol id="icon-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
+<symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+<symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+<symbol id="icon-crosshair-pin" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></symbol>
+<symbol id="icon-pencil" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10Z"/><path d="m13.8 6.7 3.5 3.5"/></symbol>
+<symbol id="icon-hand" viewBox="0 0 24 24"><path d="M7 11V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v6c0 4-2.8 7-7 7h-1c-2.2 0-3.6-1-4.8-2.5L3.5 15a1.8 1.8 0 0 1 2.8-2.2Z"/></symbol>
+<symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12.5 4 4L19 7"/></symbol>
+<symbol id="icon-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></symbol>
+<symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="icon-flag" viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 5h10l-2 3 2 3H6"/></symbol>
+<symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+<symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></symbol>
+<symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="icon-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+<symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="icon-car" viewBox="0 0 24 24"><path d="m5 16-1-1v-4l2-5h12l2 5v4l-1 1"/><path d="M5 11h14M7 16v2M17 16v2"/><circle cx="7" cy="14" r="1"/><circle cx="17" cy="14" r="1"/></symbol>
+<symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="icon-waze" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 8 8H7l-3 2 1-4.5A8 8 0 0 1 4 12Z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M9 15c1.8 1.2 4.2 1.2 6 0"/></symbol>
+</defs>
+</svg>
+
+
+<header class="app-header">
+<div class="logo-app">Copiloto Entrega</div>
+</header>
+
+<nav class="abas" aria-label="Navegação principal">
+<button class="aba-btn ativa" id="btnAbaLista" onclick="irParaAba(0)"><svg class="ui-icon"><use href="#icon-home"></use></svg><span>Home</span></button>
+<button class="aba-btn" id="btnAbaMapa" onclick="irParaAba(1)"><svg class="ui-icon"><use href="#icon-map"></use></svg><span>Mapa</span></button>
+<button class="aba-btn" id="btnAbaOcorrencias" onclick="irParaAba(2)"><svg class="ui-icon"><use href="#icon-settings"></use></svg><span>Configurações</span><b id="badgeOcorrenciasTab" style="display:none">0</b></button>
+</nav>
+
+<div id="areaAbas">
+
+<div class="painel-aba ativo" id="painelLista">
+<div class="container home-container">
+
+<div class="card home-rota-card" id="cardPrincipalLista">
+<div class="home-card-head">
+<div>
+<div class="eyebrow">ROTA DO DIA</div>
+<h2>Comece sua rota</h2>
+</div>
+<div class="versao-copiloto">V11.1</div>
+</div>
+
+<input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
+<button class="importar" onclick="selecionarArquivoRota()"><svg class="ui-icon"><use href="#icon-upload"></use></svg><span>Importar rota</span></button>
+
+
+<button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;"><svg class="ui-icon"><use href="#icon-pencil"></use></svg><span>Otimização manual</span></button>
+<button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;"><span>Restaurar ordem original</span></button>
+<div id="statusOtimizacaoRota" class="status-otimizacao-rota" style="display:none;"></div>
+
+<div class="stats">
+<div class="stat"><div>Pacotes</div><h2 id="pacotes">0</h2></div>
+<div class="stat"><div>Paradas</div><h2 id="locais">0</h2></div>
+<div class="stat pendente-cor"><div>Restantes</div><h2 id="qtdPendentes">0</h2></div>
+<div class="stat entregue-cor"><div>Entregues</div><h2 id="qtdEntregues">0</h2></div>
+<div class="stat ocorrencia-cor"><div>Ocorrências</div><h2 id="qtdOcorrencias">0</h2></div>
+</div>
+<div class="barra-progresso"><div class="barra-progresso-fill" id="barraProgresso">0%</div></div>
+<div class="home-insights" id="homeInsights">
+<div class="home-insight"><span>Progresso</span><strong id="homeInsightProgresso">0%</strong></div>
+<div class="home-insight"><span>Paradas restantes</span><strong id="homeInsightParadas">0</strong></div>
+<div class="home-insight"><span>Próxima parada</span><strong id="homeInsightProxima">—</strong></div>
+</div>
+</div>
+
+<section class="home-urgencias">
+<div class="section-heading"><div class="section-heading-icon urgencia"><svg class="ui-icon"><use href="#icon-alert"></use></svg></div><div><h2>Urgências</h2><p>Ocorrências que precisam da sua atenção</p></div><span id="homeUrgenciasContador" class="section-count">0</span></div>
+<div id="homeUrgencias"></div>
+</section>
+
+</div>
+</div>
+
+<div class="painel-aba" id="painelMapa">
+<div id="mapa"></div>
+
+<div id="painelBuscaMapa"><input type="text" id="buscaParadaMapa" placeholder="Buscar parada nº..." inputmode="numeric" onkeydown="if(event.key==='Enter') buscarParadaNoMapa()"><button onclick="buscarParadaNoMapa()" aria-label="Buscar"><svg class="ui-icon"><use href="#icon-search"></use></svg></button></div>
+<button id="botaoBuscaMapa" class="botao-flutuante-mapa" style="top:90px;" onclick="alternarBuscaMapa()" title="Buscar parada"><svg class="ui-icon"><use href="#icon-search"></use></svg></button>
+<button id="botaoOcultarEntregues" class="botao-flutuante-mapa" style="top:146px;" onclick="alternarOcultarEntreguesMapa()" title="Ocultar/mostrar entregues"><svg class="ui-icon"><use href="#icon-eye"></use></svg></button>
+<button id="botaoListaMapaDesktop" class="botao-flutuante-mapa" style="top:202px;" onclick="alternarSheetListaMapa()" title="Abrir lista de paradas"><svg class="ui-icon"><use href="#icon-list"></use></svg></button>
+<button id="botaoCentralizar" onclick="centralizarMinhaLocalizacao()" title="Buscar localização precisa e centralizar"><svg class="ui-icon"><use href="#icon-target"></use></svg></button>
+<button id="botaoAjustarPosicao" style="display:none;" onclick="alternarAjustePosicaoManual()" title="Ajustar minha posição manualmente no mapa"><svg class="ui-icon"><use href="#icon-crosshair-pin"></use></svg></button>
+
+<div id="painelDesenhoRota">
+<div class="desenho-rota-titulo"><svg class="ui-icon mini"><use href="#icon-pencil"></use></svg> Desenhe a intenção da rota</div>
+<div id="instrucaoDesenhoRota" class="desenho-rota-instrucao">O início real é sempre sua localização. Passe a linha por cima do círculo de cada pin.</div>
+<div class="desenho-modos"><button id="btnModoDesenharRota" class="ativo" onclick="definirModoInteracaoDesenho('desenhar')"><svg class="ui-icon mini"><use href="#icon-pencil"></use></svg> Desenhar</button><button id="btnModoMoverRota" onclick="definirModoInteracaoDesenho('mover')"><svg class="ui-icon mini"><use href="#icon-hand"></use></svg> Mover mapa</button></div>
+<div class="desenho-rota-acoes"><button class="desenho-limpar" onclick="limparDesenhoOtimizacao()">Limpar</button><button class="desenho-cancelar" onclick="cancelarDesenhoOtimizacao()">Cancelar</button><button class="desenho-aplicar" id="btnAplicarDesenhoRota" onclick="aplicarDesenhoOtimizacao()" disabled>Aplicar desenho</button></div>
+</div>
+
+<div id="fundoInfoMapa" onclick="fecharInfoMapa()"></div>
+<div id="painelInfoMapa"><div class="alca-painel"></div><div id="conteudoInfoMapa"></div></div>
+
+<section id="sheetListaMapa" class="sheet-lista-mapa" aria-label="Lista da rota">
+<div id="alcaListaMapa" class="sheet-lista-handle" onclick="alternarSheetListaMapa()">
+<div class="sheet-grabber"></div>
+<div class="sheet-handle-row"><div><strong>Paradas</strong><span id="sheetListaResumo">Arraste para cima</span></div><svg class="ui-icon sheet-chevron"><use href="#icon-chevron-up"></use></svg></div>
+</div>
+<div class="sheet-lista-conteudo">
+<div id="resumoMapa" class="sheet-route-summary">
+<div id="resumoMapaTextos"><span id="resumoMapaTexto">0 pendentes</span><span id="resumoMapaOcorrencias">0 ocorrências</span></div>
+<div class="legenda-mapa"><span><i class="ponto-legenda" style="background:#003CBD"></i> Pendente</span><span><i class="ponto-legenda" style="background:#9ca3af"></i> Entregue</span><span><i class="ponto-legenda" style="background:#e74c3c"></i> Ocorrência</span></div>
+<div id="statusLocalizacaoMapa"><svg class="ui-icon mini"><use href="#icon-pin"></use></svg><span>Localização: aguardando GPS...</span></div>
+</div>
+<button class="organizar-pacotes-btn" id="btnOrganizarPacotes" onclick="abrirOrganizacaoPacotes()" style="display:none;"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes</button>
+<div id="painelOrganizacaoPacotes" class="painel-organizacao-pacotes" style="display:none;">
+<div class="organizar-header"><div><div class="organizar-titulo"><svg class="ui-icon mini"><use href="#icon-package"></use></svg> Organizar pacotes no carro</div><div class="organizar-subtitulo">Carregue na ordem inversa: a última entrega entra primeiro.</div></div><button class="organizar-fechar" onclick="fecharOrganizacaoPacotes()">Fechar</button></div>
+<div class="organizar-progresso"><div id="barraOrganizarPacotes"></div></div><div id="textoProgressoOrganizar" class="organizar-progresso-texto"></div><div id="listaOrganizacaoPacotes"></div>
+</div>
+<div id="lista"></div>
+</div>
+</section>
+</div>
+
+<div class="painel-aba" id="painelOcorrencias">
+<div class="container settings-container">
+<div class="settings-title"><div><div class="eyebrow">PREFERÊNCIAS</div><h2>Configurações</h2><p>Ajuste o Copiloto para o seu jeito de trabalhar.</p></div></div>
+
+<section class="settings-card">
+<button class="settings-row settings-row-button" onclick="abrirConfiguracaoV9()">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
+<div class="settings-row-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Scanner por regiões</span></div>
+<svg class="ui-icon settings-arrow"><use href="#icon-chevron-up"></use></svg>
+</button>
+</section>
+
+<section class="settings-card">
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-eye"></use></svg></div>
+<div class="settings-row-copy"><strong>Ocultar entregues no mapa</strong><span>Deixa o mapa mais limpo conforme a rota avança.</span></div>
+<input class="settings-switch" id="configOcultarEntreguesV10" type="checkbox" onchange="alternarConfigOcultarEntreguesV10(this.checked)">
+</label>
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-list"></use></svg></div>
+<div class="settings-row-copy"><strong>Mostrar lista recolhida no computador</strong><span>No celular a lista continua escondida até você arrastar para cima.</span></div>
+<input class="settings-switch" id="configSheetDesktopV10" type="checkbox" checked onchange="alternarConfigSheetDesktopV10(this.checked)">
+</label>
+<label class="settings-row">
+<div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-clock"></use></svg></div>
+<div class="settings-row-copy"><strong>Manter tela ativa durante a rota</strong><span>Evita que a tela apague quando o aparelho permitir.</span></div>
+<input class="settings-switch" id="configTelaAtivaV10" type="checkbox" onchange="alternarConfigTelaAtivaV10(this.checked)">
+</label>
+</section>
+<div id="listaOcorrencias" style="display:none"></div>
+</div>
+</div>
+
+</div>
+
+<!-- Modal para selecionar o motivo da ocorrência -->
+<div class="modal-fundo" id="modalMotivo">
+<div class="modal-caixa">
+<h3>Motivo da ocorrência</h3>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Cliente ausente')">Cliente ausente</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Comércio fechado')">Comércio fechado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Endereço não localizado')">Endereço não localizado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Recusado')">Recusado</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Problema de acesso')">Problema de acesso</button>
+<button class="motivo-opcao" onclick="confirmarOcorrencia('Outro')">Outro</button>
+<button class="cancelar-modal" onclick="fecharModalMotivo()">Cancelar</button>
+
+</div>
+</div>
+
+<!-- V9.1: configuração principal da otimização -->
+<div class="otimizacao-fundo" id="modalConfigOtimizacaoV9">
+<div class="otimizacao-caixa">
+<h2><svg class="ui-icon mini"><use href="#icon-settings"></use></svg> Configuração de rota</h2>
+<div class="otimizacao-subtitulo">Escolha como o Copiloto deve organizar suas próximas rotas. A configuração fica salva neste aparelho.</div>
+
+<button class="otimizacao-opcao" id="opcaoV9Padrao" onclick="selecionarConfiguracaoV9Padrao()">
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
+<div><div class="titulo-opcao">Scanner por regiões</div><div class="desc-opcao">Conclui cada região antes de seguir para a próxima, partindo da sua localização atual e considerando o tempo pelas ruas.</div></div>
+</button>
+
+<button class="otimizacao-opcao" id="opcaoV9Destino" onclick="selecionarConfiguracaoV9Destino()">
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-flag"></use></svg></div>
+<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Mantém as regiões completas e considera o ponto final escolhido no mapa ou por pesquisa ao ordenar os blocos.</div></div>
+</button>
+
+<button class="otimizacao-opcao" id="opcaoV9Nenhuma" onclick="selecionarConfiguracaoV9Nenhuma()">
+<div class="icone-opcao"><svg class="ui-icon"><use href="#icon-list"></use></svg></div>
+<div><div class="titulo-opcao">Não otimizar</div><div class="desc-opcao">Mantém exatamente a ordem original da rota importada, sem reorganizar as paradas.</div></div>
+</button>
+
+<div class="config-v9-atual" id="textoConfigAtualV9"></div>
+<button class="fechar-otimizacao-btn visivel" onclick="fecharConfiguracaoV9()">Fechar</button>
+</div>
+</div>
+
+<!-- V9.1: seletor do destino final por mapa/pesquisa -->
+<div class="otimizacao-fundo" id="modalDestinoFinal">
+<div class="otimizacao-caixa destino-picker-caixa">
+<h2><svg class="ui-icon mini"><use href="#icon-flag"></use></svg> Onde deseja terminar?</h2>
+<div class="otimizacao-subtitulo">Pesquise um endereço ou toque diretamente no mapa. O Copiloto continuará priorizando tempo e levará esse ponto em conta na reta final.</div>
+
+<div class="destino-busca-linha">
+<input id="buscaEnderecoDestinoV9" type="text" placeholder="Pesquisar endereço, bairro ou local..." onkeydown="if(event.key==='Enter') buscarEnderecoDestinoV9()">
+<button onclick="buscarEnderecoDestinoV9()"><svg class="ui-icon mini"><use href="#icon-search"></use></svg> Buscar</button>
+</div>
+
+<div id="areaDestinosSalvos" style="display:none;margin-top:10px;">
+<div class="destinos-salvos-titulo">Locais salvos</div>
+<div id="listaDestinosSalvos"></div>
+</div>
+
+<div id="mapaDestinoFinal"></div>
+<div class="destino-instrucao">Toque no ponto exato do mapa onde você quer terminar. Esse ponto não precisa ser uma entrega.</div>
+<div id="destinoSelecionadoInfo">Nenhum ponto selecionado.</div>
+<input id="nomeDestinoSalvo" class="destino-nome-input" type="text" placeholder="Nome opcional para salvar: Casa, Base, Galpão...">
+<div class="destino-acoes">
+<button class="destino-salvar-btn" onclick="salvarDestinoSelecionado()"><svg class="ui-icon mini"><use href="#icon-save"></use></svg> Salvar local</button>
+<button class="destino-usar-btn" onclick="confirmarDestinoSelecionadoV9()">Usar este destino</button>
+</div>
+<button class="fechar-otimizacao-btn visivel" onclick="fecharSeletorDestinoFinal()">Cancelar</button>
+</div>
+</div>
+
+<!-- V7.5: tela de cálculo -->
+<div class="overlay-otimizando" id="overlayOtimizando">
+<div class="otimizando-conteudo">
+<div class="otimizando-spinner"></div>
+<h3>Preparando sua rota</h3>
+<div id="textoProgressoOtimizacao">Preparando as paradas...</div>
+</div>
+</div>
+
+<script src="assets/copiloto.js"></script>
+
+</body>
+
+</html>
