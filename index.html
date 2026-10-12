@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V11.5</title>
+<title>Copiloto Entrega V11.6</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1570,6 +1570,10 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 .auto-v9-btn .ui-icon{grid-row:1/3;}
 .auto-v9-btn span{font-size:13.5px;font-weight:700;}
 .auto-v9-btn small{font-size:10px;margin:1px 0 0;opacity:.78;font-weight:500;}
+#acoesOtimizacaoManualV116{grid-template-columns:1fr;}
+#btnOtimizarRotaV116{background:#173f9f;box-shadow:0 4px 12px rgba(23,63,159,.14);}
+#btnOtimizarRotaV116:hover{background:#12347f;}
+#btnOtimizarRotaV116:disabled{opacity:.58;cursor:wait;}
 .config-otimizacao-btn{width:auto;margin:0;padding:0 13px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d8dee9;background:#fff;color:#344054;box-shadow:none;min-height:54px;}
 #btnConfigOtimizacaoV9 span{display:none;}
 #btnConfigOtimizacaoV9 .ui-icon{width:20px;height:20px;}
@@ -1687,7 +1691,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 
 /* ================================================================
-   V11.5 — geometria contínua real + otimização estrita + prioridade visual de cruzamentos
+   V11.6 — otimização manual por botão + geometria contínua real + prioridade visual de cruzamentos
    ================================================================ */
 #mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
 #mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
@@ -1768,12 +1772,18 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V11.5</div>
+<div class="versao-copiloto">V11.6</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
 <button class="importar" onclick="selecionarArquivoRota()"><svg class="ui-icon"><use href="#icon-upload"></use></svg><span>Importar rota</span></button>
-
+<div class="acoes-rota-home" id="acoesOtimizacaoManualV116">
+<button class="auto-v9-btn" id="btnOtimizarRotaV116" onclick="otimizarRotaPeloBotaoV116()" style="display:none;">
+<svg class="ui-icon"><use href="#icon-route"></use></svg>
+<span>Otimizar rota</span>
+<small id="subtituloOtimizarRotaV116">Usar configuração atual</small>
+</button>
+</div>
 
 <button class="config-otimizacao-btn" id="btnDesenharOtimizacao" onclick="iniciarDesenhoOtimizacao()" style="display:none;"><svg class="ui-icon"><use href="#icon-pencil"></use></svg><span>Otimização manual</span></button>
 <button class="restaurar-shopee-btn" id="btnRestaurarShopee" onclick="restaurarOrdemShopee()" style="display:none;"><span>Restaurar ordem original</span></button>
@@ -2424,14 +2434,14 @@ salvarStorage();
 renderizarTudo();
 const campoArquivo=document.getElementById('arquivo'); if(campoArquivo) campoArquivo.value='';
 
-// V10.3: a importação já executa automaticamente o modo escolhido nas configurações.
-// No modo "Não otimizar", a ordem original é mantida sem qualquer cálculo de rota.
+// V11.6: a importação NÃO otimiza mais automaticamente. Primeiro carregamos
+// e exibimos a rota original; a otimização só começa quando o motorista toca
+// em "Otimizar rota". Isso evita estados intermediários inconsistentes no mapa.
 const configImportacao=carregarConfiguracaoV9();
 if(configImportacao.modo==='nenhuma'){
 mostrarToast('Rota importada na ordem original','sucesso');
 }else{
-mostrarToast('Rota importada. Otimizando automaticamente...','neutro');
-await executarOtimizacaoPrincipalV9();
+mostrarToast('Rota importada. Toque em Otimizar rota quando estiver pronto.','sucesso');
 }
 
 }
@@ -3611,6 +3621,44 @@ return;
 return otimizarRotaAutomaticamenteV9(cfg.destinoFinal);
 }
 return otimizarRotaAutomaticamenteV9(null);
+}
+
+// V11.6 - otimização voltou a ser uma ação explícita do motorista.
+// As configurações continuam escolhendo O MODO, mas nunca disparam o cálculo
+// automaticamente durante a importação.
+async function otimizarRotaPeloBotaoV116(){
+if(!grupos.length){mostrarToast('Importe uma rota primeiro','alerta');return;}
+const cfg=carregarConfiguracaoV9();
+if(cfg.modo==='nenhuma'){
+mostrarToast('A configuração está em “Não otimizar”. Altere em Configurações para otimizar esta rota.','alerta');
+return;
+}
+const btn=document.getElementById('btnOtimizarRotaV116');
+if(btn&&btn.disabled) return;
+if(btn) btn.disabled=true;
+try{
+await executarOtimizacaoPrincipalV9();
+}finally{
+if(btn) btn.disabled=false;
+atualizarBotaoOtimizacaoManualV116();
+}
+}
+
+function atualizarBotaoOtimizacaoManualV116(){
+const btn=document.getElementById('btnOtimizarRotaV116');
+const sub=document.getElementById('subtituloOtimizarRotaV116');
+if(!btn) return;
+btn.style.display=grupos.length?'grid':'none';
+const cfg=carregarConfiguracaoV9();
+if(!sub) return;
+if(cfg.modo==='destino'){
+const nome=cfg.destinoFinal&&(cfg.destinoFinal.nome||cfg.destinoFinal.texto||cfg.destinoFinal.endereco);
+sub.textContent=nome?`Final: ${nome}`:'Terminar próximo a um local';
+}else if(cfg.modo==='nenhuma'){
+sub.textContent='Configuração atual: não otimizar';
+}else{
+sub.textContent='Mais rápida';
+}
 }
 
 // ======================================================================
@@ -7522,6 +7570,7 @@ function atualizarStatusOtimizacaoRota(){
 const el=document.getElementById('statusOtimizacaoRota');
 const btnRestaurar=document.getElementById('btnRestaurarShopee');
 const btnOrganizar=document.getElementById('btnOrganizarPacotes');
+atualizarBotaoOtimizacaoManualV116();
 if(!el)return;
 if(!grupos.length){el.style.display='none';if(btnRestaurar)btnRestaurar.style.display='none';if(btnOrganizar)btnOrganizar.style.display='none';return;}
 if(btnRestaurar)btnRestaurar.style.display='none';
