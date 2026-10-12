@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V11.2</title>
+<title>Copiloto Entrega V11.3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1687,7 +1687,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 
 /* ================================================================
-   V11.2 — MapLibre homogêneo + pins nativos, com Leaflet como fallback
+   V11.3 — mapa homogêneo detalhado + sequência local inteligente
    ================================================================ */
 #mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
 #mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
@@ -1768,7 +1768,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V11.2</div>
+<div class="versao-copiloto">V11.3</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -3808,6 +3808,85 @@ if(extraT<=20&&extraD<=180){r.splice(j,1);r.splice(i,0,x);mudou=true;break exter
 return r;
 }
 
+
+// V11.3 - SUAVIZAÇÃO DE SEQUÊNCIA LOCAL
+// A matriz continua mandando no tempo. Esta etapa só elimina voltas visíveis
+// quando uma ordem local mais contínua é praticamente equivalente em tempo e
+// claramente menor em distância/forma, como 11 -> 12 -> 10.
+function distanciaGeoGrupoV113(a,b){
+ if(!a||!b||!coordenadaValida(a.lat,a.lng)||!coordenadaValida(b.lat,b.lng))return 0;
+ return distanciaPontos({lat:Number(a.lat),lng:Number(a.lng)},{lat:Number(b.lat),lng:Number(b.lng)});
+}
+function comprimentoGeoTrechoV113(ordem,ini,fim){
+ let d=0;for(let i=ini+1;i<=fim;i++)d+=distanciaGeoGrupoV113(ordem[i-1],ordem[i]);return d;
+}
+function permutacoesV113(arr){
+ if(arr.length<=1)return [arr.slice()];const out=[];
+ for(let i=0;i<arr.length;i++)for(const resto of permutacoesV113([...arr.slice(0,i),...arr.slice(i+1)]))out.push([arr[i],...resto]);
+ return out;
+}
+function suavizarSequenciaLocalV113(ordemGrupos,matriz,porId){
+ let ordem=[...ordemGrupos];
+ const metricasDaOrdem=lista=>metricasIndicesV9(lista.map(g=>porId.get(g.id)).filter(Number.isInteger),matriz);
+ let atual=metricasDaOrdem(ordem);
+ for(let passada=0;passada<2;passada++){
+  let mudou=false;
+  for(let i=0;i<ordem.length-2;i++){
+   const tamanho=Math.min(4,ordem.length-i);
+   if(tamanho<3)continue;
+   const bloco=ordem.slice(i,i+tamanho);
+   const anterior=i>0?ordem[i-1]:null,proximo=i+tamanho<ordem.length?ordem[i+tamanho]:null;
+   const geoAtual=(anterior?distanciaGeoGrupoV113(anterior,bloco[0]):0)+comprimentoGeoTrechoV113(bloco,0,bloco.length-1)+(proximo?distanciaGeoGrupoV113(bloco[bloco.length-1],proximo):0);
+   let melhor=null;
+   for(const perm of permutacoesV113(bloco)){
+    if(perm.every((g,k)=>g.id===bloco[k].id))continue;
+    const cand=[...ordem.slice(0,i),...perm,...ordem.slice(i+tamanho)];
+    const met=metricasDaOrdem(cand);if(!Number.isFinite(met.tempo)||!Number.isFinite(met.distancia))continue;
+    const geoNovo=(anterior?distanciaGeoGrupoV113(anterior,perm[0]):0)+comprimentoGeoTrechoV113(perm,0,perm.length-1)+(proximo?distanciaGeoGrupoV113(perm[perm.length-1],proximo):0);
+    const ganhoGeo=geoAtual-geoNovo,ganhoDist=atual.distancia-met.distancia,deltaTempo=met.tempo-atual.tempo;
+    const melhoraTempo=deltaTempo<-1;
+    const suavizaSemCusto=deltaTempo<=3&&ganhoDist>=30&&ganhoGeo>=25;
+    const suavizaForte=deltaTempo<=12&&ganhoDist>=120&&ganhoGeo>=80&&geoNovo<=geoAtual*.88;
+    if(!(melhoraTempo||suavizaSemCusto||suavizaForte))continue;
+    if(!melhor||met.tempo<melhor.metricas.tempo-3||(Math.abs(met.tempo-melhor.metricas.tempo)<=3&&(met.distancia<melhor.metricas.distancia-1||geoNovo<melhor.geoNovo))){
+      melhor={ordem:cand,metricas:met,geoNovo};
+    }
+   }
+   if(melhor){ordem=melhor.ordem;atual=melhor.metricas;mudou=true;}
+  }
+  if(!mudou)break;
+ }
+ return {ordem,metricas:atual};
+}
+
+async function repararPassagensReaisV113(ordemInicial,inicio,destino,matriz,ativos,porId){
+ let ordem=[...ordemInicial];
+ for(let passada=0;passada<2;passada++){
+  let pernas;try{pernas=await consultarPernasRotaOSRMV710(ordem,inicio,destino);}catch(e){console.warn('[V11.3] Checagem de passagens reais indisponível:',e);break;}
+  let movimento=null;
+  for(let k=0;k<Math.min(pernas.length,ordem.length);k++){
+   const origem=k===0?0:porId.get(ordem[k-1].id),destIdx=porId.get(ordem[k].id);if(!Number.isInteger(destIdx))continue;
+   const tAB=valorMatriz(matriz.duracoes,origem,destIdx),dAB=valorMatriz(matriz.distancias,origem,destIdx);if(!Number.isFinite(tAB)||!Number.isFinite(dAB))continue;
+   for(let j=k+2;j<Math.min(ordem.length,k+10);j++){
+    const g=ordem[j],perto=distanciaPontoPolilinhaV710(g,pernas[k]);if(perto>38)continue;
+    const gi=porId.get(g.id);if(!Number.isInteger(gi))continue;
+    const t1=valorMatriz(matriz.duracoes,origem,gi),t2=valorMatriz(matriz.duracoes,gi,destIdx),d1=valorMatriz(matriz.distancias,origem,gi),d2=valorMatriz(matriz.distancias,gi,destIdx);
+    if(![t1,t2,d1,d2].every(Number.isFinite))continue;
+    const extraT=t1+t2-tAB,extraD=d1+d2-dAB;
+    if(extraT>12||extraD>140)continue;
+    const score=perto+Math.max(0,extraT)*2+Math.max(0,extraD)/8;
+    if(!movimento||score<movimento.score)movimento={de:j,para:k,score};
+   }
+  }
+  if(!movimento)break;
+  const antes=metricasIndicesV9(ordem.map(g=>porId.get(g.id)),matriz);
+  const cand=[...ordem];const [g]=cand.splice(movimento.de,1);cand.splice(movimento.para,0,g);
+  const depois=metricasIndicesV9(cand.map(x=>porId.get(x.id)),matriz);
+  if(depois.tempo<=antes.tempo+12&&depois.distancia<=antes.distancia+140)ordem=cand;else break;
+ }
+ return ordem;
+}
+
 async function motorAutomaticoV9(indices,resultado,baseline){
 const sementes=[];
 sementes.push([...baseline]);
@@ -3875,12 +3954,19 @@ const baselineIndices=baselineGrupos.map(g=>porId.get(g.id));
 const indices=ativos.map(g=>porId.get(g.id));
 const resultado=await motorAutomaticoV9(indices,matriz,baselineIndices);
 const gruposPorIndice=new Map(ativos.map((g,i)=>[i+1,g]));
-const ordemGrupos=resultado.ordem.map(i=>gruposPorIndice.get(i)).filter(Boolean);
+let ordemGrupos=resultado.ordem.map(i=>gruposPorIndice.get(i)).filter(Boolean);
+// V11.3: elimina regressões locais e depois valida o caminho real para evitar
+// passar perto de uma entrega e voltar nela mais tarde.
+const suavizada=suavizarSequenciaLocalV113(ordemGrupos,matriz,porId);
+ordemGrupos=suavizada.ordem;
+atualizarProgressoOtimizacao('Eliminando voltas desnecessárias...');
+ordemGrupos=await repararPassagensReaisV113(ordemGrupos,inicio,destino,matriz,ativos,porId);
+const metricasCorrigidas=metricasIndicesV9(ordemGrupos.map(g=>porId.get(g.id)).filter(Number.isInteger),matriz);
 const baselineMet=metricasIndicesV9(baselineIndices,matriz);
-const diferencaTempoV9 = resultado.metricas.tempo - baselineMet.tempo;
-const melhorou = diferencaTempoV9 < -1 || (Math.abs(diferencaTempoV9) <= 1 && resultado.metricas.distancia < baselineMet.distancia - 1);
+const diferencaTempoV9 = metricasCorrigidas.tempo - baselineMet.tempo;
+const melhorou = diferencaTempoV9 < -1 || (Math.abs(diferencaTempoV9) <= 1 && metricasCorrigidas.distancia < baselineMet.distancia - 1);
 const ordemFinal=melhorou?ordemGrupos:baselineGrupos;
-const metFinal=melhorou?resultado.metricas:baselineMet;
+const metFinal=melhorou?metricasCorrigidas:baselineMet;
 const tempoServico=ordemFinal.reduce((acc,g)=>acc+tempoServicoGrupoSegundos(g),0);
 const metricasFinal={duracao:metFinal.tempo+tempoServico,distancia:metFinal.distancia};
 const metricasShopee={duracao:baselineMet.tempo+tempoServico,distancia:baselineMet.distancia};
@@ -3890,7 +3976,7 @@ grupos.forEach((g,i)=>{g.ordemOtimizada=i+1;(g.pacotes||[]).forEach(p=>p.organiz
 atualizarProgressoOtimizacao('Desenhando a rota vencedora pelas ruas...');
 const geometria=await geometriaRotaPelasRuasV81(ordemFinal,inicio,destino);
 metaRota={
-modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:destino?'v9_tempo_primeiro_km_desempate_destino_final':'v9_tempo_primeiro_km_desempate',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
+modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:destino?'v11_3_tempo_primeiro_suavizacao_local_destino':'v11_3_tempo_primeiro_suavizacao_local',resultadoOtimizacao:melhorou?'v9_automatica':'shopee_mantida',
 distanciaMetros:metricasFinal.distancia,duracaoSegundos:metricasFinal.duracao,
 distanciaShopeeMetros:metricasShopee.distancia,duracaoShopeeSegundos:metricasShopee.duracao,
 destinoFinal:destino,inicioRota:{lat:Number(inicio.lat),lng:Number(inicio.lng)},ultimaParada:ordemFinal.length?ordemFinal[ordemFinal.length-1].id:null,
@@ -8975,7 +9061,7 @@ if(modoDesenhoRota) setTimeout(()=>atualizarDestaqueFaltantesDesenhoV82(),0);
 
 
 // ======================================================================
-// V11.2 - MAPA VETORIAL HOMOGÊNEO + ROTA REAL PELAS RUAS
+// V11.3 - MAPA VETORIAL HOMOGÊNEO DETALHADO + ROTA REAL PELAS RUAS
 // MapLibre + OpenFreeMap na visualização; OSRM calcula a geometria da rota.
 // Nesta versão pins/GPS são camadas nativas do próprio mapa (GeoJSON), não
 // elementos HTML. Isso elimina deslocamentos aparentes ao dar zoom/resize.
@@ -9015,7 +9101,7 @@ const b=document.getElementById('mapaLivreBadgeV11');
 if(b){b.textContent=texto;b.style.display=(tipo==='erro'||tipo==='carregando')?'block':'none';}
 }
 function preencherConfigMapaLivreV11(){
-if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial estável');
+if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial detalhado');
 else if(mapaLivreFalhouV11) atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial indisponível','erro');
 else atualizarStatusMapaLivreV11('MapLibre + OpenFreeMap · sem chave');
 }
@@ -9025,7 +9111,7 @@ const p=grupos.find(g=>coordenadaValida(g.lat,g.lng));if(p)return [Number(p.lng)
 return [-46.6333,-23.5505];
 }
 function removerMarcadoresMapaLivreV11(){
-// V11.2: os pins não são mais DOM markers. Apenas limpa o dicionário legado.
+// V11.3: os pins não são mais DOM markers. Apenas limpa o dicionário legado.
 marcadoresLivreV11={};marcadorDestinoLivreV11=null;
 }
 function criarElementoPinMapaLivreV11(rotulo,cor,classeExtra=''){
@@ -9045,21 +9131,38 @@ if(!mapaLivreV11||!mapaLivreCarregadoV11||mapaLivreEstiloHomogeneizadoV112)retur
 mapaLivreEstiloHomogeneizadoV112=true;
 try{
  const style=mapaLivreV11.getStyle();if(!style||!Array.isArray(style.layers))return;
- // Evita a sensação de "outro mapa" entre zooms: os rótulos usam uma faixa
- // tipográfica estreita e fixa por categoria. As camadas continuam aparecendo
- // conforme o nível de detalhe, mas fonte/tamanho não dão saltos bruscos.
  let fontePadrao=null;
  for(const l of style.layers){const f=l&&l.layout&&l.layout['text-font'];if(Array.isArray(f)&&f.length&&f.every(x=>typeof x==='string')){fontePadrao=f;break;}}
  for(const l of style.layers){
-   if(!l||l.type!=='symbol'||!l.layout||l.layout['text-field']===undefined)continue;
+   if(!l)continue;
    const id=String(l.id||'').toLowerCase();
+   // V11.3: o OSRM pode usar ruas locais/serviços que alguns estilos só
+   // mostram em zoom muito alto. Mantemos essas camadas visíveis mais cedo
+   // para a linha da rota nunca parecer atravessar um terreno "sem rua".
+   if(l.type==='line' && /road|street|highway|motorway|trunk|primary|secondary|tertiary|minor|residential|service|track|path|living/.test(id)){
+     try{mapaLivreV11.setLayoutProperty(l.id,'visibility','visible');}catch(e){}
+     try{
+       const minAtual=Number.isFinite(l.minzoom)?Number(l.minzoom):0;
+       const maxAtual=Number.isFinite(l.maxzoom)?Number(l.maxzoom):24;
+       mapaLivreV11.setLayerZoomRange(l.id,Math.min(minAtual,11),Math.max(maxAtual,22));
+     }catch(e){}
+     try{mapaLivreV11.setPaintProperty(l.id,'line-opacity',1);}catch(e){}
+   }
+   if(l.type!=='symbol'||!l.layout||l.layout['text-field']===undefined)continue;
    let tamanho=11.5;
    if(/country|state|province|city|town|village|place|settlement/.test(id))tamanho=13;
    else if(/road|street|highway|motorway|path/.test(id))tamanho=11;
    try{mapaLivreV11.setLayoutProperty(l.id,'text-size',tamanho);}catch(e){}
    if(fontePadrao){try{mapaLivreV11.setLayoutProperty(l.id,'text-font',fontePadrao);}catch(e){}}
+   if(/road|street|highway|motorway|path/.test(id)){
+     try{
+       const minAtual=Number.isFinite(l.minzoom)?Number(l.minzoom):0;
+       const maxAtual=Number.isFinite(l.maxzoom)?Number(l.maxzoom):24;
+       mapaLivreV11.setLayerZoomRange(l.id,Math.min(minAtual,12),Math.max(maxAtual,22));
+     }catch(e){}
+   }
  }
-}catch(e){console.warn('[V11.2] Não foi possível homogeneizar tipografia do mapa:',e);}
+}catch(e){console.warn('[V11.3] Não foi possível homogeneizar/detalhar o mapa:',e);}
 }
 function garantirCamadaPrecisaoMapaLivreV11(){
 if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
@@ -9067,7 +9170,7 @@ try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO)){
 mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_PRECISAO,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
 mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_FILL,type:'fill',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'fill-color':'#2563eb','fill-opacity':0.08}});
 mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_LINE,type:'line',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'line-color':'#2563eb','line-opacity':0.55,'line-width':1.2}});
-}}catch(e){console.warn('[V11.2] Falha ao criar círculo de precisão:',e);}
+}}catch(e){console.warn('[V11.3] Falha ao criar círculo de precisão:',e);}
 }
 function atualizarCirculoPrecisaoMapaLivreV11(lat,lng,precisao){
 if(!mapaLivreV11||!mapaLivreCarregadoV11)return;garantirCamadaPrecisaoMapaLivreV11();const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO);if(!src)return;
@@ -9079,7 +9182,7 @@ try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_USUARIO)){
  mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_USUARIO,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
  mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_USUARIO_HALO,type:'circle',source:MAPA_LIVRE_SOURCE_USUARIO,paint:{'circle-radius':11,'circle-color':'rgba(37,99,235,.24)','circle-blur':0.1}});
  mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_USUARIO,type:'circle',source:MAPA_LIVRE_SOURCE_USUARIO,paint:{'circle-radius':7,'circle-color':'#2563eb','circle-stroke-color':'#ffffff','circle-stroke-width':3}});
-}return true;}catch(e){console.warn('[V11.2] Falha ao criar marcador GPS nativo:',e);return false;}
+}return true;}catch(e){console.warn('[V11.3] Falha ao criar marcador GPS nativo:',e);return false;}
 }
 function criarOuAtualizarMarcadorUsuarioLivreV11(lat,lng,precisao,centralizar){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
@@ -9111,7 +9214,7 @@ try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA)){
  const antes=mapaLivreV11.getLayer(MAPA_LIVRE_LAYER_PINS)?MAPA_LIVRE_LAYER_PINS:undefined;
  mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA_CASING,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-opacity':0.96,'line-width':8}},antes);
  mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#003CBD','line-opacity':1,'line-width':5}},antes);
-}return true;}catch(e){console.warn('[V11.2] Falha ao criar camada de rota:',e);return false;}
+}return true;}catch(e){console.warn('[V11.3] Falha ao criar camada de rota:',e);return false;}
 }
 function desenharRotaMapaLivreV11(pontos){
 if(!Array.isArray(pontos)||pontos.length<2||!garantirCamadaRotaMapaLivreV11())return;const coords=pontos.filter(p=>pontoValido(p)).map(p=>[Number(p.lng),Number(p.lat)]);if(coords.length<2)return;const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords}});
@@ -9137,7 +9240,7 @@ try{
   mapaLivreV11.on('mouseleave',MAPA_LIVRE_LAYER_PINS,()=>{try{mapaLivreV11.getCanvas().style.cursor='';}catch(e){}});
  }
  return true;
-}catch(e){console.warn('[V11.2] Falha ao criar pins nativos:',e);return false;}
+}catch(e){console.warn('[V11.3] Falha ao criar pins nativos:',e);return false;}
 }
 function atualizarPinsMapaLivreV11(){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!garantirCamadasPinsMapaLivreV112())return;
@@ -9156,7 +9259,7 @@ const geometria=[];const MAX=25;for(let base=0;base<validos.length-1;base+=MAX-1
 }
 async function recalcularRotaMapaLivreV11(assinatura){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;const pontos=pontosRotaMapaLivreV11();if(pontos.length<2){limparRotaMapaLivreV11();return;}const geracao=++mapaLivreRotaGeracaoV11;
-try{const geometria=await consultarGeometriaOSRMMapaLivreV11(pontos);if(geracao!==mapaLivreRotaGeracaoV11||!geometria.length)return;desenharRotaMapaLivreV11(geometria);assinaturaRotaLivreV11=assinatura;}catch(erro){console.warn('[V11.2] OSRM indisponível; mantendo geometria salva/fallback:',erro);if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);}
+try{const geometria=await consultarGeometriaOSRMMapaLivreV11(pontos);if(geracao!==mapaLivreRotaGeracaoV11||!geometria.length)return;desenharRotaMapaLivreV11(geometria);assinaturaRotaLivreV11=assinatura;}catch(erro){console.warn('[V11.3] OSRM indisponível; mantendo geometria salva/fallback:',erro);if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);}
 }
 function atualizarMapaLivreV11(forcarRota=false){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
@@ -9192,14 +9295,14 @@ try{
   mapaLivreV11.on('load',()=>{
    mapaLivreCarregadoV11=true;mapaLivreAtivoV11=true;mapaLivreFalhouV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.add('mapa-livre-ativo');el.classList.add('ativo');
    instalarResizeMapaLivreV112();homogeneizarEstiloMapaLivreV112();garantirCamadaRotaMapaLivreV11();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();agendarResizeMapaLivreV112();
-   atualizarStatusMapaLivreV11('Ativo · mapa vetorial estável');setTimeout(()=>{agendarResizeMapaLivreV112();atualizarMapaLivreV11(true);},0);
+   atualizarStatusMapaLivreV11('Ativo · mapa vetorial detalhado');setTimeout(()=>{agendarResizeMapaLivreV112();atualizarMapaLivreV11(true);},0);
   });
   mapaLivreV11.on('styledata',()=>{if(mapaLivreCarregadoV11){setTimeout(()=>{homogeneizarEstiloMapaLivreV112();garantirCamadaRotaMapaLivreV11();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();atualizarMapaLivreV11(false);},0);}});
-  mapaLivreV11.on('error',ev=>{console.warn('[V11.2] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
+  mapaLivreV11.on('error',ev=>{console.warn('[V11.3] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
   setTimeout(()=>{if(!mapaLivreCarregadoV11){mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial demorou a carregar','erro');}},15000);
  }
  return true;
-}catch(erro){console.warn('[V11.2] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;}
+}catch(erro){console.warn('[V11.3] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;}
 }
 
 // ----------------------------------------------------------------------
