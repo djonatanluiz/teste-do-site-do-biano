@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V11.6</title>
+<title>Copiloto Entrega V11.7</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1691,7 +1691,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 
 /* ================================================================
-   V11.6 — otimização manual por botão + geometria contínua real + prioridade visual de cruzamentos
+   V11.7 — otimização manual por botão + geometria contínua real + prioridade visual de cruzamentos
    ================================================================ */
 #mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
 #mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
@@ -1772,7 +1772,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V11.6</div>
+<div class="versao-copiloto">V11.7</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -1872,7 +1872,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <section class="settings-card">
 <div class="settings-row">
 <div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-map"></use></svg></div>
-<div class="settings-row-copy"><strong>Mapa e navegação</strong><span id="mapaLivreStatusSettingsV11">MapLibre + OpenFreeMap · rede viária reforçada</span></div>
+<div class="settings-row-copy"><strong>Mapa e navegação</strong><span id="mapaLivreStatusSettingsV11">MapLibre + OpenFreeMap · estilo homogêneo</span></div>
 </div>
 <div class="mapa-livre-info-v11"><strong>Mapa vetorial gratuito.</strong> O visual usa MapLibre/OpenFreeMap e o caminho real pelas ruas é calculado pelo OSRM. Se o mapa vetorial ficar indisponível, o Copiloto mantém automaticamente o mapa compatível de fallback.</div>
 </section>
@@ -2434,7 +2434,7 @@ salvarStorage();
 renderizarTudo();
 const campoArquivo=document.getElementById('arquivo'); if(campoArquivo) campoArquivo.value='';
 
-// V11.6: a importação NÃO otimiza mais automaticamente. Primeiro carregamos
+// V11.7: a importação NÃO otimiza mais automaticamente. Primeiro carregamos
 // e exibimos a rota original; a otimização só começa quando o motorista toca
 // em "Otimizar rota". Isso evita estados intermediários inconsistentes no mapa.
 const configImportacao=carregarConfiguracaoV9();
@@ -3261,11 +3261,13 @@ return saida;
 
 async function geometriaRotaPelasRuasV81(ordem,inicio,destino=null){
 try{
-const pernas=await consultarPernasRotaOSRMV710(ordem,inicio,destino);
-const pts=[];
-for(const perna of pernas){for(const p of perna||[]){const ult=pts[pts.length-1];if(!ult||Math.abs(ult.lat-p.lat)>1e-7||Math.abs(ult.lng-p.lng)>1e-7) pts.push(p);}}
-return simplificarPontosV81(pts,1200);
-}catch(e){console.warn('Não foi possível obter a geometria da rota pelas ruas:',e);return null;}
+const pontos=[inicio,...ordem.map(pontoGrupo),...(destino?[destino]:[])];
+const dados=await consultarGeometriaOSRMMapaLivreV11(pontos);
+if(!dados||!Array.isArray(dados.geometria)||dados.geometria.length<2) return null;
+// V11.7: não fazemos mais amostragem uniforme. Ela cortava curvas de ruas
+// em rotas longas e criava diagonais artificiais. Guardamos a geometria real.
+return dados.geometria.map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+}catch(e){console.warn('Não foi possível obter a geometria completa da rota pelas ruas:',e);return null;}
 }
 
 async function aplicarDesenhoOtimizacao(){
@@ -3623,7 +3625,7 @@ return otimizarRotaAutomaticamenteV9(cfg.destinoFinal);
 return otimizarRotaAutomaticamenteV9(null);
 }
 
-// V11.6 - otimização voltou a ser uma ação explícita do motorista.
+// V11.7 - otimização voltou a ser uma ação explícita do motorista.
 // As configurações continuam escolhendo O MODO, mas nunca disparam o cálculo
 // automaticamente durante a importação.
 async function otimizarRotaPeloBotaoV116(){
@@ -3634,10 +3636,20 @@ mostrarToast('A configuração está em “Não otimizar”. Altere em Configura
 return;
 }
 const btn=document.getElementById('btnOtimizarRotaV116');
+const sub=document.getElementById('subtituloOtimizarRotaV116');
 if(btn&&btn.disabled) return;
 if(btn) btn.disabled=true;
+if(sub) sub.textContent='Otimizando…';
+abrirOverlayOtimizacao('Iniciando otimização da rota…');
+// Garante que o overlay seja pintado antes de começar a parte pesada.
+await esperar(40);
 try{
 await executarOtimizacaoPrincipalV9();
+}catch(erro){
+console.error('[V11.7] Falha ao otimizar pelo botão:',erro);
+fecharOverlayOtimizacao();
+if(erro&&erro.message==='LOCALIZACAO_INDISPONIVEL') mostrarToast('Não consegui obter sua localização. No celular, ative o GPS e tente novamente.','alerta');
+else mostrarToast('Não consegui otimizar agora. A rota atual foi mantida.','alerta');
 }finally{
 if(btn) btn.disabled=false;
 atualizarBotaoOtimizacaoManualV116();
@@ -3980,6 +3992,32 @@ if(i<finalistas.length-1) await esperar(0);
 return melhor;
 }
 
+async function obterPontoInicialOtimizacaoV117(){
+try{
+const ponto=await obterPontoInicialOtimizacao();
+if(ponto && !ponto.manual && Number.isFinite(Number(ponto.precisao)) && Number(ponto.precisao)>1500){
+ const e=new Error('LOCALIZACAO_IMPRECISA');e.precisao=Number(ponto.precisao);throw e;
+}
+return ponto;
+}catch(erro){
+// No computador é comum não existir GPS. Para o teste da otimização não
+// ficar bloqueado, usamos a primeira parada ativa como início provisório.
+// No celular mantemos a exigência de GPS/posição real.
+const ehMovel=typeof ehDispositivoMovelV82==='function'&&ehDispositivoMovelV82();
+if(!ehMovel){
+const primeira=grupos
+ .filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g))
+ .slice()
+ .sort((a,b)=>(a.indiceImportacao??0)-(b.indiceImportacao??0))[0];
+if(primeira){
+mostrarToast('GPS indisponível no computador: usando a primeira parada como início provisório.','alerta');
+return {lat:Number(primeira.lat),lng:Number(primeira.lng),precisao:null,manual:false,fallbackPrimeiraParada:true};
+}
+}
+throw erro;
+}
+}
+
 async function otimizarRotaAutomaticamenteV9(destinoFinal=null){
 if(!grupos.length){mostrarToast('⚠️ Importe uma rota primeiro','alerta');return;}
 const ativos=grupos.filter(g=>paradaParticipaDoDesenhoV84(g)&&paradaTemCoordenadaValidaV84(g));
@@ -3996,7 +4034,7 @@ texto:destinoFinal.texto||destinoFinal.nome||destinoFinal.endereco||'Destino fin
 let inicio;
 try{
 abrirOverlayOtimizacao(destino?'Obtendo sua localização e preparando o destino final...':'Obtendo sua localização atual...');
-inicio=await obterPontoInicialOtimizacao();
+inicio=await obterPontoInicialOtimizacaoV117();
 atualizarProgressoOtimizacao(destino?'Montando matriz das ruas com o destino final...':'Montando matriz direcional das ruas...');
 const pontos=[inicio,...ativos.map(pontoGrupo),...(destino?[destino]:[])];
 const matriz=await consultarMatrizGlobalOSRM(pontos);
@@ -4819,7 +4857,7 @@ return distanciaPontos(a,b);
 async function consultarMatrizOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration,distance`;
-const resposta = await fetch(url);
+const resposta = await fetchComTimeoutV117(url,{},18000);
 if(!resposta.ok) throw new Error('OSRM_MATRIX_' + resposta.status);
 const dados = await resposta.json();
 if(!dados || !Array.isArray(dados.durations)) throw new Error('OSRM_MATRIX_INVALIDA');
@@ -4887,6 +4925,13 @@ return 0.90 * (tempo / norm.tempo) + 0.10 * (distancia / norm.distancia);
 // Consulta a matriz GLOBAL em blocos técnicos. Os blocos existem apenas para
 // respeitar o tamanho das requisições HTTP do roteador; a otimização recebe
 // no fim UMA matriz única contendo TODAS as paradas da rota.
+async function fetchComTimeoutV117(url,opcoes={},timeoutMs=18000){
+const ctrl=new AbortController();
+const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+try{return await fetch(url,{...opcoes,signal:ctrl.signal});}
+finally{clearTimeout(timer);}
+}
+
 async function consultarMatrizGlobalOSRM(pontos){
 const total = pontos.length;
 const duracoes = Array.from({length:total},()=>Array(total).fill(Infinity));
@@ -4894,6 +4939,36 @@ const distancias = Array.from({length:total},()=>Array(total).fill(Infinity));
 for(let i=0;i<total;i++){
 duracoes[i][i] = 0;
 distancias[i][i] = 0;
+}
+
+// V11.7: rotas de entrega comuns cabem em uma única tabela do OSRM. Isso
+// evita quatro ou mais chamadas consecutivas, reduzindo muito o tempo e a
+// chance de rate-limit no servidor público.
+if(total<=90){
+ const url=`https://router.project-osrm.org/table/v1/driving/${stringCoordenadas(pontos)}?annotations=duration,distance`;
+ let dados=null,ultimoErro=null;
+ for(let tentativa=0;tentativa<2&&!dados;tentativa++){
+  try{
+   atualizarProgressoOtimizacao(tentativa===0?'Calculando tempos entre todas as paradas…':'Tentando novamente o cálculo das vias…');
+   const resposta=await fetchComTimeoutV117(url,{},22000);
+   if(!resposta.ok)throw new Error('OSRM_MATRIX_GLOBAL_'+resposta.status);
+   const recebido=await resposta.json();
+   if(!recebido||!Array.isArray(recebido.durations)||recebido.durations.length!==total)throw new Error('OSRM_MATRIX_GLOBAL_INVALIDA');
+   dados=recebido;
+  }catch(erro){ultimoErro=erro;if(tentativa===0)await esperar(500);}
+ }
+ if(dados){
+  for(let i=0;i<total;i++)for(let j=0;j<total;j++){
+   const t=dados.durations&&dados.durations[i]?dados.durations[i][j]:null;
+   const d=dados.distances&&dados.distances[i]?dados.distances[i][j]:null;
+   if(Number.isFinite(t))duracoes[i][j]=t;
+   if(Number.isFinite(d))distancias[i][j]=d;
+   else if(Number.isFinite(t))distancias[i][j]=distanciaPontos(pontos[i],pontos[j]);
+  }
+  atualizarProgressoOtimizacao('Matriz viária pronta · 100%');
+  return {duracoes,distancias,provedor:'OSRM_GLOBAL'};
+ }
+ console.warn('[V11.7] Tabela única do OSRM falhou; tentando em blocos:',ultimoErro);
 }
 
 // 40 origens + 40 destinos = no máximo 80 coordenadas por chamada.
@@ -4925,7 +5000,7 @@ let dados = null;
 let ultimoErro = null;
 for(let tentativa=0; tentativa<2 && !dados; tentativa++){
 try{
-const resposta = await fetch(url);
+const resposta = await fetchComTimeoutV117(url,{},18000);
 if(!resposta.ok) throw new Error('OSRM_MATRIX_GLOBAL_' + resposta.status);
 const recebido = await resposta.json();
 if(!recebido || !Array.isArray(recebido.durations)) throw new Error('OSRM_MATRIX_GLOBAL_INVALIDA');
@@ -7006,7 +7081,7 @@ for(let base=0;base<pontos.length-1;base+=MAX-1){
 const parte=pontos.slice(base,Math.min(pontos.length,base+MAX));
 if(parte.length<2) break;
 const url=`https://router.project-osrm.org/route/v1/driving/${stringCoordenadas(parte)}?overview=false&steps=true&geometries=geojson`;
-const r=await fetch(url);if(!r.ok) throw new Error('OSRM_GEOM_'+r.status);
+const r=await fetchComTimeoutV117(url,{},18000);if(!r.ok) throw new Error('OSRM_GEOM_'+r.status);
 const d=await r.json();const rota=d.routes&&d.routes[0];if(!rota||!Array.isArray(rota.legs)) throw new Error('OSRM_GEOM_INVALIDA');
 for(const leg of rota.legs){
 const coords=[];
@@ -7076,7 +7151,7 @@ return indices.map(i=>validos[i-1]);
 async function consultarTrechoDirectionsOSRM(pontos){
 const coords = stringCoordenadas(pontos);
 const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`;
-const resposta = await fetch(url);
+const resposta = await fetchComTimeoutV117(url,{},18000);
 if(!resposta.ok) throw new Error('OSRM_ROUTE_' + resposta.status);
 const dados = await resposta.json();
 if(!dados.routes || !dados.routes[0]) throw new Error('OSRM_ROUTE_INVALIDA');
@@ -9122,7 +9197,7 @@ if(modoDesenhoRota) setTimeout(()=>atualizarDestaqueFaltantesDesenhoV82(),0);
 // elementos HTML. Isso elimina deslocamentos aparentes ao dar zoom/resize.
 // O Leaflet permanece por baixo somente como fallback e compatibilidade.
 // ======================================================================
-const MAPA_LIVRE_ESTILO_V11='https://tiles.openfreemap.org/styles/liberty';
+const MAPA_LIVRE_ESTILO_V11='https://tiles.openfreemap.org/styles/positron';
 let mapaLivreAtivoV11=false;
 let mapaLivreV11=null;
 let mapaLivreCarregadoV11=false;
@@ -9162,9 +9237,9 @@ const b=document.getElementById('mapaLivreBadgeV11');
 if(b){b.textContent=texto;b.style.display=(tipo==='erro'||tipo==='carregando')?'block':'none';}
 }
 function preencherConfigMapaLivreV11(){
-if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial detalhado');
+if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial homogêneo');
 else if(mapaLivreFalhouV11) atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial indisponível','erro');
-else atualizarStatusMapaLivreV11('MapLibre + OpenFreeMap · rede viária reforçada');
+else atualizarStatusMapaLivreV11('MapLibre + OpenFreeMap · estilo homogêneo');
 }
 function posicaoInicialMapaLivreV11(){
 if(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario))return [Number(ultimaPosicaoUsuario.lng),Number(ultimaPosicaoUsuario.lat)];
@@ -9188,56 +9263,17 @@ for(let i=0;i<=passos;i++){const brg=2*Math.PI*i/passos;const lat2=Math.asin(Mat
 return {type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[coords]}};
 }
 function homogeneizarEstiloMapaLivreV112(){
-if(!mapaLivreV11||!mapaLivreCarregadoV11||mapaLivreEstiloHomogeneizadoV112)return;
+// V11.7: não alteramos mais minzoom, maxzoom, fontes ou visibilidade das
+// camadas do estilo. Essas mudanças eram a causa de partes do mapa
+// desaparecerem/reaparecerem de forma diferente durante o zoom.
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
 mapaLivreEstiloHomogeneizadoV112=true;
-try{
- const style=mapaLivreV11.getStyle();if(!style||!Array.isArray(style.layers))return;
- let fontePadrao=null;
- for(const l of style.layers){const f=l&&l.layout&&l.layout['text-font'];if(Array.isArray(f)&&f.length&&f.every(x=>typeof x==='string')){fontePadrao=f;break;}}
- for(const l of style.layers){
-   if(!l)continue;
-   const id=String(l.id||'').toLowerCase();
-   // V11.4: o OSRM pode usar ruas locais/serviços que alguns estilos só
-   // mostram em zoom muito alto. Mantemos essas camadas visíveis mais cedo
-   // para a linha da rota nunca parecer atravessar um terreno "sem rua".
-   if(l.type==='line' && /road|street|highway|motorway|trunk|primary|secondary|tertiary|minor|residential|service|track|path|living/.test(id)){
-     try{mapaLivreV11.setLayoutProperty(l.id,'visibility','visible');}catch(e){}
-     try{
-       const minAtual=Number.isFinite(l.minzoom)?Number(l.minzoom):0;
-       const maxAtual=Number.isFinite(l.maxzoom)?Number(l.maxzoom):24;
-       mapaLivreV11.setLayerZoomRange(l.id,Math.min(minAtual,11),Math.max(maxAtual,22));
-     }catch(e){}
-     try{mapaLivreV11.setPaintProperty(l.id,'line-opacity',1);}catch(e){}
-   }
-   if(l.type!=='symbol'||!l.layout||l.layout['text-field']===undefined)continue;
-   let tamanho=11.5;
-   if(/country|state|province|city|town|village|place|settlement/.test(id))tamanho=13;
-   else if(/road|street|highway|motorway|path/.test(id))tamanho=11;
-   try{mapaLivreV11.setLayoutProperty(l.id,'text-size',tamanho);}catch(e){}
-   if(fontePadrao){try{mapaLivreV11.setLayoutProperty(l.id,'text-font',fontePadrao);}catch(e){}}
-   if(/road|street|highway|motorway|path/.test(id)){
-     try{
-       const minAtual=Number.isFinite(l.minzoom)?Number(l.minzoom):0;
-       const maxAtual=Number.isFinite(l.maxzoom)?Number(l.maxzoom):24;
-       mapaLivreV11.setLayerZoomRange(l.id,Math.min(minAtual,12),Math.max(maxAtual,22));
-     }catch(e){}
-   }
- }
-}catch(e){console.warn('[V11.5] Não foi possível homogeneizar/detalhar o mapa:',e);}
 }
 function garantirRedeViariaCompletaV114(){
-if(!mapaLivreV11||!mapaLivreCarregadoV11)return false;
-try{
- if(mapaLivreV11.getLayer(MAPA_LIVRE_LAYER_RUAS))return true;
- const style=mapaLivreV11.getStyle();if(!style||!style.sources)return false;
- const entrada=Object.entries(style.sources).find(([id,src])=>src&&src.type==='vector');if(!entrada)return false;
- const sourceId=entrada[0];
- const primeiroSimbolo=(style.layers||[]).find(l=>l&&l.type==='symbol');const antes=primeiroSimbolo?primeiroSimbolo.id:undefined;
- const filtro=['match',['get','class'],['rail','ferry','aerialway','transit'],false,true];
- mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_RUAS_CASING,type:'line',source:sourceId,'source-layer':'transportation',minzoom:10,maxzoom:22,filter:filtro,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-opacity':0.96,'line-width':['interpolate',['linear'],['zoom'],10,0.9,12,1.35,14,2.15,16,3.7,18,6.1,20,9.2]}},antes);
- mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_RUAS,type:'line',source:sourceId,'source-layer':'transportation',minzoom:10,maxzoom:22,filter:filtro,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#d6d9df','line-opacity':0.96,'line-width':['interpolate',['linear'],['zoom'],10,0.42,12,0.72,14,1.2,16,2.2,18,3.7,20,5.8]}},antes);
- return true;
-}catch(e){console.warn('[V11.5] Não foi possível reforçar a rede viária completa:',e);return false;}
+// V11.7: o estilo Positron já controla a rede viária de forma consistente.
+// Não adicionamos uma segunda rede de ruas por cima do mapa, pois isso criava
+// divergência visual entre níveis de zoom.
+return !!(mapaLivreV11&&mapaLivreCarregadoV11);
 }
 function garantirCamadaPrecisaoMapaLivreV11(){
 if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
@@ -9422,7 +9458,7 @@ for(let base=0;base<validos.length-1;base+=MAX-1){
  const parte=validos.slice(base,Math.min(validos.length,base+MAX));if(parte.length<2)break;
  const coords=parte.map(p=>`${p.lng},${p.lat}`).join(';');
  const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&steps=true&geometries=geojson`;
- const r=await fetch(url);if(!r.ok)throw new Error('OSRM_ROUTE_'+r.status);const d=await r.json();const rota=d.routes&&d.routes[0];if(!rota||!rota.geometry||!Array.isArray(rota.geometry.coordinates)||!Array.isArray(rota.legs))throw new Error('OSRM_ROUTE_INVALIDA');
+ const r=await fetchComTimeoutV117(url,{},18000);if(!r.ok)throw new Error('OSRM_ROUTE_'+r.status);const d=await r.json();const rota=d.routes&&d.routes[0];if(!rota||!rota.geometry||!Array.isArray(rota.geometry.coordinates)||!Array.isArray(rota.legs))throw new Error('OSRM_ROUTE_INVALIDA');
  const bloco=[];for(const c of rota.geometry.coordinates){if(!Array.isArray(c)||c.length<2)continue;const p={lat:Number(c[1]),lng:Number(c[0])};const last=bloco[bloco.length-1];if(!last||Math.abs(last.lat-p.lat)>1e-9||Math.abs(last.lng-p.lng)>1e-9)bloco.push(p);}if(bloco.length>1)segmentos.push(bloco);
  for(const leg of rota.legs){const pts=[];for(const st of (leg.steps||[])){const arr=st.geometry&&st.geometry.coordinates;if(Array.isArray(arr))for(const c of arr){if(!Array.isArray(c)||c.length<2)continue;const p={lat:Number(c[1]),lng:Number(c[0])};const last=pts[pts.length-1];if(!last||Math.abs(last.lat-p.lat)>1e-9||Math.abs(last.lng-p.lng)>1e-9)pts.push(p);}}if(pts.length>1)pernas.push(pts);}
  if(base+MAX-1<validos.length-1)await esperar(140);
@@ -9433,7 +9469,7 @@ return {geometria,segmentos,pernas};
 async function recalcularRotaMapaLivreV11(assinatura){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;const pontos=pontosRotaMapaLivreV11();if(pontos.length<2){limparRotaMapaLivreV11();return;}const geracao=++mapaLivreRotaGeracaoV11;
 try{const dados=await consultarGeometriaOSRMMapaLivreV11(pontos);if(geracao!==mapaLivreRotaGeracaoV11||!dados.segmentos.length)return;pernasRotaLivreV114=dados.pernas||[];desenharRotaMapaLivreV11(dados.segmentos);desenharPrioridadeCruzamentosV114(pernasRotaLivreV114);assinaturaRotaLivreV11=assinatura;}
-catch(erro){console.warn('[V11.5] OSRM indisponível; usando geometria salva sanitizada:',erro);pernasRotaLivreV114=[];if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(segmentarGeometriaSeguraV115(metaRota.geometriaRota));}
+catch(erro){console.warn('[V11.7] OSRM indisponível; usando geometria salva real:',erro);pernasRotaLivreV114=[];if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(segmentarGeometriaSeguraV115(metaRota.geometriaRota));}
 }
 function atualizarMapaLivreV11(forcarRota=false){
 if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
@@ -9466,18 +9502,18 @@ try{
   mapaLivreV11=new maplibregl.Map({container:el,style:MAPA_LIVRE_ESTILO_V11,center:posicaoInicialMapaLivreV11(),zoom:12,minZoom:3,maxZoom:20,attributionControl:true,dragRotate:false,pitchWithRotate:false,touchPitch:false,cooperativeGestures:false,fadeDuration:0,renderWorldCopies:false});
   mapaLivreV11.addControl(new maplibregl.NavigationControl({showCompass:false,showZoom:true,visualizePitch:false}),'bottom-left');
   mapaLivreV11.on('click',ev=>{if(!modoAjustePosicaoManual||!ev.lngLat)return;definirPosicaoManual({lat:ev.lngLat.lat,lng:ev.lngLat.lng});});
-  mapaLivreV11.on('zoomend',()=>{try{garantirRedeViariaCompletaV114();mapaLivreV11.resize();mapaLivreV11.triggerRepaint();}catch(e){}});
+  mapaLivreV11.on('zoomend',()=>{try{mapaLivreV11.resize();mapaLivreV11.triggerRepaint();}catch(e){}});
   mapaLivreV11.on('load',()=>{
    mapaLivreCarregadoV11=true;mapaLivreAtivoV11=true;mapaLivreFalhouV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.add('mapa-livre-ativo');el.classList.add('ativo');
    instalarResizeMapaLivreV112();homogeneizarEstiloMapaLivreV112();garantirRedeViariaCompletaV114();garantirCamadaRotaMapaLivreV11();garantirCamadaCruzamentosV114();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();agendarResizeMapaLivreV112();
-   atualizarStatusMapaLivreV11('Ativo · mapa vetorial detalhado');setTimeout(()=>{agendarResizeMapaLivreV112();atualizarMapaLivreV11(true);},0);
+   atualizarStatusMapaLivreV11('Ativo · mapa vetorial homogêneo');setTimeout(()=>{agendarResizeMapaLivreV112();atualizarMapaLivreV11(true);},0);
   });
   mapaLivreV11.on('styledata',()=>{if(mapaLivreCarregadoV11){setTimeout(()=>{homogeneizarEstiloMapaLivreV112();garantirRedeViariaCompletaV114();garantirCamadaRotaMapaLivreV11();garantirCamadaCruzamentosV114();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();atualizarMapaLivreV11(false);},0);}});
-  mapaLivreV11.on('error',ev=>{console.warn('[V11.5] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
+  mapaLivreV11.on('error',ev=>{console.warn('[V11.7] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
   setTimeout(()=>{if(!mapaLivreCarregadoV11){mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial demorou a carregar','erro');}},15000);
  }
  return true;
-}catch(erro){console.warn('[V11.5] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;}
+}catch(erro){console.warn('[V11.7] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;}
 }
 
 // ----------------------------------------------------------------------
