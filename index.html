@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V11.1</title>
+<title>Copiloto Entrega V11.2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1687,7 +1687,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 
 /* ================================================================
-   V11.1 — MapLibre + OpenFreeMap, com Leaflet como fallback
+   V11.2 — MapLibre homogêneo + pins nativos, com Leaflet como fallback
    ================================================================ */
 #mapaWrapV11{position:relative;width:100%;height:100%;overflow:hidden;background:#eef1f5;}
 #mapaWrapV11>#mapa,#mapaLivreV11{position:absolute;inset:0;width:100%;height:100%;}
@@ -1768,7 +1768,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V11.1</div>
+<div class="versao-copiloto">V11.2</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -8401,7 +8401,7 @@ console.error("Não foi possível carregar a rota salva:", erro);
 // ----------------------------------------------------------------------
 
 function inicializarMapaSeNecessario(){
-if(mapa){ iniciarMapaLivreV11(false); return; }
+if(mapa){ if(abaAtual===1) iniciarMapaLivreV11(false); return; }
 
 mapa = L.map('mapa', {
 rotate: true,        // habilita a rotação do mapa
@@ -8426,7 +8426,7 @@ definirPosicaoManual(e.latlng);
 });
 
 instalarEventosDesenhoRota();
-iniciarMapaLivreV11(false);
+if(abaAtual===1) iniciarMapaLivreV11(false);
 
 }
 
@@ -8768,6 +8768,7 @@ if(id && marcadoresLivreV11 && marcadoresLivreV11[id]){
 const elLivre=marcadoresLivreV11[id].getElement();
 if(elLivre) elLivre.classList.add('selecionado');
 }
+if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarPinsMapaLivreV11();
 
 }
 
@@ -8974,8 +8975,10 @@ if(modoDesenhoRota) setTimeout(()=>atualizarDestaqueFaltantesDesenhoV82(),0);
 
 
 // ======================================================================
-// V11.1 - MAPA LIVRE VETORIAL + ROTA REAL PELAS RUAS
-// MapLibre + OpenFreeMap na visualizacao; OSRM calcula a geometria da rota.
+// V11.2 - MAPA VETORIAL HOMOGÊNEO + ROTA REAL PELAS RUAS
+// MapLibre + OpenFreeMap na visualização; OSRM calcula a geometria da rota.
+// Nesta versão pins/GPS são camadas nativas do próprio mapa (GeoJSON), não
+// elementos HTML. Isso elimina deslocamentos aparentes ao dar zoom/resize.
 // O Leaflet permanece por baixo somente como fallback e compatibilidade.
 // ======================================================================
 const MAPA_LIVRE_ESTILO_V11='https://tiles.openfreemap.org/styles/liberty';
@@ -8983,18 +8986,28 @@ let mapaLivreAtivoV11=false;
 let mapaLivreV11=null;
 let mapaLivreCarregadoV11=false;
 let mapaLivreFalhouV11=false;
-let marcadoresLivreV11={};
+let marcadoresLivreV11={}; // compatibilidade com funções antigas; V11.2 usa camadas nativas
 let marcadorUsuarioLivreV11=null;
 let marcadorDestinoLivreV11=null;
 let assinaturaRotaLivreV11='';
 let mapaLivreRotaGeracaoV11=0;
 let mapaLivrePrimeiroEnquadramentoV11=false;
+let mapaLivreResizeObserverV112=null;
+let mapaLivreResizeRafV112=0;
+let mapaLivreEventosPinsV112=false;
+let mapaLivreEstiloHomogeneizadoV112=false;
 const MAPA_LIVRE_SOURCE_ROTA='copiloto-rota-v11';
 const MAPA_LIVRE_LAYER_ROTA_CASING='copiloto-rota-casing-v11';
 const MAPA_LIVRE_LAYER_ROTA='copiloto-rota-v11';
 const MAPA_LIVRE_SOURCE_PRECISAO='copiloto-precisao-v11';
 const MAPA_LIVRE_LAYER_PRECISAO_FILL='copiloto-precisao-fill-v11';
 const MAPA_LIVRE_LAYER_PRECISAO_LINE='copiloto-precisao-line-v11';
+const MAPA_LIVRE_SOURCE_PINS='copiloto-pins-v112';
+const MAPA_LIVRE_LAYER_PINS='copiloto-pins-v112';
+const MAPA_LIVRE_LAYER_PIN_LABELS='copiloto-pin-labels-v112';
+const MAPA_LIVRE_SOURCE_USUARIO='copiloto-usuario-v112';
+const MAPA_LIVRE_LAYER_USUARIO_HALO='copiloto-usuario-halo-v112';
+const MAPA_LIVRE_LAYER_USUARIO='copiloto-usuario-v112';
 
 function atualizarStatusMapaLivreV11(texto,tipo=''){
 const s=document.getElementById('mapaLivreStatusSettingsV11');if(s)s.textContent=texto;
@@ -9002,7 +9015,7 @@ const b=document.getElementById('mapaLivreBadgeV11');
 if(b){b.textContent=texto;b.style.display=(tipo==='erro'||tipo==='carregando')?'block':'none';}
 }
 function preencherConfigMapaLivreV11(){
-if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial gratuito');
+if(mapaLivreAtivoV11&&mapaLivreCarregadoV11) atualizarStatusMapaLivreV11('Ativo · mapa vetorial estável');
 else if(mapaLivreFalhouV11) atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial indisponível','erro');
 else atualizarStatusMapaLivreV11('MapLibre + OpenFreeMap · sem chave');
 }
@@ -9012,58 +9025,72 @@ const p=grupos.find(g=>coordenadaValida(g.lat,g.lng));if(p)return [Number(p.lng)
 return [-46.6333,-23.5505];
 }
 function removerMarcadoresMapaLivreV11(){
-Object.values(marcadoresLivreV11).forEach(m=>{try{m.remove();}catch(e){}});marcadoresLivreV11={};
-if(marcadorDestinoLivreV11){try{marcadorDestinoLivreV11.remove();}catch(e){}marcadorDestinoLivreV11=null;}
+// V11.2: os pins não são mais DOM markers. Apenas limpa o dicionário legado.
+marcadoresLivreV11={};marcadorDestinoLivreV11=null;
 }
 function criarElementoPinMapaLivreV11(rotulo,cor,classeExtra=''){
-const el=document.createElement('button');
-el.type='button';
-el.className='mapa-livre-pin-v11 '+classeExtra;
-el.style.setProperty('--pin-cor',cor);
-el.setAttribute('aria-label','Parada '+String(rotulo));
+// Mantido apenas por compatibilidade com código legado oculto.
+const el=document.createElement('button');el.type='button';el.className='mapa-livre-pin-v11 '+classeExtra;
+el.style.setProperty('--pin-cor',cor);el.setAttribute('aria-label','Parada '+String(rotulo));
 const tamanho=String(rotulo).length>=3?'8px':'10px';
-el.innerHTML=`<span class="mapa-livre-pin-corpo-v11"><span style="font-size:${tamanho}">${escaparHtmlTexto(rotulo)}</span></span>`;
-return el;
+el.innerHTML=`<span class="mapa-livre-pin-corpo-v11"><span style="font-size:${tamanho}">${escaparHtmlTexto(rotulo)}</span></span>`;return el;
 }
 function geoJsonCirculoMapaLivreV11(lat,lng,raioMetros){
 const coords=[];const passos=64;const R=6378137;const latRad=Number(lat)*Math.PI/180;const lngRad=Number(lng)*Math.PI/180;const ang=Number(raioMetros)/R;
-for(let i=0;i<=passos;i++){
-const brg=2*Math.PI*i/passos;
-const lat2=Math.asin(Math.sin(latRad)*Math.cos(ang)+Math.cos(latRad)*Math.sin(ang)*Math.cos(brg));
-const lng2=lngRad+Math.atan2(Math.sin(brg)*Math.sin(ang)*Math.cos(latRad),Math.cos(ang)-Math.sin(latRad)*Math.sin(lat2));
-coords.push([lng2*180/Math.PI,lat2*180/Math.PI]);
-}
+for(let i=0;i<=passos;i++){const brg=2*Math.PI*i/passos;const lat2=Math.asin(Math.sin(latRad)*Math.cos(ang)+Math.cos(latRad)*Math.sin(ang)*Math.cos(brg));const lng2=lngRad+Math.atan2(Math.sin(brg)*Math.sin(ang)*Math.cos(latRad),Math.cos(ang)-Math.sin(latRad)*Math.sin(lat2));coords.push([lng2*180/Math.PI,lat2*180/Math.PI]);}
 return {type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[coords]}};
+}
+function homogeneizarEstiloMapaLivreV112(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11||mapaLivreEstiloHomogeneizadoV112)return;
+mapaLivreEstiloHomogeneizadoV112=true;
+try{
+ const style=mapaLivreV11.getStyle();if(!style||!Array.isArray(style.layers))return;
+ // Evita a sensação de "outro mapa" entre zooms: os rótulos usam uma faixa
+ // tipográfica estreita e fixa por categoria. As camadas continuam aparecendo
+ // conforme o nível de detalhe, mas fonte/tamanho não dão saltos bruscos.
+ let fontePadrao=null;
+ for(const l of style.layers){const f=l&&l.layout&&l.layout['text-font'];if(Array.isArray(f)&&f.length&&f.every(x=>typeof x==='string')){fontePadrao=f;break;}}
+ for(const l of style.layers){
+   if(!l||l.type!=='symbol'||!l.layout||l.layout['text-field']===undefined)continue;
+   const id=String(l.id||'').toLowerCase();
+   let tamanho=11.5;
+   if(/country|state|province|city|town|village|place|settlement/.test(id))tamanho=13;
+   else if(/road|street|highway|motorway|path/.test(id))tamanho=11;
+   try{mapaLivreV11.setLayoutProperty(l.id,'text-size',tamanho);}catch(e){}
+   if(fontePadrao){try{mapaLivreV11.setLayoutProperty(l.id,'text-font',fontePadrao);}catch(e){}}
+ }
+}catch(e){console.warn('[V11.2] Não foi possível homogeneizar tipografia do mapa:',e);}
 }
 function garantirCamadaPrecisaoMapaLivreV11(){
 if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
-try{
-if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO)){
+try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO)){
 mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_PRECISAO,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
 mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_FILL,type:'fill',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'fill-color':'#2563eb','fill-opacity':0.08}});
 mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PRECISAO_LINE,type:'line',source:MAPA_LIVRE_SOURCE_PRECISAO,paint:{'line-color':'#2563eb','line-opacity':0.55,'line-width':1.2}});
-}
-}catch(e){console.warn('[V11.1] Falha ao criar círculo de precisão:',e);}
+}}catch(e){console.warn('[V11.2] Falha ao criar círculo de precisão:',e);}
 }
 function atualizarCirculoPrecisaoMapaLivreV11(lat,lng,precisao){
-if(!mapaLivreV11||!mapaLivreCarregadoV11)return;
-garantirCamadaPrecisaoMapaLivreV11();
-const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO);if(!src)return;
-if(Number.isFinite(Number(precisao))&&Number(precisao)>0)src.setData({type:'FeatureCollection',features:[geoJsonCirculoMapaLivreV11(Number(lat),Number(lng),Number(precisao))]});
-else src.setData({type:'FeatureCollection',features:[]});
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return;garantirCamadaPrecisaoMapaLivreV11();const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PRECISAO);if(!src)return;
+if(Number.isFinite(Number(precisao))&&Number(precisao)>0)src.setData({type:'FeatureCollection',features:[geoJsonCirculoMapaLivreV11(Number(lat),Number(lng),Number(precisao))]});else src.setData({type:'FeatureCollection',features:[]});
+}
+function garantirCamadasUsuarioMapaLivreV112(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return false;
+try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_USUARIO)){
+ mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_USUARIO,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+ mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_USUARIO_HALO,type:'circle',source:MAPA_LIVRE_SOURCE_USUARIO,paint:{'circle-radius':11,'circle-color':'rgba(37,99,235,.24)','circle-blur':0.1}});
+ mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_USUARIO,type:'circle',source:MAPA_LIVRE_SOURCE_USUARIO,paint:{'circle-radius':7,'circle-color':'#2563eb','circle-stroke-color':'#ffffff','circle-stroke-width':3}});
+}return true;}catch(e){console.warn('[V11.2] Falha ao criar marcador GPS nativo:',e);return false;}
 }
 function criarOuAtualizarMarcadorUsuarioLivreV11(lat,lng,precisao,centralizar){
-if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!window.maplibregl)return;
-const pos=[Number(lng),Number(lat)];
-if(!marcadorUsuarioLivreV11){
-const el=document.createElement('div');el.className='mapa-livre-usuario-v11';el.innerHTML='<span></span>';
-marcadorUsuarioLivreV11=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(pos).addTo(mapaLivreV11);
-}else marcadorUsuarioLivreV11.setLngLat(pos);
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
+if(garantirCamadasUsuarioMapaLivreV112()){
+ const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_USUARIO);if(src)src.setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:[Number(lng),Number(lat)]}}]});
+}
 atualizarCirculoPrecisaoMapaLivreV11(lat,lng,precisao);
-if(centralizar)mapaLivreV11.easeTo({center:pos,zoom:Math.max(mapaLivreV11.getZoom()||12,17),duration:420});
+if(centralizar)mapaLivreV11.easeTo({center:[Number(lng),Number(lat)],zoom:Math.max(mapaLivreV11.getZoom()||12,17),duration:350});
 }
 function centralizarMapaLivreV11(lat,lng,zoom=17){
-if(mapaLivreAtivoV11&&mapaLivreV11&&mapaLivreCarregadoV11)mapaLivreV11.easeTo({center:[Number(lng),Number(lat)],zoom:Math.max(mapaLivreV11.getZoom()||12,zoom),duration:420});
+if(mapaLivreAtivoV11&&mapaLivreV11&&mapaLivreCarregadoV11)mapaLivreV11.easeTo({center:[Number(lng),Number(lat)],zoom:Math.max(mapaLivreV11.getZoom()||12,zoom),duration:350});
 }
 function assinaturaRotaAtualMapaLivreV11(){
 const pts=[];
@@ -9074,114 +9101,106 @@ if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))pts.push(
 return pts.join('|')+'|'+String(metaRota&&metaRota.atualizadoEm||'');
 }
 function pontosRotaMapaLivreV11(){
-const out=[];
-const inicio=(metaRota&&metaRota.inicioRota&&pontoValido(metaRota.inicioRota))?metaRota.inicioRota:(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario)?ultimaPosicaoUsuario:null);
-if(inicio)out.push({lat:Number(inicio.lat),lng:Number(inicio.lng)});
-for(const g of grupos){if(coordenadaValida(g.lat,g.lng))out.push({lat:Number(g.lat),lng:Number(g.lng)});}
-if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))out.push({lat:Number(metaRota.destinoFinal.lat),lng:Number(metaRota.destinoFinal.lng)});
-return out;
+const out=[];const inicio=(metaRota&&metaRota.inicioRota&&pontoValido(metaRota.inicioRota))?metaRota.inicioRota:(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario)?ultimaPosicaoUsuario:null);
+if(inicio)out.push({lat:Number(inicio.lat),lng:Number(inicio.lng)});for(const g of grupos){if(coordenadaValida(g.lat,g.lng))out.push({lat:Number(g.lat),lng:Number(g.lng)});}if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))out.push({lat:Number(metaRota.destinoFinal.lat),lng:Number(metaRota.destinoFinal.lng)});return out;
 }
 function garantirCamadaRotaMapaLivreV11(){
 if(!mapaLivreV11||!mapaLivreCarregadoV11)return false;
-try{
-if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA)){
-mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_ROTA,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA_CASING,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-opacity':0.98,'line-width':9}});
-mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#003CBD','line-opacity':1,'line-width':5.5}});
-}
-return true;
-}catch(e){console.warn('[V11.1] Falha ao criar camada de rota:',e);return false;}
+try{if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA)){
+ mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_ROTA,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+ const antes=mapaLivreV11.getLayer(MAPA_LIVRE_LAYER_PINS)?MAPA_LIVRE_LAYER_PINS:undefined;
+ mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA_CASING,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-opacity':0.96,'line-width':8}},antes);
+ mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_ROTA,type:'line',source:MAPA_LIVRE_SOURCE_ROTA,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#003CBD','line-opacity':1,'line-width':5}},antes);
+}return true;}catch(e){console.warn('[V11.2] Falha ao criar camada de rota:',e);return false;}
 }
 function desenharRotaMapaLivreV11(pontos){
-if(!Array.isArray(pontos)||pontos.length<2||!garantirCamadaRotaMapaLivreV11())return;
-const coords=pontos.filter(p=>pontoValido(p)).map(p=>[Number(p.lng),Number(p.lat)]);if(coords.length<2)return;
-const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords}});
+if(!Array.isArray(pontos)||pontos.length<2||!garantirCamadaRotaMapaLivreV11())return;const coords=pontos.filter(p=>pontoValido(p)).map(p=>[Number(p.lng),Number(p.lat)]);if(coords.length<2)return;const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords}});
 }
-function limparRotaMapaLivreV11(){
-if(!mapaLivreV11||!mapaLivreCarregadoV11)return;try{const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'FeatureCollection',features:[]});}catch(e){}
+function limparRotaMapaLivreV11(){if(!mapaLivreV11||!mapaLivreCarregadoV11)return;try{const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_ROTA);if(src)src.setData({type:'FeatureCollection',features:[]});}catch(e){}}
+function garantirCamadasPinsMapaLivreV112(){
+if(!mapaLivreV11||!mapaLivreCarregadoV11)return false;
+try{
+ if(!mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PINS))mapaLivreV11.addSource(MAPA_LIVRE_SOURCE_PINS,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+ if(!mapaLivreV11.getLayer(MAPA_LIVRE_LAYER_PINS))mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PINS,type:'circle',source:MAPA_LIVRE_SOURCE_PINS,paint:{
+  'circle-radius':['case',['==',['get','tipo'],'destino'],14,['boolean',['get','selecionado'],false],14,12],
+  'circle-color':['get','cor'],'circle-stroke-color':['case',['boolean',['get','selecionado'],false],'#9DB7FF','#ffffff'],
+  'circle-stroke-width':['case',['boolean',['get','selecionado'],false],4,2],
+  'circle-opacity':1
+ }});
+ if(!mapaLivreV11.getLayer(MAPA_LIVRE_LAYER_PIN_LABELS))mapaLivreV11.addLayer({id:MAPA_LIVRE_LAYER_PIN_LABELS,type:'symbol',source:MAPA_LIVRE_SOURCE_PINS,layout:{
+  'text-field':['get','rotulo'],'text-size':10,'text-font':['Noto Sans Regular'],'text-anchor':'center','text-allow-overlap':true,'text-ignore-placement':true
+ },paint:{'text-color':'#ffffff','text-halo-color':'rgba(0,0,0,0)','text-halo-width':0}});
+ if(!mapaLivreEventosPinsV112){
+  mapaLivreEventosPinsV112=true;
+  mapaLivreV11.on('click',MAPA_LIVRE_LAYER_PINS,ev=>{const f=ev.features&&ev.features[0];const id=f&&f.properties&&f.properties.id;if(id&&id!=='__destino__')abrirInfoMapa(String(id));});
+  mapaLivreV11.on('mouseenter',MAPA_LIVRE_LAYER_PINS,()=>{try{mapaLivreV11.getCanvas().style.cursor='pointer';}catch(e){}});
+  mapaLivreV11.on('mouseleave',MAPA_LIVRE_LAYER_PINS,()=>{try{mapaLivreV11.getCanvas().style.cursor='';}catch(e){}});
+ }
+ return true;
+}catch(e){console.warn('[V11.2] Falha ao criar pins nativos:',e);return false;}
+}
+function atualizarPinsMapaLivreV11(){
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!garantirCamadasPinsMapaLivreV112())return;
+const features=[];
+for(const grupo of grupos){
+ if(!coordenadaValida(grupo.lat,grupo.lng))continue;const status=statusEfetivoGrupo(grupo);if(ocultarEntreguesMapa&&status==='entregue')continue;
+ const rotulo=temOrdemOtimizada(grupo)?grupo.ordemOtimizada:(ehStopValido(grupo.stop)?grupo.stop:'•');
+ features.push({type:'Feature',properties:{id:String(grupo.id),rotulo:String(rotulo),cor:corPorStatus(status),tipo:'parada',selecionado:String(grupo.id)===String(marcadorSelecionadoId||'')},geometry:{type:'Point',coordinates:[Number(grupo.lng),Number(grupo.lat)]}});
+}
+if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal))features.push({type:'Feature',properties:{id:'__destino__',rotulo:'◆',cor:'#111827',tipo:'destino',selecionado:false},geometry:{type:'Point',coordinates:[Number(metaRota.destinoFinal.lng),Number(metaRota.destinoFinal.lat)]}});
+const src=mapaLivreV11.getSource(MAPA_LIVRE_SOURCE_PINS);if(src)src.setData({type:'FeatureCollection',features});
 }
 async function consultarGeometriaOSRMMapaLivreV11(pontos){
-const validos=(pontos||[]).filter(p=>pontoValido(p)).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
-if(validos.length<2)return [];
-const geometria=[];const MAX=25;
-for(let base=0;base<validos.length-1;base+=MAX-1){
-const parte=validos.slice(base,Math.min(validos.length,base+MAX));if(parte.length<2)break;
-const coords=parte.map(p=>`${p.lng},${p.lat}`).join(';');
-const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&steps=false&geometries=geojson`;
-const r=await fetch(url);if(!r.ok)throw new Error('OSRM_ROUTE_'+r.status);
-const d=await r.json();const rota=d.routes&&d.routes[0];const arr=rota&&rota.geometry&&rota.geometry.coordinates;
-if(!Array.isArray(arr)||arr.length<2)throw new Error('OSRM_ROUTE_INVALIDA');
-arr.forEach((c,idx)=>{if(geometria.length&&idx===0)return;if(Array.isArray(c)&&c.length>=2)geometria.push({lat:Number(c[1]),lng:Number(c[0])});});
-if(base+MAX-1<validos.length-1)await esperar(140);
-}
-return geometria;
+const validos=(pontos||[]).filter(p=>pontoValido(p)).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));if(validos.length<2)return [];
+const geometria=[];const MAX=25;for(let base=0;base<validos.length-1;base+=MAX-1){const parte=validos.slice(base,Math.min(validos.length,base+MAX));if(parte.length<2)break;const coords=parte.map(p=>`${p.lng},${p.lat}`).join(';');const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&steps=false&geometries=geojson`;const r=await fetch(url);if(!r.ok)throw new Error('OSRM_ROUTE_'+r.status);const d=await r.json();const rota=d.routes&&d.routes[0];const arr=rota&&rota.geometry&&rota.geometry.coordinates;if(!Array.isArray(arr)||arr.length<2)throw new Error('OSRM_ROUTE_INVALIDA');arr.forEach((c,idx)=>{if(geometria.length&&idx===0)return;if(Array.isArray(c)&&c.length>=2)geometria.push({lat:Number(c[1]),lng:Number(c[0])});});if(base+MAX-1<validos.length-1)await esperar(140);}return geometria;
 }
 async function recalcularRotaMapaLivreV11(assinatura){
-if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
-const pontos=pontosRotaMapaLivreV11();if(pontos.length<2){limparRotaMapaLivreV11();return;}
-const geracao=++mapaLivreRotaGeracaoV11;
-try{
-const geometria=await consultarGeometriaOSRMMapaLivreV11(pontos);
-if(geracao!==mapaLivreRotaGeracaoV11||!geometria.length)return;
-desenharRotaMapaLivreV11(geometria);assinaturaRotaLivreV11=assinatura;
-}catch(erro){
-console.warn('[V11.1] OSRM indisponível; mantendo geometria salva/fallback:',erro);
-if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);
-}
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;const pontos=pontosRotaMapaLivreV11();if(pontos.length<2){limparRotaMapaLivreV11();return;}const geracao=++mapaLivreRotaGeracaoV11;
+try{const geometria=await consultarGeometriaOSRMMapaLivreV11(pontos);if(geracao!==mapaLivreRotaGeracaoV11||!geometria.length)return;desenharRotaMapaLivreV11(geometria);assinaturaRotaLivreV11=assinatura;}catch(erro){console.warn('[V11.2] OSRM indisponível; mantendo geometria salva/fallback:',erro);if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);}
 }
 function atualizarMapaLivreV11(forcarRota=false){
-if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11||!window.maplibregl)return;
-removerMarcadoresMapaLivreV11();
+if(!mapaLivreAtivoV11||!mapaLivreV11||!mapaLivreCarregadoV11)return;
+atualizarPinsMapaLivreV11();
 const bounds=new maplibregl.LngLatBounds();let temPonto=false;
-for(const grupo of grupos){
-if(!coordenadaValida(grupo.lat,grupo.lng))continue;
-const status=statusEfetivoGrupo(grupo);if(ocultarEntreguesMapa&&status==='entregue')continue;
-const lat=Number(grupo.lat),lng=Number(grupo.lng);const rotulo=temOrdemOtimizada(grupo)?grupo.ordemOtimizada:(ehStopValido(grupo.stop)?grupo.stop:'•');
-const el=criarElementoPinMapaLivreV11(rotulo,corPorStatus(status));el.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();abrirInfoMapa(grupo.id);});
-marcadoresLivreV11[grupo.id]=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([lng,lat]).addTo(mapaLivreV11);
-bounds.extend([lng,lat]);temPonto=true;
-}
-if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal)){
-const p=[Number(metaRota.destinoFinal.lng),Number(metaRota.destinoFinal.lat)];const el=criarElementoPinMapaLivreV11('◆','#111827','destino');el.setAttribute('aria-label','Destino final');
-marcadorDestinoLivreV11=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(p).addTo(mapaLivreV11);bounds.extend(p);temPonto=true;
-}
-if(!mapaLivrePrimeiroEnquadramentoV11&&temPonto){
-try{mapaLivreV11.fitBounds(bounds,{padding:{top:72,right:54,bottom:112,left:54},maxZoom:16.5,duration:0});mapaLivrePrimeiroEnquadramentoV11=true;}catch(e){}
-}
+for(const grupo of grupos){if(!coordenadaValida(grupo.lat,grupo.lng))continue;const status=statusEfetivoGrupo(grupo);if(ocultarEntreguesMapa&&status==='entregue')continue;bounds.extend([Number(grupo.lng),Number(grupo.lat)]);temPonto=true;}
+if(metaRota&&metaRota.destinoFinal&&pontoValido(metaRota.destinoFinal)){bounds.extend([Number(metaRota.destinoFinal.lng),Number(metaRota.destinoFinal.lat)]);temPonto=true;}
+if(!mapaLivrePrimeiroEnquadramentoV11&&temPonto){try{mapaLivreV11.fitBounds(bounds,{padding:{top:72,right:54,bottom:112,left:54},maxZoom:16.5,duration:0});mapaLivrePrimeiroEnquadramentoV11=true;}catch(e){}}
 if(ultimaPosicaoUsuario&&pontoValido(ultimaPosicaoUsuario))criarOuAtualizarMarcadorUsuarioLivreV11(Number(ultimaPosicaoUsuario.lat),Number(ultimaPosicaoUsuario.lng),precisaoLocalizacaoMetros,false);
-const assinatura=assinaturaRotaAtualMapaLivreV11();
-if(forcarRota||assinatura!==assinaturaRotaLivreV11){
-if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);else limparRotaMapaLivreV11();
-recalcularRotaMapaLivreV11(assinatura);
+const assinatura=assinaturaRotaAtualMapaLivreV11();if(forcarRota||assinatura!==assinaturaRotaLivreV11){if(metaRota&&Array.isArray(metaRota.geometriaRota)&&metaRota.geometriaRota.length>1)desenharRotaMapaLivreV11(metaRota.geometriaRota);else limparRotaMapaLivreV11();recalcularRotaMapaLivreV11(assinatura);}
 }
+function agendarResizeMapaLivreV112(){
+if(!mapaLivreV11)return;cancelAnimationFrame(mapaLivreResizeRafV112);mapaLivreResizeRafV112=requestAnimationFrame(()=>{try{mapaLivreV11.resize();}catch(e){}});
+}
+function instalarResizeMapaLivreV112(){
+const wrap=document.getElementById('mapaWrapV11');if(!wrap)return;
+try{if(mapaLivreResizeObserverV112)mapaLivreResizeObserverV112.disconnect();mapaLivreResizeObserverV112=new ResizeObserver(()=>agendarResizeMapaLivreV112());mapaLivreResizeObserverV112.observe(wrap);}catch(e){}
+if(!window.__copilotoResizeMapaV112){window.__copilotoResizeMapaV112=true;window.addEventListener('resize',agendarResizeMapaLivreV112,{passive:true});window.addEventListener('orientationchange',()=>setTimeout(agendarResizeMapaLivreV112,120),{passive:true});}
 }
 async function iniciarMapaLivreV11(forcar=false){
-preencherConfigMapaLivreV11();
-if(mapaLivreAtivoV11&&mapaLivreV11&&!forcar)return true;
-if(!window.maplibregl){mapaLivreFalhouV11=true;atualizarStatusMapaLivreV11('Fallback ativo · MapLibre não carregou','erro');return false;}
+preencherConfigMapaLivreV11();if(mapaLivreAtivoV11&&mapaLivreV11&&!forcar){agendarResizeMapaLivreV112();return true;}if(!window.maplibregl){mapaLivreFalhouV11=true;atualizarStatusMapaLivreV11('Fallback ativo · MapLibre não carregou','erro');return false;}
 const el=document.getElementById('mapaLivreV11');if(!el)return false;
+// Não inicializa enquanto a aba estiver invisível/sem tamanho. Esse era o
+// principal gatilho de projeções erradas depois de abrir/fechar a aba.
+const rect=el.getBoundingClientRect();if((rect.width<20||rect.height<20)&&abaAtual!==1)return false;
 try{
-mapaLivreFalhouV11=false;atualizarStatusMapaLivreV11('Carregando mapa vetorial…','carregando');
-if(mapaLivreV11&&forcar){try{mapaLivreV11.remove();}catch(e){}mapaLivreV11=null;mapaLivreCarregadoV11=false;}
-if(!mapaLivreV11){
-mapaLivreV11=new maplibregl.Map({container:el,style:MAPA_LIVRE_ESTILO_V11,center:posicaoInicialMapaLivreV11(),zoom:12,minZoom:3,maxZoom:20,attributionControl:true,dragRotate:false,pitchWithRotate:false,touchPitch:false,cooperativeGestures:false});
-mapaLivreV11.addControl(new maplibregl.NavigationControl({showCompass:false,showZoom:true,visualizePitch:false}),'bottom-left');
-mapaLivreV11.on('click',ev=>{if(!modoAjustePosicaoManual||!ev.lngLat)return;definirPosicaoManual({lat:ev.lngLat.lat,lng:ev.lngLat.lng});});
-mapaLivreV11.on('load',()=>{
-mapaLivreCarregadoV11=true;mapaLivreAtivoV11=true;mapaLivreFalhouV11=false;
-const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.add('mapa-livre-ativo');el.classList.add('ativo');
-atualizarStatusMapaLivreV11('Ativo · mapa vetorial gratuito');
-atualizarMapaLivreV11(true);
-});
-mapaLivreV11.on('error',ev=>{console.warn('[V11.1] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
-setTimeout(()=>{if(!mapaLivreCarregadoV11){mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial demorou a carregar','erro');}},15000);
+ mapaLivreFalhouV11=false;atualizarStatusMapaLivreV11('Carregando mapa vetorial…','carregando');
+ if(mapaLivreV11&&forcar){try{mapaLivreV11.remove();}catch(e){}mapaLivreV11=null;mapaLivreCarregadoV11=false;mapaLivreEventosPinsV112=false;mapaLivreEstiloHomogeneizadoV112=false;mapaLivrePrimeiroEnquadramentoV11=false;}
+ if(!mapaLivreV11){
+  mapaLivreV11=new maplibregl.Map({container:el,style:MAPA_LIVRE_ESTILO_V11,center:posicaoInicialMapaLivreV11(),zoom:12,minZoom:3,maxZoom:20,attributionControl:true,dragRotate:false,pitchWithRotate:false,touchPitch:false,cooperativeGestures:false,fadeDuration:0,renderWorldCopies:false});
+  mapaLivreV11.addControl(new maplibregl.NavigationControl({showCompass:false,showZoom:true,visualizePitch:false}),'bottom-left');
+  mapaLivreV11.on('click',ev=>{if(!modoAjustePosicaoManual||!ev.lngLat)return;definirPosicaoManual({lat:ev.lngLat.lat,lng:ev.lngLat.lng});});
+  mapaLivreV11.on('load',()=>{
+   mapaLivreCarregadoV11=true;mapaLivreAtivoV11=true;mapaLivreFalhouV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.add('mapa-livre-ativo');el.classList.add('ativo');
+   instalarResizeMapaLivreV112();homogeneizarEstiloMapaLivreV112();garantirCamadaRotaMapaLivreV11();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();agendarResizeMapaLivreV112();
+   atualizarStatusMapaLivreV11('Ativo · mapa vetorial estável');setTimeout(()=>{agendarResizeMapaLivreV112();atualizarMapaLivreV11(true);},0);
+  });
+  mapaLivreV11.on('styledata',()=>{if(mapaLivreCarregadoV11){setTimeout(()=>{homogeneizarEstiloMapaLivreV112();garantirCamadaRotaMapaLivreV11();garantirCamadasPinsMapaLivreV112();garantirCamadasUsuarioMapaLivreV112();atualizarMapaLivreV11(false);},0);}});
+  mapaLivreV11.on('error',ev=>{console.warn('[V11.2] Erro no mapa vetorial:',ev&&ev.error?ev.error:ev);});
+  setTimeout(()=>{if(!mapaLivreCarregadoV11){mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · mapa vetorial demorou a carregar','erro');}},15000);
+ }
+ return true;
+}catch(erro){console.warn('[V11.2] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;}
 }
-return true;
-}catch(erro){
-console.warn('[V11.1] Mapa livre não pôde ser ativado:',erro);mapaLivreFalhouV11=true;mapaLivreAtivoV11=false;const wrap=document.getElementById('mapaWrapV11');if(wrap)wrap.classList.remove('mapa-livre-ativo');el.classList.remove('ativo');atualizarStatusMapaLivreV11('Fallback ativo · usando mapa compatível','erro');return false;
-}
-}
-
 
 // ----------------------------------------------------------------------
 // V10.1 - PREFERÊNCIAS DO APP
@@ -9272,6 +9291,7 @@ document.getElementById(idBtn).classList.toggle('ativa', i === indice);
 // tamanho (necessário porque ele estava com display:none)
 if(indice === 1){
 inicializarMapaSeNecessario();
+iniciarMapaLivreV11(false);
 iniciarGestosSheetListaMapa();
 iniciarRastreamentoLocalizacao();
 if(ehLayoutMobileV10()) definirSheetListaMapa(false);
@@ -9407,7 +9427,7 @@ carregarStorage();
 configurarControlesPorDispositivoV82();
 carregarPreferenciasV10();
 preencherConfigMapaLivreV11();
-iniciarMapaLivreV11(false);
+// O mapa vetorial é inicializado apenas quando a aba Mapa fica visível.
 
 // V7.1 é focada no celular: começa a pedir/acompanhar o GPS já ao abrir o
 // Copiloto, para a otimização ter um ponto inicial pronto antes da importação.
