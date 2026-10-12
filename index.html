@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V10.5</title>
+<title>Copiloto Entrega V10.6</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1740,7 +1740,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V10.5</div>
+<div class="versao-copiloto">V10.6</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -2255,13 +2255,12 @@ item["Customer Name"] ||
 item["Buyer Name"] ||
 "";
 
-const lat =
-item["Latitude"] ||
-"";
-
-const lng =
-item["Longitude"] ||
-"";
+// V10.6 - Para rotas Shopee, latitude/longitude são sempre a fonte
+// primária da posição. O número do imóvel vem do endereço informado
+// pelo destinatário e nunca é substituído por um número inferido do mapa.
+const lat = normalizarCoordenadaImportada(item["Latitude"]);
+const lng = normalizarCoordenadaImportada(item["Longitude"]);
+const numeroImovelInformado = extrairNumeroImovelInformado(endereco);
 
 const stopOriginal =
 item["Stop"] ||
@@ -2294,6 +2293,8 @@ id: chaveBalde + "#" + (baldes[chaveBalde].length + 1),
 endereco:endereco,
 lat:lat,
 lng:lng,
+numeroImovelInformado:numeroImovelInformado,
+fonteLocalizacao:coordenadaValida(lat,lng) ? 'coordenadas_shopee' : 'endereco_fallback',
 stop:paradaBase,
 stopOriginal:paradaBase,
 ordemOtimizada:null,
@@ -2324,6 +2325,7 @@ cluster.grupo.pacotes.push({
 
 codigo:codigo,
 endereco:endereco,
+numeroImovelInformado:numeroImovelInformado,
 stop:stopTexto,
 destinatario:destinatario,
 status:'pendente',
@@ -2395,16 +2397,45 @@ await executarOtimizacaoPrincipalV9();
 }
 
 // ----------------------------------------------------------------------
-// CORREÇÃO DE COORDENADAS AUSENTES/ERRADAS A PARTIR DO ENDEREÇO
-// Só entra em ação quando a Latitude/Longitude da planilha está vazia
-// ou claramente fora do Brasil - não mexe em coordenadas que já parecem
-// corretas, pra não gastar tempo/cota à toa.
+// PRIORIDADE DE LOCALIZAÇÃO SHOPEE (V10.6)
+// 1) Latitude/Longitude da planilha definem a posição do pin.
+// 2) O número do imóvel vem do endereço informado pelo destinatário.
+// 3) Só quando a coordenada está ausente/inválida usamos o endereço como fallback.
+// Nunca substituímos uma coordenada válida apenas porque um geocodificador
+// retornou outro número de imóvel.
 // ----------------------------------------------------------------------
 
+// V10.6 - aceita coordenadas numéricas da planilha e também valores
+// textuais com vírgula decimal, sem transformar vazio em zero.
+function normalizarCoordenadaImportada(valor){
+if(valor === null || valor === undefined) return '';
+let texto = String(valor).trim();
+if(!texto) return '';
+if(texto.includes(',') && !texto.includes('.')) texto = texto.replace(',', '.');
+const numero = Number(texto);
+return Number.isFinite(numero) ? numero : '';
+}
+
+// O número usado operacionalmente vem SEMPRE do endereço informado
+// pelo destinatário. Coordenadas definem a posição; este número define
+// qual imóvel procurar naquele ponto.
+function extrairNumeroImovelInformado(endereco){
+const texto = normalizarTexto(String(endereco || ''));
+if(!texto) return null;
+
+// Usa a mesma leitura estrutural de rua+número, que ignora números de
+// apartamento/bloco e identificadores como BR-101, SC-401, KM e CEP.
+const info = extrairRuaENumero(texto);
+return info && info.numero ? String(info.numero) : null;
+}
+
 function coordenadaValida(lat, lng){
-const latN = parseFloat(lat);
-const lngN = parseFloat(lng);
-if(isNaN(latN) || isNaN(lngN)) return false;
+const latNormalizada = normalizarCoordenadaImportada(lat);
+const lngNormalizada = normalizarCoordenadaImportada(lng);
+if(latNormalizada === '' || lngNormalizada === '') return false;
+const latN = Number(latNormalizada);
+const lngN = Number(lngNormalizada);
+if(!Number.isFinite(latN) || !Number.isFinite(lngN)) return false;
 if(latN === 0 && lngN === 0) return false;
 // faixa aproximada do território brasileiro
 if(latN > 6 || latN < -34 || lngN > -30 || lngN < -75) return false;
@@ -2516,6 +2547,8 @@ const resultado = await geocodificarEndereco(montarConsultaEndereco(grupo));
 if(resultado){
 grupo.lat = resultado.lat;
 grupo.lng = resultado.lng;
+grupo.fonteLocalizacao = 'endereco_fallback';
+if(!grupo.numeroImovelInformado) grupo.numeroImovelInformado = extrairNumeroImovelInformado(grupo.endereco);
 corrigidas++;
 }
 
@@ -4345,10 +4378,7 @@ return distanciaMetros(Number(a.lat), Number(a.lng), Number(b.lat), Number(b.lng
 }
 
 function gruposComCoordenadaValida(){
-return grupos.filter(g => {
-const p = pontoGrupo(g);
-return pontoValido(p);
-});
+return grupos.filter(g => coordenadaValida(g.lat, g.lng));
 }
 
 async function obterPontoInicialOtimizacao(){
@@ -7422,6 +7452,26 @@ posicoes.push({ inicio: inicioValor, fim: inicioValor + m[1].length });
 return posicoes;
 }
 
+// Números que aparecem no endereço mas NÃO representam o imóvel:
+// apartamento/bloco/unidade, código de rodovia (BR-101/SC-401), KM e CEP.
+function posicoesDeNumeroNaoImovel(enderecoNormalizado){
+const posicoes = [...posicoesDeNumeroDeUnidade(enderecoNormalizado)];
+const regexes = [
+/\b(?:br|sc|sp|rj|mg|pr|rs|ba|pe|ce|go|df|es|ms|mt|pa|pb|rn|al|se|pi|ma|to|ro|rr|ap|ac)[\s-]*(\d{1,4})\b/gi,
+/\bkm\.?\s*(\d+(?:[.,]\d+)?)\b/gi,
+/\bcep\s*[:.-]?\s*(\d{5}-?\d{3})\b/gi
+];
+for(const regex of regexes){
+let m;
+while((m = regex.exec(enderecoNormalizado)) !== null){
+const valor = m[1];
+const inicio = m.index + m[0].lastIndexOf(valor);
+posicoes.push({inicio, fim: inicio + valor.length});
+}
+}
+return posicoes;
+}
+
 // Acha o nome da rua e o número da casa/prédio juntos: o número da casa
 // é o primeiro número "livre" do endereço (que não faz parte de um
 // "apto X"/"bloco Y"), esteja ele separado por vírgula ou não
@@ -7434,32 +7484,39 @@ function extrairRuaENumero(enderecoNormalizado){
 enderecoNormalizado = normalizarTexto(expandirAbreviacaoLogradouro(enderecoNormalizado));
 
 const numeroRegex = /\d+/g;
-const posicoesUnidade = posicoesDeNumeroDeUnidade(enderecoNormalizado);
+const posicoesIgnoradas = posicoesDeNumeroNaoImovel(enderecoNormalizado);
+const candidatos = [];
 let m;
 
 while((m = numeroRegex.exec(enderecoNormalizado)) !== null){
-
-const dentroDeUnidade = posicoesUnidade.some(
+const ignorarNumero = posicoesIgnoradas.some(
 p => m.index >= p.inicio && m.index < p.fim
 );
+const pareceCep = m[0].length >= 7;
+if(ignorarNumero || pareceCep) continue;
 
-if(!dentroDeUnidade){
+// Número logo após uma vírgula é o padrão mais confiável de número do
+// imóvel: "Rua 7 de Setembro, 123". Isso evita confundir o "7" do nome
+// da rua com o número da casa.
+const prefixo = enderecoNormalizado.slice(0, m.index);
+const ultimaVirgula = prefixo.lastIndexOf(',');
+const aposVirgula = ultimaVirgula >= 0 && prefixo.slice(ultimaVirgula + 1).trim() === '';
+candidatos.push({index:m.index, numero:m[0], aposVirgula});
+}
+
+if(candidatos.length === 0) return { rua:null, numero:null };
+
+// Prioriza o primeiro número explicitamente separado por vírgula.
+// Sem vírgula, usa o último número livre: "Rua 7 de Setembro 123" -> 123.
+const escolhido = candidatos.find(c => c.aposVirgula) || candidatos[candidatos.length - 1];
 
 let rua = enderecoNormalizado
-.slice(0, m.index)
-.replace(/,\s*$/, "")
+.slice(0, escolhido.index)
+.replace(/,\s*$/, '')
 .trim();
 
 rua = normalizarTexto(expandirAbreviacaoLogradouro(rua)).trim();
-
-return { rua: rua || null, numero: m[0] };
-
-}
-
-}
-
-return { rua: null, numero: null };
-
+return { rua: rua || null, numero: escolhido.numero };
 }
 
 // Distância real em metros entre duas coordenadas (fórmula de Haversine)
@@ -8798,9 +8855,9 @@ const pontosValidos = [];
 
 grupos.forEach(grupo=>{
 
-const lat = parseFloat(grupo.lat);
-const lng = parseFloat(grupo.lng);
-if(isNaN(lat) || isNaN(lng)) return;
+if(!coordenadaValida(grupo.lat, grupo.lng)) return;
+const lat = Number(normalizarCoordenadaImportada(grupo.lat));
+const lng = Number(normalizarCoordenadaImportada(grupo.lng));
 
 const statusGrupo = statusEfetivoGrupo(grupo);
 
