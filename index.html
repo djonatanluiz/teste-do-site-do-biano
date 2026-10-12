@@ -11940,7 +11940,7 @@ function addBase(map){
  const message=text=>{box.hidden=false;box.replaceChildren(document.createTextNode(text));const b=document.createElement('button');b.textContent='Tentar carregar novamente';b.onclick=()=>{if(gl)gl.setStyle(JSON.parse(JSON.stringify(CE12_STYLE)));else start();};box.append(b);};
  function start(){
   if(disposed)return;
-  if(!window.maplibregl?.supported()){message('Este navegador não oferece o recurso gráfico necessário ao mapa. Abra em um navegador atualizado.');return;}
+  if(typeof window.maplibregl?.Map!=='function'){message('A biblioteca do mapa não carregou. Abra em um navegador atualizado.');return;}
   try{
    if(layer&&map.hasLayer(layer))map.removeLayer(layer);
    layer=L.maplibreGL({style:JSON.parse(JSON.stringify(CE12_STYLE)),padding:.3,updateInterval:16,attributionControl:false,maxZoom:20,minZoom:1,renderWorldCopies:false}).addTo(map);
