@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V12.1</title>
+<title>Copiloto Entrega V13</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3734,7 +3734,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V12.1</div>
+<div class="versao-copiloto">V13</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -3816,7 +3816,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <section class="settings-card">
 <button class="settings-row settings-row-button" onclick="abrirConfiguracaoV9()">
 <div class="settings-row-icon"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
-<div class="settings-row-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Scanner por regiões</span></div>
+<div class="settings-row-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Concluir ruas e bairros</span></div>
 <svg class="ui-icon settings-arrow"><use href="#icon-chevron-up"></use></svg>
 </button>
 </section>
@@ -3867,12 +3867,12 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 
 <button class="otimizacao-opcao" id="opcaoV9Padrao" onclick="selecionarConfiguracaoV9Padrao()">
 <div class="icone-opcao"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
-<div><div class="titulo-opcao">Scanner por regiões</div><div class="desc-opcao">Conclui cada região antes de seguir para a próxima, partindo da sua localização atual e considerando o tempo pelas ruas.</div></div>
+<div><div class="titulo-opcao">Concluir ruas e bairros</div><div class="desc-opcao">Conclui cada bairro e agrupa as entregas de cada trecho de rua. Considera sua posição inicial, o tempo de deslocamento e os quilômetros pelas vias, sem trânsito ao vivo.</div></div>
 </button>
 
 <button class="otimizacao-opcao" id="opcaoV9Destino" onclick="selecionarConfiguracaoV9Destino()">
 <div class="icone-opcao"><svg class="ui-icon"><use href="#icon-flag"></use></svg></div>
-<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Mantém as regiões completas e considera o ponto final escolhido no mapa ou por pesquisa ao ordenar os blocos.</div></div>
+<div><div class="titulo-opcao">Terminar próximo a um local</div><div class="desc-opcao">Conclui ruas e bairros e compara as ligações entre eles até o destino final escolhido. Ruas sem saída e sentidos únicos podem exigir retornos.</div></div>
 </button>
 
 <button class="otimizacao-opcao" id="opcaoV9Nenhuma" onclick="selecionarConfiguracaoV9Nenhuma()">
@@ -5797,12 +5797,12 @@ const textoResumo=cfg.modo==='nenhuma'
 ? 'Não otimizar'
 : (cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)
 ? `Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`
-: 'Scanner por regiões');
+: 'Concluir ruas e bairros');
 if(resumo) resumo.textContent=textoResumo;
 if(atual){
 if(cfg.modo==='nenhuma') atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('list')} Não otimizar · manter ordem original`;
 else if(cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)) atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('flag')} Terminar próximo de ${escaparHtmlTexto(textoDestinoCurtoV9(cfg.destinoFinal))}`;
-else atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('route')} Scanner por regiões`;
+else atual.innerHTML=`<strong>Configuração atual:</strong> ${iconeLinha('route')} Concluir ruas e bairros`;
 }
 if(opPadrao) opPadrao.classList.toggle('selecionada',cfg.modo==='padrao');
 if(opDestino) opDestino.classList.toggle('selecionada',cfg.modo==='destino');
@@ -7029,7 +7029,7 @@ const t = dados.durations && dados.durations[a] ? dados.durations[a][b] : null;
 const d = dados.distances && dados.distances[a] ? dados.distances[a][b] : null;
 if(Number.isFinite(t)) duracoes[oi][dj] = t;
 if(Number.isFinite(d)) distancias[oi][dj] = d;
-else if(Number.isFinite(t)) distancias[oi][dj] = distanciaPontos(pontos[oi], pontos[dj]);
+// Distância viária ausente permanece infinita; nunca substitui por linha reta.
 }
 }
 
@@ -11202,7 +11202,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function atualizarResumoSettingsV10(){
 const cfg=carregarConfiguracaoV9();
 const el=document.getElementById('settingsResumoOtimizacao');
-if(el)el.textContent=cfg.modo==='nenhuma'?'Não otimizar':(cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)?`Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`:'Scanner por regiões');
+if(el)el.textContent=cfg.modo==='nenhuma'?'Não otimizar':(cfg.modo==='destino'&&pontoValido(cfg.destinoFinal)?`Terminar próximo: ${textoDestinoCurtoV9(cfg.destinoFinal)}`:'Concluir ruas e bairros');
 }
 function atualizarInformacoesHomeV101(percentual){
 const p=document.getElementById('homeInsightProgresso');if(p)p.textContent=`${Number.isFinite(percentual)?percentual:0}%`;
@@ -11483,6 +11483,151 @@ return {groups,solve};
 })();
 
 /* Copiloto Entrega V11 — extensão local, sem conta ou envio automático. */
+/* V13: entrega contígua por região e por trecho de rua.
+   Custos dirigidos da malha viária. Não estima combustível em litros.
+   ScannerRegioes.groups mantém a identificação/migração de regiões da V12. */
+const ScannerRuas=(()=>{
+'use strict';
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
+function street(g){
+  let s=norm(g.logradouro||g.rua||g.endereco);
+  // Só remove número de imóvel delimitado: preserva Rua 7 de Setembro/Rua 20.
+  s=s.split(/[,;]|\s+(?:n[º°.]?|numero)\s*\d/)[0].trim();
+  s=s.replace(/^r[.]?\s+/,'rua ').replace(/^av[.]?\s+/,'avenida ').replace(/^rod[.]?\s+/,'rodovia ');
+  return s && /[a-z]/.test(s)?s:'';
+}
+function compare(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const x=a[i]??0,y=b[i]??0;if(x===y||Math.abs(x-y)<1e-7)continue;return x<y?-1:1;}return 0;}
+function corridors(block,stops,m){
+  const names=new Map(),units=[];
+  for(const i of block.members){const s=street(stops[i-1]);const key=s||'@'+i;if(!names.has(key))names.set(key,[]);names.get(key).push(i);}
+  // Um nome repetido não une trechos sem ligação próxima pelas ruas.
+  for(const [name,ids] of names){const left=new Set(ids);while(left.size){const first=left.values().next().value;left.delete(first);const members=[first];
+    for(let k=0;k<members.length;k++)for(const j of [...left])if(Math.min(m.distancias[members[k]][j],m.distancias[j][members[k]])<=1600){members.push(j);left.delete(j);}
+    units.push({name,members});
+  }}
+  return units;
+}
+function unitPaths(unit,m,forced){
+  const ids=unit.members;if(ids.length===1)return [ids.slice()];
+  const sym=(i,j)=>Math.min(m.distancias[i][j],m.distancias[j][i]);
+  let a=ids[0],b=ids[1],span=-1;
+  for(let x=0;x<ids.length;x++)for(let y=x+1;y<ids.length;y++){const d=sym(ids[x],ids[y]);if(Number.isFinite(d)&&d>span){a=ids[x];b=ids[y];span=d;}}
+  const potential=i=>{const x=sym(a,i),y=sym(b,i);return Number.isFinite(x)&&Number.isFinite(y)?x-y:0;};
+  const p=ids.slice().sort((i,j)=>potential(i)-potential(j)||i-j);
+  const out=[p,p.slice().reverse()];
+  // Ruas circulares e sentidos únicos não têm necessariamente uma projeção
+  // linear. Também percorre seus vizinhos pelas vias, partindo das extremidades.
+  for(const start of forced?[forced]:[a,b])for(const field of ['distancias','duracoes']){
+    const q=[start],left=new Set(ids.filter(i=>i!==start));while(left.size){const j=[...left].sort((i,j)=>m[field][q.at(-1)][i]-m[field][q.at(-1)][j]||i-j)[0];q.push(j);left.delete(j);}out.push(q);
+  }
+  // Uma próxima entrega manual no meio da rua pode exigir um retorno.
+  const seen=new Set();return out.map(q=>forced?[forced,...q.filter(i=>i!==forced)]:q).filter(q=>{const k=q.join(',');if(seen.has(k))return false;seen.add(k);return true;});
+}
+async function solve(indices,m,stops,next,startAt,evaluate,options={}){
+  if(!indices.length)return {order:[],blocks:[],metrics:evaluate([],m,stops,startAt),diagnostics:{version:13}};
+  if(indices.length!==stops.length||new Set(indices).size!==indices.length||indices.some(i=>!Number.isInteger(i)||i<1||i>stops.length))throw Error('Lista de paradas inconsistente.');
+  const started=performance.now(),weight=options.distanceWeight??0.2;
+  const limit=options.maxMs??6500,workLimit=options.maxCandidates??5000;
+  let work=0,lastYield=started,limited=false;
+  async function tick(){work++;if(performance.now()-lastYield>18){await new Promise(r=>setTimeout(r,0));lastYield=performance.now();}}
+  const expired=()=>{const x=work>=workLimit||performance.now()-started>limit;if(x)limited=true;return x;};
+  const edge=(i,j)=>{const t=m.duracoes[i]?.[j],d=m.distancias[i]?.[j];return Number.isFinite(t)&&t>=0&&Number.isFinite(d)&&d>=0?t+weight*d:Infinity;};
+  const score=e=>Number.isFinite(e.duration)?[...e.score.slice(0,4),e.duration+weight*(e.distance||0),e.distance||0]:[Infinity];
+  const blocks=ScannerRegioes.groups(stops,m),forced=indices.find(i=>stops[i-1].id===next);
+  const first=blocks.find(b=>b.members.includes(forced)),tail=Number.isInteger(m.indiceDestinoFinalV9)?m.indiceDestinoFinalV9:null;
+  const windows=stops.some(g=>g.v11?.priority||Number.isFinite(g.v11?.startMin)||Number.isFinite(g.janelaHardMin)||Number.isFinite(g.janelaSoftInicioMin)||Number.isFinite(g.janelaSoftFimMin));
+  function describe(path){let cost=0;for(let k=1;k<path.length;k++)cost+=edge(path[k-1],path[k]);return {path,from:path[0],to:path.at(-1),cost};}
+  // Programação dinâmica escolhe conjuntamente a orientação de todos os trechos
+  // para uma sequência fixa; inclui a chegada e a saída, não apenas a entrada.
+  function orient(sequence,variants,start=0,end=tail){
+    let states=[{cost:0,to:start,prev:null,v:null}];
+    for(const id of sequence){const newer=[];for(const v of variants.get(id)){let best=null;
+      for(const s of states){const cost=s.cost+(s.to===null?0:edge(s.to,v.from))+v.cost;if(!best||cost<best.cost)best={cost,to:v.to,prev:s,v};}newer.push(best);
+    }states=newer;}
+    let best=null;for(const s of states){const cost=s.cost+(end===null?0:edge(s.to,end));if(!best||cost<best.total)best={...s,total:cost};}
+    const segments=[];for(let s=best;s?.v;s=s.prev)segments.push(s.v.path);return {path:segments.reverse().flat(),cost:best?.total??0};
+  }
+  function canonical(seq,items,fixed){return seq.filter(i=>i===fixed).concat(seq.filter(i=>i!==fixed&&!items[i].deferred),seq.filter(i=>i!==fixed&&items[i].deferred));}
+  function seedsFor(items,variants,fixed,start,end){
+    const ids=items.map((_,i)=>i),out=[],seen=new Set();
+    const add=s=>{s=canonical(s,items,fixed);const k=s.join(',');if(!seen.has(k)){seen.add(k);out.push(s);}};
+    add(ids);add(ids.slice().reverse());
+    const between=(a,b)=>Math.min(...variants.get(a).flatMap(x=>variants.get(b).map(y=>edge(x.to,y.from))));
+    const sorted=ids.slice().sort((a,b)=>Math.min(...variants.get(a).map(v=>edge(start,v.from)))-Math.min(...variants.get(b).map(v=>edge(start,v.from)))||a-b);
+    const starts=fixed!==undefined?[fixed]:[...new Set([...sorted.slice(0,4),...ids.filter((_,k)=>k%Math.max(1,Math.ceil(ids.length/6))===0),...(end===null?[]:[ids.slice().sort((a,b)=>Math.min(...variants.get(a).map(v=>edge(v.to,end)))-Math.min(...variants.get(b).map(v=>edge(v.to,end))))[0]])])];
+    for(const first of starts){const s=[first],left=new Set(ids.filter(i=>i!==first));while(left.size){const j=[...left].sort((a,b)=>between(s.at(-1),a)-between(s.at(-1),b)||a-b)[0];s.push(j);left.delete(j);}add(s);add(s.slice().reverse());}
+    return out;
+  }
+  const variants=new Map(),allUnits=[];
+  for(const b of blocks){
+    const units=corridors(b,stops,m);allUnits.push(...units);
+    const fixed=units.findIndex(u=>u.members.includes(forced));
+    const uv=new Map(units.map((u,k)=>[k,unitPaths(u,m,fixed===k?forced:null).map(describe)]));
+    if(units.length===1){variants.set(b.id,uv.get(0));await tick();continue;}
+    const sequences=seedsFor(units,uv,fixed<0?undefined:fixed,0,tail);
+    const candidates=[],seen=new Set();
+    function add(seq){
+      // Conservar variantes com entradas/saídas diferentes é essencial para
+      // conectar bairros. Custo externo será decidido no nível seguinte.
+      const p=orient(seq,uv,null,null).path,key=p.join(',');
+      if(!seen.has(key)){seen.add(key);candidates.push(describe(p));}
+      const withOrigin=orient(seq,uv,0,tail).path,k=withOrigin.join(',');if(!seen.has(k)){seen.add(k);candidates.push(describe(withOrigin));}
+      for(const endId of [seq[0],seq.at(-1)])for(const v of uv.get(endId)){
+        const locked=new Map(uv);locked.set(endId,[v]);const path=orient(seq,locked,null,null).path,key=path.join(',');if(!seen.has(key)){seen.add(key);candidates.push(describe(path));}
+      }
+    }
+    for(const seq of sequences){add(seq);await tick();}
+    // Relocação e reversão de ruas inteiras. Nunca intercala entregas A/B/A.
+    let bestSeq=sequences.reduce((a,s)=>orient(s,uv,0,tail).cost<orient(a,uv,0,tail).cost?s:a,sequences[0]);
+    let bestCost=orient(bestSeq,uv,0,tail).cost;
+    for(let round=0;round<2&&!expired();round++){let improved=false;
+      for(let i=0;i<units.length&&!expired();i++)for(let j=i+1;j<units.length&&!expired();j++)for(const kind of [0,1]){
+        const s=bestSeq.slice();if(kind===0)s.splice(j,0,s.splice(i,1)[0]);else s.splice(i,j-i+1,...s.slice(i,j+1).reverse());
+        if(fixed>=0&&s[0]!==fixed)continue;const cost=orient(s,uv,0,tail).cost;
+        if(cost<bestCost-1e-7){bestSeq=s;bestCost=cost;improved=true;add(s);}await tick();
+      }
+      if(!improved)break;
+    }
+    // Retém entradas/saídas, depois as melhores variantes internas (máximo 24).
+    const sorted=candidates.sort((a,b)=>a.cost-b.cost),kept=[],ends=new Set();
+    for(const c of sorted){const k=c.from+':'+c.to;if(!ends.has(k)){ends.add(k);kept.push(c);}if(kept.length>=20)break;}
+    for(const c of sorted){if(!kept.includes(c))kept.push(c);if(kept.length>=24)break;}
+    variants.set(b.id,kept);await tick();
+  }
+  function expand(sequence){
+    const plain=orient(sequence,variants).path;
+    let result={order:plain,metrics:evaluate(plain,m,stops,startAt),sequence};
+    if(windows){
+      // Busca limitada com horário real de chegada/espera; nenhuma janela é apagada.
+      const partialMatrix={...m,indiceDestinoFinalV9:null};let beam=[{path:[],rank:[0]}];
+      for(let k=0;k<sequence.length;k++){
+        const list=[];for(const s of beam)for(const v of variants.get(sequence[k])){const path=s.path.concat(v.path);const e=evaluate(path,k===sequence.length-1?m:partialMatrix,stops,startAt);list.push({path,rank:score(e)});}
+        list.sort((a,b)=>compare(a.rank,b.rank));beam=list.slice(0,8);
+      }
+      for(const s of beam){const e=evaluate(s.path,m,stops,startAt);if(compare(score(e),score(result.metrics))<0)result={order:s.path,metrics:e,sequence};}
+    }
+    return result;
+  }
+  const sequences=seedsFor(blocks,variants,first?.id,0,tail);let best=null;
+  for(const seq of sequences){const c=expand(seq);if(!best||compare(score(c.metrics),score(best.metrics))<0)best=c;await tick();}
+  for(let round=0;round<3&&!expired();round++){let improved=false;
+    for(let i=0;i<blocks.length&&!expired();i++)for(let j=0;j<blocks.length&&!expired();j++){
+      if(i===j)continue;
+      for(const kind of [0,1]){if(kind===1&&i>j)continue;const s=best.sequence.slice();
+        if(kind===0)s.splice(j,0,s.splice(i,1)[0]);else s.splice(i,j-i+1,...s.slice(i,j+1).reverse());
+        const valid=canonical(s,blocks,first?.id);if(valid.some((v,k)=>v!==s[k]))continue;
+        const c=expand(s);if(compare(score(c.metrics),score(best.metrics))<0){best=c;improved=true;}await tick();
+      }
+    }if(!improved)break;
+  }
+  if(best.order.length!==indices.length||new Set(best.order).size!==indices.length||best.order.some(i=>!indices.includes(i)))throw Error('Não foi possível preservar todas as paradas.');
+  if(!Number.isFinite(best.metrics.duration))throw Error('Não encontrei uma sequência pelas ruas que conclua cada bloco. Confira os acessos e as regiões.');
+  return {...best,blocks:best.sequence.map(i=>blocks[i]),diagnostics:{version:13,regions:blocks.length,streets:allUnits.length,candidates:work,limited,elapsedMs:Math.round(performance.now()-started),distanceWeight:weight}};
+}
+return {solve,street,corridors,unitPaths};
+})();
+ScannerRegioes.solve=ScannerRuas.solve;
+
 const CE11 = (() => {
 'use strict';
 const KEY='copiloto_v11_snapshot', MEMORY='copiloto_v11_enderecos';
@@ -11635,19 +11780,20 @@ async function optimize(destination=null){
     const indices=active.map((_,i)=>i+1);
     // Não passa pelo motor global: ele poderia intercalar regiões.
     const startAt=Math.max(Date.now(),route().pauseUntil||0);
+    atualizarProgressoOtimizacao('Comparando ruas e ligações entre bairros...');
     const chosen=await constrained(indices,matrix,active,[indices],route().next,startAt);
     if(!Number.isFinite(chosen.metrics.duration))throw new Error('Há endereços sem acesso pela malha viária.');
     const ordered=chosen.order.map(i=>active[i-1]);
     const geometry=await geometriaRotaPelasRuasV81(ordered,start,end);
     if(revision!==rev||route().id!==routeId)throw new Error('A rota mudou durante o cálculo. Recalcule novamente.');
-    const v=route();v.blocks=chosen.blocks.map(b=>({label:b.label,explicit:b.explicit,ids:b.members.map(i=>active[i-1].id)}));
+    const v=route();v.optimizer=chosen.diagnostics;v.blocks=chosen.blocks.map(b=>({label:b.label,explicit:b.explicit,ids:b.members.map(i=>active[i-1].id)}));
     for(const block of v.blocks)for(const id of block.ids)opts(active.find(g=>g.id===id)).blockLabel=block.label;
     v.eta={calculatedAt:Date.now(),startAt,arrivals:chosen.metrics.arrivals,finish:chosen.metrics.finish,tail:end?matrix.duracoes[chosen.order.at(-1)][matrix.indiceDestinoFinalV9]:0};
     grupos=[...ordered,...grupos.filter(g=>pending(g)&&!active.includes(g)),...grupos.filter(g=>!pending(g))];
     grupos.forEach((g,i)=>g.ordemOtimizada=i+1);
-    metaRota={...metaRota,modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:'v11_1_scanner_regioes_contiguas',destinoFinal:end,inicioRota:start,geometriaRota:geometry,geometryVersion12:1,distanciaMetros:chosen.metrics.distance,duracaoSegundos:chosen.metrics.duration,atualizadoEm:Date.now(),v11:v};
+    metaRota={...metaRota,modo:'auto_v9',provedor:'OSRM_GLOBAL',criterio:'v13_ruas_bairros_contiguos',destinoFinal:end,inicioRota:start,geometriaRota:geometry,geometryVersion12:1,distanciaMetros:chosen.metrics.distance,duracaoSegundos:chosen.metrics.duration,atualizadoEm:Date.now(),v11:v};
     note('optimized',{stops:active.length,late:chosen.metrics.misses});save();renderizarTudo();
-    mostrarToast(chosen.metrics.misses?`${chosen.metrics.misses} parada(s) com atraso previsto. Revise horários e escolhas manuais.`:geometry?'Rota organizada por regiões completas; pacotes preservados.':'Sequência atualizada. O desenho do trajeto está indisponível.','neutro');
+    mostrarToast(chosen.metrics.misses?`${chosen.metrics.misses} parada(s) com atraso previsto. Revise horários e escolhas manuais.`:geometry?'Rota organizada por bairros e trechos de rua completos; pacotes preservados.':'Sequência atualizada. O desenho do trajeto está indisponível.','neutro');
   }catch(e){mostrarToast('Não alterei a sequência. '+(e.message||'Falha ao calcular a rota.'),'alerta');}
   finally{busy=false;fecharOverlayOtimizacao();updatePanel();}
 }
