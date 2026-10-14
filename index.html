@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.15</title>
+<title>Copiloto Entrega V14.16</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3820,7 +3820,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.15</div>
+<div class="versao-copiloto">V14.16</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -12209,18 +12209,21 @@ function cleanupDialog(){
 }
 function close(){
   const d=document.getElementById('ce11-dialog');
-  // Fechar a interface não depende do driver da câmera nem de arquivos locais.
-  try{if(d?.open)d.close();}finally{if(d?.open)d.removeAttribute('open');cleanupDialog();}
+  // Fechamento defensivo: funciona tanto pelo <dialog> nativo quanto como fallback.
+  try{if(d&&typeof d.close==='function'&&d.open)d.close();}catch(e){}
+  if(d){d.removeAttribute('open');d.style.display='none';d.removeAttribute('data-expected');}
+  cleanupDialog();
 }
 function modal(title,html){
   stopCamera();photoUrls.forEach(URL.revokeObjectURL);photoUrls=[];
-  const d=document.getElementById('ce11-dialog');d.innerHTML=`<header><h2>${esc(title)}</h2><button type="button" class="ce11-btn ce11-dialog-close" data-ce11="close" aria-label="Fechar janela">Fechar</button></header><div class="ce11-body">${html}</div>`;
-  // O fechamento é tratado no próprio botão, antes de qualquer delegação
-  // global ou interceptação de cliques nos elementos ancestrais da janela.
-  d.querySelector('.ce11-dialog-close').addEventListener('click',event=>{
-    event.preventDefault();event.stopPropagation();close();
-  });
-  if(!d.open)d.showModal();
+  const d=document.getElementById('ce11-dialog');
+  d.style.removeProperty('display');
+  d.innerHTML=`<header><h2>${esc(title)}</h2><form method="dialog" class="ce11-dialog-close-form" style="margin:0"><button type="submit" class="ce11-btn ce11-dialog-close" value="close" aria-label="Fechar janela">Fechar</button></form></header><div class="ce11-body">${html}</div>`;
+  // O form method="dialog" fecha nativamente mesmo se a delegação global falhar.
+  // Este listener é só um fallback adicional e também evita reabrir a ação abaixo.
+  const form=d.querySelector('.ce11-dialog-close-form');
+  if(form)form.addEventListener('submit',event=>{event.preventDefault();event.stopPropagation();close();},{once:true});
+  if(!d.open){try{d.showModal();}catch(e){d.setAttribute('open','');}}
 }
 function open(id){
   const g=encontrarGrupo(id);if(!g)return;ensure();selected=id;
@@ -12426,7 +12429,7 @@ function attach(){
   const dialog=document.createElement('dialog');dialog.id='ce11-dialog';
   dialog.addEventListener('close',cleanupDialog);
   dialog.addEventListener('cancel',()=>{cleanupDialog();});
-  // O botão Fechar usa a ação delegada data-ce11="close"; o cancelamento nativo continua disponível.
+  // O botão Fechar usa form method="dialog" com fallback defensivo; Esc continua disponível.
 
   document.body.append(dialog);
   setInterval(updatePanel,30000);
