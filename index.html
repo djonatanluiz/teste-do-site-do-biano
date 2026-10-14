@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.4</title>
+<title>Copiloto Entrega V14.5</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3811,7 +3811,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.4</div>
+<div class="versao-copiloto">V14.5</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -4493,6 +4493,40 @@ workbook.SheetNames[0]
 const json =
 XLSX.utils.sheet_to_json(sheet);
 
+// V14.5 - A referência operacional da planilha é posicional:
+// coluna B = Sequence e coluna C = Stop. Lemos diretamente as células
+// para não depender de nomes de cabeçalho, espaços invisíveis ou aliases.
+// O SPX TN da coluna D é usado apenas para associar a linha ao pacote certo.
+try{
+const faixa = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
+if(faixa){
+const referenciasPorCodigo = new Map();
+const valorCelula = (linha,coluna)=>{
+const celula = sheet[XLSX.utils.encode_cell({r:linha,c:coluna})];
+if(!celula) return '';
+const valor = celula.v;
+return valor === undefined || valor === null ? '' : String(valor).trim();
+};
+for(let linha=faixa.s.r; linha<=faixa.e.r; linha++){
+const codigoLinha = valorCelula(linha,3); // coluna D = SPX TN
+if(!codigoLinha || /^spx\s*tn$/i.test(codigoLinha)) continue;
+referenciasPorCodigo.set(codigoLinha,{
+sequencia:valorCelula(linha,1), // coluna B = Sequence
+stop:valorCelula(linha,2)       // coluna C = Stop
+});
+}
+for(const item of json){
+const codigoItem = String(item['SPX TN'] ?? item['SPX_TN'] ?? '').trim();
+const referencia = referenciasPorCodigo.get(codigoItem);
+if(!referencia) continue;
+item.__copilotoSequenceColB = referencia.sequencia;
+item.__copilotoStopColC = referencia.stop;
+}
+}
+}catch(erro){
+console.warn('Não foi possível ler Stop/Sequence diretamente das colunas B/C; usando os cabeçalhos como fallback.',erro);
+}
+
 processarEntregas(json);
 
 };
@@ -4680,11 +4714,14 @@ item["Longitude"] ||
 "";
 
 const stopOriginal =
-item["Stop"] ||
+item.__copilotoStopColC !== undefined ? item.__copilotoStopColC :
+(item["Stop"] ||
 item["stop"] ||
-"";
+"");
 
-const sequenciaOriginal = primeiroValorPlanilha(item,["Sequence","sequence","Sequência","Sequencia","Seq","Sequence Number"]);
+const sequenciaOriginal = item.__copilotoSequenceColB !== undefined
+? item.__copilotoSequenceColB
+: primeiroValorPlanilha(item,["Sequence","sequence","Sequência","Sequencia","Seq","Sequence Number"]);
 
 const stopTexto = String(stopOriginal).trim();
 
