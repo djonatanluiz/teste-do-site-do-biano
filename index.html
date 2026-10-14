@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.3</title>
+<title>Copiloto Entrega V14.4</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3811,7 +3811,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.3</div>
+<div class="versao-copiloto">V14.4</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -9956,7 +9956,9 @@ return String(nomeCompleto).trim().split(/\s+/)[0];
 // cada "sub-local" dentro de uma Parada composta (ex: casa 43/45/1).
 function formatarNumeroReferenciaPacote(valor){
 const texto=String(valor??'').trim();
-if(!texto)return '—';
+// Na identificação operacional mostramos Stop (coluna C) primeiro e
+// Sequence (coluna B) depois. Traço/vazio significa item sem referência.
+if(!texto || texto==='-')return '★';
 return /^\d+$/.test(texto)?texto.padStart(2,'0'):texto;
 }
 
