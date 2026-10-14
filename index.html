@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.9</title>
+<title>Copiloto Entrega V14.10</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3824,7 +3824,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.9</div>
+<div class="versao-copiloto">V14.10</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -4711,6 +4711,325 @@ reader.readAsArrayBuffer(arquivo);
 
 }
 
+
+// ----------------------------------------------------------------------
+// V7.5 - RESTRIÇÕES OPERACIONAIS OPCIONAIS
+// A planilha atual da Shopee normalmente não traz janelas de horário. Estas
+// regras só entram em ação quando houver colunas compatíveis; nada é inventado.
+// ----------------------------------------------------------------------
+
+function primeiroValorPlanilha(item, nomes){
+for(const nome of nomes){
+const valor = item ? item[nome] : null;
+if(valor !== undefined && valor !== null && String(valor).trim() !== '') return valor;
+}
+return null;
+}
+
+function horaParaMinutos(valor){
+if(valor === undefined || valor === null || valor === '') return null;
+if(valor instanceof Date && !isNaN(valor.getTime())) return valor.getHours()*60 + valor.getMinutes();
+
+if(typeof valor === 'number' && Number.isFinite(valor)){
+// Excel pode entregar horários como fração de um dia ou serial com fração.
+const fracao = valor >= 0 ? valor % 1 : 0;
+if(fracao > 0 || (valor >= 0 && valor < 1)) return Math.round(fracao * 24 * 60);
+}
+
+const txt = String(valor).trim().toLowerCase();
+const m = txt.match(/(?:^|\D)([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?/i);
+if(m) return Number(m[1])*60 + Number(m[2] || 0);
+return null;
+}
+
+function janelaPreferencialTexto(valor){
+if(valor === undefined || valor === null || valor === '') return {inicio:null,fim:null};
+const txt = normalizarTexto(String(valor));
+if(/manha/.test(txt)) return {inicio:8*60,fim:12*60};
+if(/tarde/.test(txt)) return {inicio:12*60,fim:18*60};
+if(/noite/.test(txt)) return {inicio:18*60,fim:22*60};
+
+const encontrados = [...String(valor).matchAll(/([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?/gi)]
+.map(m=>Number(m[1])*60 + Number(m[2] || 0));
+if(encontrados.length >= 2) return {inicio:encontrados[0],fim:encontrados[1]};
+return {inicio:null,fim:null};
+}
+
+function enderecoParecePredio(endereco){
+const txt = normalizarTexto(endereco);
+return /\b(apto|apartamento|bloco|condominio|condominio|edificio|residencial|torre|unidade)\b/.test(txt);
+}
+
+function extrairRestricoesOperacionaisLinha(item, endereco){
+const hardBruto = primeiroValorPlanilha(item,[
+'Horário Limite','Horario Limite','Entrega até','Entrega ate','Deadline',
+'Delivery Deadline','Time Window End','Janela Fim','End Time'
+]);
+
+const softBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial','Preferência de Horário','Preferencia de Horario',
+'Preferred Time','Preferred Window','Preference'
+]);
+const softInicioBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial Início','Janela Preferencial Inicio','Preferred Start','Time Window Start'
+]);
+const softFimBruto = primeiroValorPlanilha(item,[
+'Janela Preferencial Fim','Preferred End'
+]);
+
+let soft = janelaPreferencialTexto(softBruto);
+const inicioSeparado = horaParaMinutos(softInicioBruto);
+const fimSeparado = horaParaMinutos(softFimBruto);
+if(Number.isFinite(inicioSeparado)) soft.inicio = inicioSeparado;
+if(Number.isFinite(fimSeparado)) soft.fim = fimSeparado;
+
+const servicoBruto = primeiroValorPlanilha(item,[
+'Tempo de Serviço (min)','Tempo de Servico (min)','Tempo de Serviço','Tempo de Servico',
+'Service Time (min)','Service Minutes','Service Time'
+]);
+let servicoSegundos = null;
+const nServico = Number(String(servicoBruto ?? '').replace(',','.'));
+if(Number.isFinite(nServico) && nServico > 0 && nServico <= 180) servicoSegundos = Math.round(nServico*60);
+
+// Regra solicitada para o teste: casa = 2 min; prédio/condomínio = 7 min.
+if(!Number.isFinite(servicoSegundos)) servicoSegundos = enderecoParecePredio(endereco) ? 7*60 : 2*60;
+
+return {
+janelaHardMin:horaParaMinutos(hardBruto),
+janelaSoftInicioMin:Number.isFinite(soft.inicio) ? soft.inicio : null,
+janelaSoftFimMin:Number.isFinite(soft.fim) ? soft.fim : null,
+tempoServicoSegundos:servicoSegundos
+};
+}
+
+function combinarRestricoesGrupo(grupo, restricao){
+if(!grupo || !restricao) return;
+
+if(Number.isFinite(restricao.janelaHardMin)){
+grupo.janelaHardMin = Number.isFinite(grupo.janelaHardMin)
+? Math.min(grupo.janelaHardMin, restricao.janelaHardMin)
+: restricao.janelaHardMin;
+}
+
+// Preferência soft: quando vários pacotes no mesmo local têm janelas, usamos
+// a interseção possível. Se forem conflitantes, preservamos a primeira em vez
+// de inventar uma preferência nova.
+if(Number.isFinite(restricao.janelaSoftInicioMin) && Number.isFinite(restricao.janelaSoftFimMin)){
+if(!Number.isFinite(grupo.janelaSoftInicioMin) || !Number.isFinite(grupo.janelaSoftFimMin)){
+grupo.janelaSoftInicioMin = restricao.janelaSoftInicioMin;
+grupo.janelaSoftFimMin = restricao.janelaSoftFimMin;
+}else{
+const inicio = Math.max(grupo.janelaSoftInicioMin, restricao.janelaSoftInicioMin);
+const fim = Math.min(grupo.janelaSoftFimMin, restricao.janelaSoftFimMin);
+if(inicio <= fim){
+grupo.janelaSoftInicioMin = inicio;
+grupo.janelaSoftFimMin = fim;
+}
+}
+}
+
+if(Number.isFinite(restricao.tempoServicoSegundos)){
+grupo.tempoServicoSegundos = Math.max(Number(grupo.tempoServicoSegundos)||0, restricao.tempoServicoSegundos);
+}
+}
+
+async function processarEntregas(dados){
+
+// Nova planilha = nova rota (zera tudo, inclusive o que estava salvo)
+const baldes = {}; // agrupados primeiro por número de Parada (ou "EXTRA")
+
+document.getElementById("pacotes").innerText =
+dados.length;
+
+dados.forEach(item=>{
+
+const endereco =
+item["Destination Address"] ||
+item["Address"] ||
+"-";
+
+const restricoesOperacionais = extrairRestricoesOperacionaisLinha(item, endereco);
+
+const bairro =
+item["Bairro"] ||
+item["Neighborhood"] ||
+"";
+
+const cidade =
+item["City"] ||
+item["Cidade"] ||
+"";
+
+const cep =
+item["Zipcode/Postal code"] ||
+item["Zipcode"] ||
+item["CEP"] ||
+"";
+
+const codigo =
+item["SPX TN"] ||
+item["SPX_TN"] ||
+"-";
+
+const destinatario =
+item["Recipient"] ||
+item["Recipient Name"] ||
+item["Consignee"] ||
+item["Consignee Name"] ||
+item["Nome"] ||
+item["Nome do Destinatário"] ||
+item["Customer Name"] ||
+item["Buyer Name"] ||
+"";
+
+const lat =
+item["Latitude"] ||
+"";
+
+const lng =
+item["Longitude"] ||
+"";
+
+const stopPlanilhaDireto = item.__copilotoStopColC;
+const stopOriginal =
+(stopPlanilhaDireto !== undefined && stopPlanilhaDireto !== null && String(stopPlanilhaDireto).trim() !== ''
+  ? stopPlanilhaDireto
+  : (item["Stop"] ?? item["stop"] ?? ""));
+
+const sequenciaPlanilhaDireta = item.__copilotoSequenceColB;
+const sequenciaOriginal =
+(sequenciaPlanilhaDireta !== undefined && sequenciaPlanilhaDireta !== null && String(sequenciaPlanilhaDireta).trim() !== ''
+  ? sequenciaPlanilhaDireta
+  : (item["Sequence"] ?? item["sequence"] ?? ""));
+
+const stopTexto = String(stopOriginal).trim();
+
+const paradaBase = stopTexto
+.replace(/[A-Za-z]$/,"")
+.trim();
+
+// Balde inicial: mesmo número de Parada já é um forte indício de ser o
+// mesmo local. Dentro do balde, decide-se se é "o mesmo lugar de fato"
+// pela função paradasMesmoLocal (unidade/apto -> depois distância real).
+const chaveBalde = stopTexto ? ("STOP|" + paradaBase) : "EXTRA";
+
+if(!baldes[chaveBalde]) baldes[chaveBalde] = [];
+
+const candidato = { endereco:endereco, lat:lat, lng:lng };
+
+let cluster = baldes[chaveBalde].find(c => paradasMesmoLocal(c.representante, candidato));
+
+if(!cluster){
+
+cluster = {
+representante: candidato,
+grupo: {
+id: chaveBalde + "#" + (baldes[chaveBalde].length + 1),
+endereco:endereco,
+lat:lat,
+lng:lng,
+coordinateSource:coordenadaValida(lat,lng)?"planilha":"pendente",
+stop:paradaBase,
+stopOriginal:paradaBase,
+ordemOtimizada:null,
+destinatario:destinatario,
+bairro:bairro,
+cidade:cidade,
+cep:cep,
+janelaHardMin:null,
+janelaSoftInicioMin:null,
+janelaSoftFimMin:null,
+tempoServicoSegundos:null,
+pacotes:[]
+// status não fica mais aqui - é calculado por pacote (ver statusEfetivoGrupo)
+}
+};
+
+baldes[chaveBalde].push(cluster);
+
+}
+
+if(!cluster.grupo.destinatario && destinatario){
+cluster.grupo.destinatario = destinatario;
+}
+
+combinarRestricoesGrupo(cluster.grupo, restricoesOperacionais);
+
+cluster.grupo.pacotes.push({
+
+codigo:codigo,
+endereco:endereco,
+stop:stopTexto,
+sequencia:String(sequenciaOriginal ?? '').trim(),
+destinatario:destinatario,
+telefone:String(primeiroValorPlanilha(item,['Telefone','Phone','Phone Number','Recipient Phone','Celular'])||''),
+status:'pendente',
+motivo:null,
+organizadoCarro:false
+
+});
+
+});
+
+grupos = [];
+Object.values(baldes).forEach(lista => lista.forEach(c => grupos.push(c.grupo)));
+grupos.forEach((g, indice) => {
+if(!Number.isFinite(g.indiceImportacao)) g.indiceImportacao = indice;
+});
+
+mapaFoiEnquadrado = false; // nova rota -> próximo enquadramento do mapa deve se ajustar às novas paradas
+celebracaoMostrada = false; // nova rota -> pode comemorar de novo quando terminar essa
+marcosMostrados = new Set(); // nova rota -> pode avisar os marcos de progresso de novo
+recordeAvisado = false; // nova rota -> pode avisar recorde de novo
+painelPacotesAbertos = new Set(); // nova rota -> nenhum painel deve começar aberto
+
+metaRota = {
+modo:null,
+provedor:'OSRM',
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+atualizadoEm:null
+};
+
+salvarStorage();
+
+// V8.1: importar uma rota NÃO dispara qualquer otimização automática.
+// Apenas corrigimos coordenadas ausentes e mostramos a ordem original da Shopee.
+abrirOverlayOtimizacao('Preparando os endereços da rota...');
+await corrigirCoordenadasAusentes({renderizar:false, silencioso:true});
+fecharOverlayOtimizacao();
+
+grupos.sort((a,b)=>(a.indiceImportacao ?? 0) - (b.indiceImportacao ?? 0));
+grupos.forEach(g=>{ g.ordemOtimizada = null; });
+metaRota = {
+modo:'shopee',
+provedor:null,
+distanciaMetros:null,
+duracaoSegundos:null,
+distanciaShopeeMetros:null,
+duracaoShopeeSegundos:null,
+destinoFinal:null,
+organizacaoPacotesConcluida:false,
+atualizadoEm:Date.now()
+};
+salvarStorage();
+renderizarTudo();
+const campoArquivo=document.getElementById('arquivo'); if(campoArquivo) campoArquivo.value='';
+
+// V10.3: a importação já executa automaticamente o modo escolhido nas configurações.
+// No modo "Não otimizar", a ordem original é mantida sem qualquer cálculo de rota.
+const configImportacao=carregarConfiguracaoV9();
+if(configImportacao.modo==='nenhuma'){
+mostrarToast('Rota importada na ordem original','sucesso');
+}else{
+mostrarToast('Rota importada. Otimizando automaticamente...','neutro');
+await executarOtimizacaoPrincipalV9();
+}
+
+}
 
 // ----------------------------------------------------------------------
 // CORREÇÃO DE COORDENADAS AUSENTES/ERRADAS A PARTIR DO ENDEREÇO
