@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.12</title>
+<title>Copiloto Entrega V14.13</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3820,7 +3820,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.12</div>
+<div class="versao-copiloto">V14.13</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -11741,14 +11741,16 @@ function groups(stops,m){
 }
 // Held–Karp por bloco pequeno. Guarda o melhor percurso para cada entrada/saída,
 // sem presumir que números de imóvel ou distâncias em linha reta sejam vias.
-function paths(unit,m,forced){
+function paths(unit,m,forced,options={}){
  const ids=unit.members,n=ids.length;if(n===1)return [ids.slice()];
- const cost=(i,j)=>{const t=m.duracoes[i]?.[j],d=m.distancias[i]?.[j];return Number.isFinite(t)&&Number.isFinite(d)?t+.2*d:Infinity;},all=[];
+ const cost=(i,j)=>{const t=m.duracoes[i]?.[j],d=m.distancias[i]?.[j];return Number.isFinite(t)&&Number.isFinite(d)?t>=0&&d>=0?t+(options.distanceWeight??.2)*d:Infinity:Infinity;},all=[];
  for(let start=0;start<n;start++){if(forced&&ids[start]!==forced)continue;
    const size=1<<n,dp=Array.from({length:size},()=>Array(n).fill(Infinity)),prev=Array.from({length:size},()=>Array(n).fill(-1));dp[1<<start][start]=0;
    for(let mask=1;mask<size;mask++)for(let j=0;j<n;j++)if(Number.isFinite(dp[mask][j]))for(let k=0;k<n;k++)if(!(mask&(1<<k))){const next=mask|(1<<k),c=dp[mask][j]+cost(ids[j],ids[k]);if(c<dp[next][k]){dp[next][k]=c;prev[next][k]=j;}}
    for(let end=0;end<n;end++){if(!Number.isFinite(dp[size-1][end]))continue;let mask=size-1,j=end,p=[];while(j>=0){p.push(ids[j]);const k=prev[mask][j];mask^=1<<j;j=k;}all.push({path:p.reverse(),cost:dp[size-1][end]});}
  }
+ // Revisão local: conserva cada par de entrada/saída, sem poda prematura.
+ if(options.allEndpoints)return all.map(c=>c.path);
  // Todas as entradas e saídas aparecem, com limite para o nível de região.
  all.sort((a,b)=>a.cost-b.cost);const out=[],seen=new Set();for(const side of [0,-1]){const ends=new Set();for(const c of all){const e=c.path.at(side);if(ends.has(e))continue;ends.add(e);const k=c.path.join(',');if(!seen.has(k)){seen.add(k);out.push(c.path);}}}
  return out.length?out:[ids.slice()];
@@ -11877,9 +11879,46 @@ async function solve(indices,m,stops,next,startAt,evaluate,options={}){
       }
     }if(!improved)break;
   }
+  // V14.13: revisão de microblocos com fronteiras reais da rota já escolhida.
+  // Cada alternativa usa custos dirigidos da matriz viária, inclusive chegada
+  // e saída. Não ordena por projeção GPS, número da casa ou rótulo da parada.
+  const microBefore=best.metrics.duration+weight*(best.metrics.distance||0)+weight*(best.metrics.entryRegret||0);
+  let microChanges=0,microCandidates=0,microLimited=false;
+  const microDeadline=performance.now()+Math.max(0,options.microMaxMs??1200);
+  const microLimit=Math.max(0,options.microMaxCandidates??3000),microCache=new Map();
+  const microExpired=()=>{const stop=microCandidates>=microLimit||performance.now()>=microDeadline;if(stop)microLimited=true;return stop;};
+  for(let pass=0;pass<2&&!microExpired();pass++){
+    let changed=false;
+    for(const unit of allUnits){
+      if(microExpired())break;
+      if(unit.members.length<2||unit.members.length>8)continue;
+      const positions=unit.members.map(i=>best.order.indexOf(i)).sort((a,b)=>a-b),offset=positions[0];
+      if(offset<0||positions.at(-1)-offset+1!==unit.members.length)continue;
+      if(!microCache.has(unit))microCache.set(unit,ScannerBlocos.paths(unit,m,unit.members.includes(forced)?forced:null,{allEndpoints:true,distanceWeight:weight}));
+      for(const path of microCache.get(unit)){
+        if(microExpired())break;
+        const order=best.order.slice();order.splice(offset,path.length,...path);
+        if(forced&&order[0]!==forced)continue;
+        if(order.every((i,k)=>i===best.order[k]))continue;
+        // Uma aresta ausente nunca vira distância em linha reta.
+        const walk=[0,...order,...(tail===null?[]:[tail])];
+        if(walk.some((i,k)=>k&& !Number.isFinite(edge(walk[k-1],i))))continue;
+        const metrics=evaluate(order,m,stops,startAt),oldScore=score(best.metrics),newScore=score(metrics);
+        microCandidates++;
+        // Exige melhora estrita no custo global E nenhuma piora em qualquer
+        // restrição anterior (horários, prioridades etc.), nem troca em empate.
+        if(Number.isFinite(newScore[4])&&newScore.slice(0,4).every((v,k)=>v<=oldScore[k]+1e-7)&&newScore[4]<oldScore[4]-1e-7){
+          best={...best,order,metrics};microChanges++;changed=true;
+        }
+        await tick();
+      }
+    }
+    if(!changed)break;
+  }
+  const microAfter=best.metrics.duration+weight*(best.metrics.distance||0)+weight*(best.metrics.entryRegret||0);
   if(best.order.length!==indices.length||new Set(best.order).size!==indices.length||best.order.some(i=>!indices.includes(i)))throw Error('Não foi possível preservar todas as paradas.');
   if(!Number.isFinite(best.metrics.duration))throw Error('Não encontrei uma sequência pelas ruas que conclua cada bloco. Confira os acessos e as regiões.');
-  return {...best,blocks:best.sequence.map(i=>blocks[i]),diagnostics:{version:14,regions:blocks.length,streets:allUnits.length,candidates:work,limited,elapsedMs:Math.round(performance.now()-started),distanceWeight:weight}};
+  return {...best,blocks:best.sequence.map(i=>blocks[i]),diagnostics:{version:14,microRevision:"14.13",microChanges,microCandidates,microLimited,microBefore,microAfter,regions:blocks.length,streets:allUnits.length,candidates:work,limited,elapsedMs:Math.round(performance.now()-started),distanceWeight:weight}};
 }
 return {solve,street,corridors,unitPaths};
 })();
