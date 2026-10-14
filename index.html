@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.16</title>
+<title>Copiloto Entrega V14.17</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3705,7 +3705,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 .ce11-panel .ce11-btn{width:100%!important;min-height:44px!important;margin:0!important;padding:10px 12px!important;border-radius:11px!important;font-size:12px!important;font-weight:700!important;box-shadow:none!important;}
 .ce11-panel .ce11-btn[data-ce11="optimize"]{background:linear-gradient(135deg,#406DCE,#003CBD)!important;color:#fff!important;border:0!important;box-shadow:0 4px 10px rgba(0,60,189,.15)!important;}
 .ce11-panel .ce11-btn[data-ce11="backup"]{background:#edf3ff!important;color:#003CBD!important;border:1px solid #d5e1fb!important;}
-.ce11-dialog-close{min-height:42px!important;min-width:72px!important;touch-action:manipulation!important;pointer-events:auto!important;}
+#ce11-dialog header{pointer-events:none!important}.ce11-dialog-close{min-height:42px!important;min-width:72px!important;touch-action:manipulation!important;pointer-events:auto!important;position:relative!important;z-index:10!important;}
 .ocorrencias-container{max-width:760px;margin:0 auto;padding-top:18px;padding-bottom:28px;}
 #painelOcorrencias .aviso-vazio{background:#fff;border:1px solid #eaecf0;border-radius:16px;padding:28px 18px;color:#98a2b3;text-align:center;box-shadow:0 4px 16px rgba(16,24,40,.035);}
 #painelOcorrencias .grupo{margin-bottom:10px;}
@@ -3820,7 +3820,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.16</div>
+<div class="versao-copiloto">V14.17</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -12218,11 +12218,7 @@ function modal(title,html){
   stopCamera();photoUrls.forEach(URL.revokeObjectURL);photoUrls=[];
   const d=document.getElementById('ce11-dialog');
   d.style.removeProperty('display');
-  d.innerHTML=`<header><h2>${esc(title)}</h2><form method="dialog" class="ce11-dialog-close-form" style="margin:0"><button type="submit" class="ce11-btn ce11-dialog-close" value="close" aria-label="Fechar janela">Fechar</button></form></header><div class="ce11-body">${html}</div>`;
-  // O form method="dialog" fecha nativamente mesmo se a delegação global falhar.
-  // Este listener é só um fallback adicional e também evita reabrir a ação abaixo.
-  const form=d.querySelector('.ce11-dialog-close-form');
-  if(form)form.addEventListener('submit',event=>{event.preventDefault();event.stopPropagation();close();},{once:true});
+  d.innerHTML=`<header><h2>${esc(title)}</h2><button type="button" class="ce11-btn ce11-dialog-close" data-ce11="close" aria-label="Fechar janela" onclick="event.preventDefault();event.stopPropagation();const d=document.getElementById('ce11-dialog');try{if(d&&typeof d.close==='function'&&d.open)d.close();}catch(e){}if(d){d.removeAttribute('open');d.style.display='none';}">Fechar</button></header><div class="ce11-body">${html}</div>`;
   if(!d.open){try{d.showModal();}catch(e){d.setAttribute('open','');}}
 }
 function open(id){
@@ -12429,7 +12425,7 @@ function attach(){
   const dialog=document.createElement('dialog');dialog.id='ce11-dialog';
   dialog.addEventListener('close',cleanupDialog);
   dialog.addEventListener('cancel',()=>{cleanupDialog();});
-  // O botão Fechar usa form method="dialog" com fallback defensivo; Esc continua disponível.
+  // O botão Fechar encerra o dialog imediatamente; não depende do botão Voltar do navegador. Esc continua disponível.
 
   document.body.append(dialog);
   setInterval(updatePanel,30000);
