@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.6</title>
+<title>Copiloto Entrega V14.7</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3811,7 +3811,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.6</div>
+<div class="versao-copiloto">V14.7</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -12098,7 +12098,15 @@ function attach(){
   const oldImport=processarEntregas;
   processarEntregas=async rows=>{
     if(busy){mostrarToast('Aguarde o cálculo atual.','alerta');return;}
-    if(grupos.length&&!confirm('Importar uma planilha inicia uma nova rota. Exporte um backup da rota atual se precisar guardá-la. Continuar?'))return;
+    if(grupos.length){
+      const substituir=confirm('Já existe uma rota ativa. Deseja substituir a rota atual?\n\nAo confirmar, a rota atual será substituída e a nova rota será importada e otimizada conforme a configuração escolhida.');
+      if(!substituir){
+        const campoArquivo=document.getElementById('arquivo');
+        if(campoArquivo) campoArquivo.value='';
+        mostrarToast('Importação cancelada. A rota atual foi mantida.','neutro');
+        return;
+      }
+    }
     if(!Array.isArray(rows)||!rows.length||rows.some(r=>!r['Destination Address']&&!r.Address)){mostrarToast('Planilha vazia ou sem a coluna de endereço esperada. A rota atual foi mantida.','alerta');return;}
     const before=JSON.parse(JSON.stringify(snapshot()));
     try{await store('state','before-import',before);}catch(e){}
