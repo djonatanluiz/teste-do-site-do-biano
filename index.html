@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.1</title>
+<title>Copiloto Entrega V14.2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3678,6 +3678,41 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 #ce12-navigation small{font-size:10px;color:#647580}#ce12-navigation.active{border-left:4px solid #1769e0}
 @media(max-width:480px){#ce12-navigation{padding:9px 11px;right:65px}#ce12-navigation strong{font-size:14px}}
 </style>
+
+<style id="v14-2-ui-updates">
+/* V14.2: somente interface. Mapa e otimização permanecem intocados. */
+.abas{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px!important;}
+#ce12-navigation{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;user-select:none!important;}
+
+.home-otimizacao{margin:12px 0 0!important;}
+.home-otimizacao-card{width:100%!important;min-height:58px!important;margin:0!important;padding:11px 14px!important;border:0!important;border-radius:12px!important;background:linear-gradient(135deg,#406DCE,#003CBD)!important;color:#fff!important;box-shadow:0 5px 14px rgba(0,60,189,.20)!important;display:grid!important;grid-template-columns:30px minmax(0,1fr) 20px!important;align-items:center!important;gap:10px!important;text-align:left!important;}
+.home-otimizacao-card:hover{filter:brightness(1.02);}
+.home-otimizacao-card:active{transform:scale(.985)!important;filter:brightness(.96)!important;}
+.home-otimizacao-icon{display:grid;place-items:center;width:30px;height:30px;color:#fff;}
+.home-otimizacao-icon .ui-icon{width:24px;height:24px;stroke-width:1.9;}
+.home-otimizacao-copy{min-width:0;display:block;}
+.home-otimizacao-copy strong{display:block;color:#fff!important;font-size:14px!important;font-weight:700!important;line-height:1.2!important;}
+.home-otimizacao-copy span{display:block;color:rgba(255,255,255,.78)!important;font-size:10.5px!important;line-height:1.35!important;margin-top:3px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.home-otimizacao-arrow{width:18px!important;height:18px!important;color:#fff!important;transform:rotate(90deg);opacity:.86;}
+
+.ce11-panel[hidden]{display:none!important;}
+.ce11-panel{margin:14px 0 0!important;padding:14px!important;background:#f7f9fe!important;border:1px solid #dfe7f6!important;border-radius:14px!important;color:#344054!important;box-shadow:none!important;}
+.ce11-panel-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;margin:0 0 4px!important;}
+.ce11-panel-head>div{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important;}
+.ce11-panel-kicker{display:inline-block!important;font-size:9px!important;line-height:1!important;letter-spacing:.9px!important;font-weight:800!important;color:var(--brand)!important;text-transform:uppercase!important;}
+.ce11-panel-head strong{display:inline-block!important;font-size:13px!important;line-height:1.25!important;color:#101828!important;margin:0!important;}
+.ce11-panel p{margin:5px 0 0!important;font-size:11px!important;line-height:1.4!important;color:#667085!important;}
+.ce11-panel #ce11-eta-help{display:block!important;margin-top:2px!important;color:#98a2b3!important;font-size:10px!important;line-height:1.35!important;}
+.ce11-panel .ce11-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin:11px 0 0!important;}
+.ce11-panel .ce11-btn{width:100%!important;min-height:44px!important;margin:0!important;padding:10px 12px!important;border-radius:11px!important;font-size:12px!important;font-weight:700!important;box-shadow:none!important;}
+.ce11-panel .ce11-btn[data-ce11="optimize"]{background:linear-gradient(135deg,#406DCE,#003CBD)!important;color:#fff!important;border:0!important;box-shadow:0 4px 10px rgba(0,60,189,.15)!important;}
+.ce11-panel .ce11-btn[data-ce11="backup"]{background:#edf3ff!important;color:#003CBD!important;border:1px solid #d5e1fb!important;}
+.ce11-dialog-close{min-height:42px!important;min-width:72px!important;touch-action:manipulation!important;pointer-events:auto!important;}
+.ocorrencias-container{max-width:760px;margin:0 auto;padding-top:18px;padding-bottom:28px;}
+#painelOcorrencias .aviso-vazio{background:#fff;border:1px solid #eaecf0;border-radius:16px;padding:28px 18px;color:#98a2b3;text-align:center;box-shadow:0 4px 16px rgba(16,24,40,.035);}
+#painelOcorrencias .grupo{margin-bottom:10px;}
+@media(max-width:430px){.aba-btn{font-size:9.5px!important;padding-left:3px!important;padding-right:3px!important}.aba-btn .ui-icon{width:21px;height:21px}.ce11-panel .ce11-actions{grid-template-columns:1fr!important}.home-otimizacao-card{min-height:56px!important}}
+</style>
 </head>
 
 <body translate="no">
@@ -3736,7 +3771,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.1</div>
+<div class="versao-copiloto">V14.2</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -3758,9 +3793,9 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 </div>
 
 <section class="home-otimizacao">
-<div class="section-heading"><div class="section-heading-icon rota"><svg class="ui-icon"><use href="#icon-route"></use></svg></div><div><h2>Configuração de otimização</h2><p>Escolha como o Copiloto deve organizar suas próximas rotas</p></div></div>
-<button class="home-otimizacao-card" type="button" onclick="abrirConfiguracaoV9()">
-<div class="home-otimizacao-copy"><strong>Otimização de rota</strong><span id="settingsResumoOtimizacao">Concluir blocos e bairros</span></div>
+<button class="home-otimizacao-card" type="button" onclick="abrirConfiguracaoV9()" aria-label="Abrir configuração de otimização">
+<span class="home-otimizacao-icon"><svg class="ui-icon"><use href="#icon-route"></use></svg></span>
+<span class="home-otimizacao-copy"><strong>Configuração de otimização</strong><span id="settingsResumoOtimizacao">Concluir blocos e bairros</span></span>
 <svg class="ui-icon home-otimizacao-arrow"><use href="#icon-chevron-up"></use></svg>
 </button>
 </section>
