@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.7</title>
+<title>Copiloto Entrega V14.8</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3752,6 +3752,19 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 .confirmar-selecao-ocorrencia{background:#e74c3c!important;color:#fff!important;}
 .confirmar-selecao-ocorrencia:disabled{opacity:.4!important;cursor:not-allowed!important;}
 .ce11-entry-compact{margin-top:7px!important;}
+
+/* V14.8 - confirmação visual antes de substituir uma rota já carregada */
+.modal-substituir-rota{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.48);backdrop-filter:blur(3px)}
+.modal-substituir-rota.aberto{display:flex}
+.modal-substituir-rota-card{width:min(430px,100%);background:#fff;border:1px solid #dbe4f2;border-radius:22px;padding:22px;box-shadow:0 22px 65px rgba(15,23,42,.28);font-family:Inter,sans-serif}
+.modal-substituir-rota-icone{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#eef3ff;color:#003CBD;margin-bottom:14px}
+.modal-substituir-rota-card h3{margin:0 0 8px;font:700 20px/1.2 'Space Grotesk',Inter,sans-serif;color:#111827}
+.modal-substituir-rota-card p{margin:0;color:#64748b;font-size:14px;line-height:1.5}
+.modal-substituir-rota-acoes{display:grid;grid-template-columns:1fr 1.25fr;gap:10px;margin-top:20px}
+.modal-substituir-rota-acoes button{min-height:48px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer}
+.modal-substituir-cancelar{background:#fff;border:1px solid #d5deed;color:#334155}
+.modal-substituir-confirmar{background:#003CBD;border:1px solid #003CBD;color:#fff;box-shadow:0 8px 20px rgba(0,60,189,.18)}
+@media(max-width:600px){.modal-substituir-rota{align-items:flex-end;padding:12px}.modal-substituir-rota-card{border-radius:22px 22px 18px 18px;padding:20px}.modal-substituir-rota-acoes{grid-template-columns:1fr}.modal-substituir-confirmar{order:-1}}
 </style>
 </head>
 
@@ -3811,10 +3824,21 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.7</div>
+<div class="versao-copiloto">V14.8</div>
 </div>
 
-<input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
+<input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()" oncancel="substituicaoRotaConfirmada=false">
+<div id="modalSubstituirRota" class="modal-substituir-rota" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tituloSubstituirRota">
+  <div class="modal-substituir-rota-card">
+    <div class="modal-substituir-rota-icone"><svg class="ui-icon"><use href="#icon-route"></use></svg></div>
+    <h3 id="tituloSubstituirRota">Substituir rota atual?</h3>
+    <p>Você já tem uma rota carregada. Ao continuar, ela será substituída pela nova planilha e a nova rota será otimizada conforme sua configuração atual.</p>
+    <div class="modal-substituir-rota-acoes">
+      <button type="button" class="modal-substituir-cancelar" data-substituir-cancelar onclick="fecharConfirmacaoSubstituirRota()">Cancelar</button>
+      <button type="button" class="modal-substituir-confirmar" onclick="confirmarSubstituicaoRota()">Substituir rota</button>
+    </div>
+  </div>
+</div>
 <button class="importar" onclick="selecionarArquivoRota()"><svg class="ui-icon"><use href="#icon-upload"></use></svg><span>Importar rota</span></button>
 
 
@@ -4384,7 +4408,40 @@ let primeiraCentralizacaoGPSFeita = false;
 // (alvoAguardandoMotivo é declarado mais abaixo, junto da lógica de status)
 function iconeLinha(nome, classe='mini'){return `<svg class="ui-icon ${classe||''}" aria-hidden="true"><use href="#icon-${nome}"></use></svg>`;}
 function textoSemEmoji(texto){return String(texto||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').replace(/[\uFE0F\u200D]/g,'').replace(/\s{2,}/g,' ').trim();}
-function selecionarArquivoRota(){const input=document.getElementById('arquivo');if(input) input.click();}
+let substituicaoRotaConfirmada=false;
+function abrirConfirmacaoSubstituirRota(){
+  const modal=document.getElementById('modalSubstituirRota');
+  if(!modal)return;
+  modal.classList.add('aberto');
+  modal.setAttribute('aria-hidden','false');
+  const cancelar=modal.querySelector('[data-substituir-cancelar]');
+  if(cancelar) cancelar.focus({preventScroll:true});
+}
+function fecharConfirmacaoSubstituirRota(){
+  const modal=document.getElementById('modalSubstituirRota');
+  if(modal){modal.classList.remove('aberto');modal.setAttribute('aria-hidden','true');}
+  substituicaoRotaConfirmada=false;
+  const input=document.getElementById('arquivo');
+  if(input) input.value='';
+}
+function confirmarSubstituicaoRota(){
+  const modal=document.getElementById('modalSubstituirRota');
+  if(modal){modal.classList.remove('aberto');modal.setAttribute('aria-hidden','true');}
+  substituicaoRotaConfirmada=true;
+  const input=document.getElementById('arquivo');
+  if(input){input.value='';setTimeout(()=>input.click(),0);}
+}
+function selecionarArquivoRota(){
+  const input=document.getElementById('arquivo');
+  if(!input)return;
+  input.value='';
+  if(Array.isArray(grupos)&&grupos.length){
+    abrirConfirmacaoSubstituirRota();
+    return;
+  }
+  substituicaoRotaConfirmada=false;
+  input.click();
+}
 let sheetListaMapaAberto=false;
 let sheetTouchInicioY=null;
 function ehLayoutMobileV10(){return window.matchMedia('(max-width: 799px)').matches;}
@@ -4469,10 +4526,8 @@ document.getElementById("arquivo").files[0];
 
 
 if(!arquivo){
-
-alert("Selecione a planilha");
+substituicaoRotaConfirmada=false;
 return;
-
 }
 
 const reader = new FileReader();
@@ -12098,15 +12153,15 @@ function attach(){
   const oldImport=processarEntregas;
   processarEntregas=async rows=>{
     if(busy){mostrarToast('Aguarde o cálculo atual.','alerta');return;}
-    if(grupos.length){
-      const substituir=confirm('Já existe uma rota ativa. Deseja substituir a rota atual?\n\nAo confirmar, a rota atual será substituída e a nova rota será importada e otimizada conforme a configuração escolhida.');
-      if(!substituir){
-        const campoArquivo=document.getElementById('arquivo');
-        if(campoArquivo) campoArquivo.value='';
-        mostrarToast('Importação cancelada. A rota atual foi mantida.','neutro');
-        return;
-      }
+    if(grupos.length&&!substituicaoRotaConfirmada){
+      mostrarToast('Confirme a substituição da rota antes de importar outra planilha.','alerta');
+      const campoArquivo=document.getElementById('arquivo');
+      if(campoArquivo) campoArquivo.value='';
+      abrirConfirmacaoSubstituirRota();
+      return;
     }
+    const substituindoRota=!!(grupos.length&&substituicaoRotaConfirmada);
+    substituicaoRotaConfirmada=false;
     if(!Array.isArray(rows)||!rows.length||rows.some(r=>!r['Destination Address']&&!r.Address)){mostrarToast('Planilha vazia ou sem a coluna de endereço esperada. A rota atual foi mantida.','alerta');return;}
     const before=JSON.parse(JSON.stringify(snapshot()));
     try{await store('state','before-import',before);}catch(e){}
