@@ -14,7 +14,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 
-<title>Copiloto Entrega V14.14</title>
+<title>Copiloto Entrega V14.15</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3820,7 +3820,7 @@ body{background:#f7f8fb;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-b
 <div class="eyebrow">ROTA DO DIA</div>
 <h2>Comece sua rota</h2>
 </div>
-<div class="versao-copiloto">V14.14</div>
+<div class="versao-copiloto">V14.15</div>
 </div>
 
 <input type="file" id="arquivo" accept=".xlsx,.xls" style="display:none" onchange="importarExcel()">
@@ -11897,7 +11897,7 @@ async function solve(indices,m,stops,next,startAt,evaluate,options={}){
       }
     }if(!improved)break;
   }
-  // V14.14: revisão de microblocos com fronteiras reais da rota já escolhida.
+  // V14.15: revisão de microblocos com fronteiras reais da rota já escolhida.
   // Cada alternativa usa custos dirigidos da matriz viária, inclusive chegada
   // e saída. Não ordena por projeção GPS, número da casa ou rótulo da parada.
   const microBefore=best.metrics.duration+weight*(best.metrics.distance||0)+weight*(best.metrics.entryRegret||0);
@@ -11933,7 +11933,7 @@ async function solve(indices,m,stops,next,startAt,evaluate,options={}){
     }
     if(!changed)break;
   }
-  // V14.14: reconsidera conjuntamente dois microblocos vizinhos. A poda
+  // V14.15: reconsidera conjuntamente dois microblocos vizinhos. A poda
   // anterior pode esconder uma entrada/saída vantajosa para o bloco seguinte.
   // Mantém regiões e cada microbloco contíguos, inclusive em ruas de mão única.
   let pairChanges=0,pairCandidates=0,pairLimited=false;
@@ -12215,6 +12215,11 @@ function close(){
 function modal(title,html){
   stopCamera();photoUrls.forEach(URL.revokeObjectURL);photoUrls=[];
   const d=document.getElementById('ce11-dialog');d.innerHTML=`<header><h2>${esc(title)}</h2><button type="button" class="ce11-btn ce11-dialog-close" data-ce11="close" aria-label="Fechar janela">Fechar</button></header><div class="ce11-body">${html}</div>`;
+  // O fechamento é tratado no próprio botão, antes de qualquer delegação
+  // global ou interceptação de cliques nos elementos ancestrais da janela.
+  d.querySelector('.ce11-dialog-close').addEventListener('click',event=>{
+    event.preventDefault();event.stopPropagation();close();
+  });
   if(!d.open)d.showModal();
 }
 function open(id){
