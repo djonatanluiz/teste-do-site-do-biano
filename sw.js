@@ -1,4 +1,4 @@
-const CACHE='copiloto-shell-v14.13-microblocos';
+const CACHE='copiloto-shell-v14.14-conexoes-livres';
 const HOME=new URL('index.html',self.registration.scope).href;
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.add(new Request(HOME,{cache:'reload'})))));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('copiloto-shell-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));

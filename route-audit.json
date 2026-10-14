@@ -1,0 +1,170 @@
+{
+  "packages": 81,
+  "stops": 71,
+  "matrixCoordinatesMatched": 71,
+  "configTests": 3,
+  "originAssumption": "Northernmost delivery",
+  "before": {
+    "distance": 31890.300000000007,
+    "duration": 8442.200000047684,
+    "last": 15
+  },
+  "after": {
+    "distance": 30297.900000000005,
+    "duration": 8286.400000333786,
+    "last": 14,
+    "previousPositionOfNewEnd": 70,
+    "tailInPreviousNumbers": [
+      60,
+      59,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      71,
+      69,
+      70
+    ],
+    "diagnostics": {
+      "version": 14,
+      "microRevision": "14.14",
+      "pairChanges": 2,
+      "pairCandidates": 157,
+      "pairLimited": false,
+      "microChanges": 2,
+      "microCandidates": 518,
+      "microLimited": false,
+      "microBefore": 14582.34000047684,
+      "microAfter": 14383.500000333788,
+      "regions": 7,
+      "streets": 23,
+      "candidates": 1107,
+      "limited": false,
+      "elapsedMs": 2020,
+      "distanceWeight": 0.2,
+      "compoundRegionsAccepted": true
+    }
+  },
+  "reversedLastPair": {
+    "distance": 30371.000000000007,
+    "duration": 8293.10000038147
+  },
+  "tailCoordinates": [
+    {
+      "position": 58,
+      "index": 20,
+      "lat": -28.0602883,
+      "lng": -48.6228181
+    },
+    {
+      "position": 59,
+      "index": 8,
+      "lat": -28.0662994,
+      "lng": -48.6242981
+    },
+    {
+      "position": 60,
+      "index": 9,
+      "lat": -28.0662994,
+      "lng": -48.6242981
+    },
+    {
+      "position": 61,
+      "index": 7,
+      "lat": -28.0658921,
+      "lng": -48.6245991
+    },
+    {
+      "position": 62,
+      "index": 10,
+      "lat": -28.0667248,
+      "lng": -48.6263504
+    },
+    {
+      "position": 63,
+      "index": 11,
+      "lat": -28.0670624,
+      "lng": -48.6260109
+    },
+    {
+      "position": 64,
+      "index": 19,
+      "lat": -28.0666294,
+      "lng": -48.6257973
+    },
+    {
+      "position": 65,
+      "index": 18,
+      "lat": -28.0672722,
+      "lng": -48.6252365
+    },
+    {
+      "position": 66,
+      "index": 17,
+      "lat": -28.0668182,
+      "lng": -48.6241608
+    },
+    {
+      "position": 67,
+      "index": 16,
+      "lat": -28.0683365,
+      "lng": -48.6253166
+    },
+    {
+      "position": 68,
+      "index": 12,
+      "lat": -28.0677929,
+      "lng": -48.6261215
+    },
+    {
+      "position": 69,
+      "index": 13,
+      "lat": -28.076653,
+      "lng": -48.6296754
+    },
+    {
+      "position": 70,
+      "index": 14,
+      "lat": -28.0755558,
+      "lng": -48.6307619
+    },
+    {
+      "position": 71,
+      "index": 15,
+      "lat": -28.0701542,
+      "lng": -48.6257758
+    }
+  ],
+  "tailBlocks": [
+    {
+      "label": "capao",
+      "micro": [
+        [
+          7,
+          9,
+          8,
+          10,
+          11,
+          19,
+          18,
+          17,
+          16,
+          12
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          15
+        ],
+        [
+          20
+        ]
+      ]
+    }
+  ]
+}

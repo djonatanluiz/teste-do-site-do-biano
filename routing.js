@@ -3,8 +3,15 @@ const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 const geo=(a,b)=>{if([a.lat,a.lng,b.lat,b.lng].some(x=>x===null||x===undefined||!Number.isFinite(Number(x))))return Infinity;return Math.hypot((a.lat-b.lat)*111320,(a.lng-b.lng)*111320*Math.cos((+a.lat + +b.lat)*Math.PI/360));};
 function name(g){let s=norm(g.bairro),city=norm(g.cidade);if(city&&s.startsWith(city+' '))s=s.slice(city.length+1);return s.replace(/\b(de|da|do|das|dos)\b/g,' ').replace(/\s+/g,' ').trim();}
 function editOne(a,b){if(a===b)return true;if(Math.abs(a.length-b.length)>1)return false;let i=0,j=0,n=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++n>1)return false;if(a.length>=b.length)i++;if(b.length>=a.length)j++;}return n+(i<a.length||j<b.length?1:0)<=1;}
-function similar(a,b){if(!a||!b)return false;if(a===b)return true;const x=a.split(' '),y=b.split(' ');return (Math.min(a.length,b.length)>=8&&editOne(a,b))||(x.length!==y.length&&Math.min(x.length,y.length)===1&&Math.max(x.length,y.length)===2&&Math.min(a.length,b.length)>=6&&(x.includes(b)||y.includes(a)));}
-function groups(stops,m){
+function similar(a,b,compoundRegions=false){if(!a||!b)return false;if(a===b)return true;
+ // Nomes compostos importados podem mencionar duas localidades (bairro/praia).
+ // Só reconhece inclusão de tokens completos, nunca prefixos de palavras.
+ // groups ainda exige proximidade por vias, diâmetro e mesma região manual.
+ const tokens=s=>s.replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(x=>x&&!['praia','bairro','loteamento','de','da','do','das','dos'].includes(x));
+ const aa=tokens(a),bb=tokens(b),small=aa.length<=bb.length?aa:bb,large=aa.length<=bb.length?bb:aa;
+if(compoundRegions&&small.length&&large.length>small.length&&small.some(x=>x.length>=4)&&small.every(x=>large.includes(x)))return true;
+const x=a.split(' '),y=b.split(' ');return (Math.min(a.length,b.length)>=8&&editOne(a,b))||(x.length!==y.length&&Math.min(x.length,y.length)===1&&Math.max(x.length,y.length)===2&&Math.min(a.length,b.length)>=6&&(x.includes(b)||y.includes(a)));}
+function groups(stops,m,options={}){
  const ids=stops.map((_,i)=>i+1),road=(i,j)=>Math.min(m.distancias[i]?.[j]??Infinity,m.distancias[j]?.[i]??Infinity);
  const manual=i=>norm(stops[i-1].v11?.region),city=i=>norm(stops[i-1].cidade);
  const compatible=(a,b)=>a.every(i=>b.every(j=>(!city(i)||!city(j)||city(i)===city(j))&&manual(i)===manual(j)));
@@ -21,7 +28,7 @@ function groups(stops,m){
  for(let pass=0;pass<2;pass++)for(let a=0;a<macro.length;a++)for(let b=a+1;b<macro.length;b++){
    const x=macro[a],y=macro[b];if(!compatible(x.members,y.members))continue;
    const named=x.manual&&x.manual===y.manual;
-   if(!named&&!(similar(x.region,y.region)||!x.region||!y.region))continue;
+   if(!named&&!((options.compoundRegions?[...new Set(x.members.map(i=>name(stops[i-1])))].some(a=>[...new Set(y.members.map(i=>name(stops[i-1])))].some(b=>similar(a,b,true))):similar(x.region,y.region))||!x.region||!y.region))continue;
    const near=Math.min(...x.members.flatMap(i=>y.members.map(j=>road(i,j))));
    if(!named&&(near>1400||!x.members.every(i=>y.members.every(j=>geo(stops[i-1],stops[j-1])<=2500))))continue;
    x.members.push(...y.members);x.microblocks.push(...y.microblocks);if(!x.region)x.region=y.region;macro.splice(b--,1);
@@ -66,6 +73,17 @@ function unitPaths(unit,m,forced){return ScannerBlocos.paths(unit,m,forced);}
 async function solve(indices,m,stops,next,startAt,evaluate,options={}){
   if(!indices.length)return {order:[],blocks:[],metrics:evaluate([],m,stops,startAt),diagnostics:{version:14}};
   if(indices.length!==stops.length||new Set(indices).size!==indices.length||indices.some(i=>!Number.isInteger(i)||i<1||i>stops.length))throw Error('Lista de paradas inconsistente.');
+  // Bairro composto é hipótese: mantém a solução sem aliases se a nova
+  // interpretação não melhorar o percurso global sem piorar tempo/restrições.
+  if(options.compoundRegions===undefined){
+    const original=await solve(indices,m,stops,next,startAt,evaluate,{...options,compoundRegions:false});
+    if(ScannerBlocos.groups(stops,m,{compoundRegions:true}).length===original.blocks.length)return original;
+    const alternative=await solve(indices,m,stops,next,startAt,evaluate,{...options,compoundRegions:true});
+    const w=options.distanceWeight??.2,a=alternative.metrics,b=original.metrics;
+    const raw=e=>e.duration+w*(e.distance||0),weighted=e=>raw(e)+w*(e.entryRegret||0);
+    const accept=a.score.slice(0,4).every((v,i)=>v<=b.score[i]+1e-7)&&a.duration<=b.duration+1e-7&&raw(a)<raw(b)-1e-7&&weighted(a)<weighted(b)-1e-7;
+    const selected=accept?alternative:original;selected.diagnostics={...selected.diagnostics,compoundRegionsAccepted:accept,elapsedMs:original.diagnostics.elapsedMs+alternative.diagnostics.elapsedMs};return selected;
+  }
   const started=performance.now(),weight=options.distanceWeight??0.2;
   const limit=options.maxMs??6500,workLimit=options.maxCandidates??5000;
   let work=0,lastYield=started,limited=false;
@@ -73,7 +91,7 @@ async function solve(indices,m,stops,next,startAt,evaluate,options={}){
   const expired=()=>{const x=work>=workLimit||performance.now()-started>limit;if(x)limited=true;return x;};
   const edge=(i,j)=>{const t=m.duracoes[i]?.[j],d=m.distancias[i]?.[j];return Number.isFinite(t)&&t>=0&&Number.isFinite(d)&&d>=0?t+weight*d:Infinity;};
   const score=e=>Number.isFinite(e.duration)?[...e.score.slice(0,4),e.duration+weight*(e.distance||0)+weight*(e.entryRegret||0),e.distance||0]:[Infinity];
-  const blocks=ScannerBlocos.groups(stops,m),forced=indices.find(i=>stops[i-1].id===next);
+  const blocks=ScannerBlocos.groups(stops,m,{compoundRegions:options.compoundRegions}),forced=indices.find(i=>stops[i-1].id===next);
   const first=blocks.find(b=>b.members.includes(forced)),tail=Number.isInteger(m.indiceDestinoFinalV9)?m.indiceDestinoFinalV9:null;
   const windows=stops.some(g=>g.v11?.priority||Number.isFinite(g.v11?.startMin)||Number.isFinite(g.janelaHardMin)||Number.isFinite(g.janelaSoftInicioMin)||Number.isFinite(g.janelaSoftFimMin));
   const byPoint=new Map(blocks.flatMap(b=>b.microblocks.flatMap(u=>u.members.map(i=>[i,u]))));
@@ -204,10 +222,75 @@ async function solve(indices,m,stops,next,startAt,evaluate,options={}){
     }
     if(!changed)break;
   }
+  // V14.14: reconsidera conjuntamente dois microblocos vizinhos. A poda
+  // anterior pode esconder uma entrada/saída vantajosa para o bloco seguinte.
+  // Mantém regiões e cada microbloco contíguos, inclusive em ruas de mão única.
+  let pairChanges=0,pairCandidates=0,pairLimited=false;
+  const joinedUnits=[];
+  const pairDeadline=performance.now()+Math.max(0,options.pairMaxMs??1800);
+  const pairLimit=Math.max(0,options.pairMaxCandidates??2400);
+  const pairExpired=()=>{const stop=performance.now()>=pairDeadline||pairCandidates>=pairLimit;if(stop)pairLimited=true;return stop;};
+  const parent=new Map(blocks.flatMap(b=>b.microblocks.map(u=>[u,b])));
+  const fullPaths=u=>{if(!microCache.has(u))microCache.set(u,ScannerBlocos.paths(u,m,u.members.includes(forced)?forced:null,{allEndpoints:true,distanceWeight:weight}));return microCache.get(u);};
+  for(let pass=0;pass<2&&!pairExpired();pass++){
+    let changed=false;
+    const units=allUnits.slice().sort((a,b)=>best.order.indexOf(a.members[0])-best.order.indexOf(b.members[0]));
+    for(let k=0;k+1<units.length&&!pairExpired();k++){
+      const a=units[k],b=units[k+1];if(parent.get(a)!==parent.get(b))continue;
+      const positions=a.members.concat(b.members).map(i=>best.order.indexOf(i)).sort((x,y)=>x-y);
+      const offset=positions[0],size=positions.length;
+      if(offset<0||positions.at(-1)-offset+1!==size)continue;
+      const before=offset?best.order[offset-1]:0,after=best.order[offset+size]??tail;
+      // Ranking inclui as duas fronteiras, custo dirigido e arrependimento
+      // de entrada. A aceitação usa depois a avaliação da rota INTEIRA.
+      const candidates=[];
+      for(const [left,right] of [[a,b],[b,a]]){
+        if(forced&&(left.members.includes(forced)||right.members.includes(forced))&&(!left.members.includes(forced)||offset!==0))continue;
+        for(const p of fullPaths(left))for(const q of fullPaths(right)){
+          const path=p.concat(q),d=describe(path);
+          const cost=edge(before,d.from)+weight*regret(before,d.from)+d.cost+(after===null?0:edge(d.to,after)+weight*regret(d.to,after));
+          if(Number.isFinite(cost))candidates.push({path,cost});
+        }
+      }
+      // Uma fronteira artificial não pode obrigar a passar pela entrada de
+      // uma rua e voltar depois. Reabre apenas a união local de até 10 pontos;
+      // a região manual/macro continua intacta. Compara também os custos
+      // de entrar e sair desta união com as paradas externas reais.
+      const members=a.members.concat(b.members);
+      if(members.length<=10&&members.every(i=>members.every(j=>ScannerBlocos.geo(stops[i-1],stops[j-1])<=600))){
+        const union={members};
+        for(const path of ScannerBlocos.paths(union,m,members.includes(forced)?forced:null,{allEndpoints:true,distanceWeight:weight})){
+          const d=describe(path),cost=edge(before,d.from)+weight*regret(before,d.from)+d.cost+(after===null?0:edge(d.to,after)+weight*regret(d.to,after));
+          if(Number.isFinite(cost))candidates.push({path,cost,union:true});
+        }
+      }
+      candidates.sort((x,y)=>x.cost-y.cost);
+      // Limite por vizinhança distribui a revisão pela rota, sem consumir
+      // todo o orçamento no primeiro par; horários continuam na avaliação.
+      for(const candidate of candidates.slice(0,windows?32:8)){
+        if(pairExpired())break;
+        const order=best.order.slice();order.splice(offset,size,...candidate.path);
+        if(order.every((v,j)=>v===best.order[j])||(forced&&order[0]!==forced))continue;
+        const metrics=evaluate(order,m,stops,startAt),oldRank=score(best.metrics),rank=score(metrics);pairCandidates++;
+        if(Number.isFinite(rank[4])&&metrics.duration<=best.metrics.duration+1e-7&&metrics.duration+weight*metrics.distance<best.metrics.duration+weight*best.metrics.distance-1e-7&&rank.slice(0,4).every((v,j)=>v<=oldRank[j]+1e-7)&&rank[4]<oldRank[4]-1e-7){best={...best,order,metrics};pairChanges++;changed=true;if(candidate.union)joinedUnits.push([a,b]);}
+        await tick();
+      }
+      await tick();
+    }
+    if(!changed)break;
+  }
+  // Expõe os blocos realmente revisados; não reporta fronteiras antigas
+  // que a revisão local comprovadamente tornou desnecessárias.
+  for(const block of blocks){
+    const sets=block.microblocks.map(u=>({units:[u],members:u.members.slice()}));
+    for(const [a,b] of joinedUnits){const x=sets.find(s=>s.units.includes(a)),y=sets.find(s=>s.units.includes(b));if(!x||!y||x===y)continue;x.units.push(...y.units);x.members.push(...y.members);sets.splice(sets.indexOf(y),1);}
+    block.microblocks=sets.map(s=>s.units.length===1?s.units[0]:{...s.units[0],members:best.order.filter(i=>s.members.includes(i)),revisedBoundary:true});
+  }
+
   const microAfter=best.metrics.duration+weight*(best.metrics.distance||0)+weight*(best.metrics.entryRegret||0);
   if(best.order.length!==indices.length||new Set(best.order).size!==indices.length||best.order.some(i=>!indices.includes(i)))throw Error('Não foi possível preservar todas as paradas.');
   if(!Number.isFinite(best.metrics.duration))throw Error('Não encontrei uma sequência pelas ruas que conclua cada bloco. Confira os acessos e as regiões.');
-  return {...best,blocks:best.sequence.map(i=>blocks[i]),diagnostics:{version:14,microRevision:"14.13",microChanges,microCandidates,microLimited,microBefore,microAfter,regions:blocks.length,streets:allUnits.length,candidates:work,limited,elapsedMs:Math.round(performance.now()-started),distanceWeight:weight}};
+  return {...best,blocks:best.sequence.map(i=>blocks[i]),diagnostics:{version:14,microRevision:"14.14",pairChanges,pairCandidates,pairLimited,microChanges,microCandidates,microLimited,microBefore,microAfter,regions:blocks.length,streets:allUnits.length,candidates:work,limited,elapsedMs:Math.round(performance.now()-started),distanceWeight:weight}};
 }
 return {solve,street,corridors,unitPaths};
 })();
